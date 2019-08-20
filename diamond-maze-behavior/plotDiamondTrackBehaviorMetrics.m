@@ -9,9 +9,9 @@ for anIdx = 1:length(animals)
     for trackIdx = 1:length(trainingoptions)
         %initialize structures and track info
         track = trainingoptions{trackIdx};
-        allsessdata(animals(anIdx)).(track).perCorrect = []; allsessdata(animals(anIdx)).(track).trialdur = [];
-        allsessdata(animals(anIdx)).(track).trialdurAvg = []; allsessdata(animals(anIdx)).(track).trialdurSem = [];
-        allsessdata(animals(anIdx)).(track).numTrials = [];
+        allsessdata(animals(anIdx)).(track).perCorrect = []; allsessdata(animals(anIdx)).(track).trialDur = [];
+        allsessdata(animals(anIdx)).(track).numTrials = []; allsessdata(animals(anIdx)).(track).trialDurCorrect = [];
+        allsessdata(animals(anIdx)).(track).trialDurFailed = []; allsessdata(animals(anIdx)).(track).trialDurIncorrect = [];
         for sessIdx = 1:size(inclsess,1)
             sessindex = indices.behaviorindex(inclsess(sessIdx),:);
             sessdata = behaviordata.bySession{sessindex(1)}{sessindex(2)}{sessindex(3)};
@@ -23,9 +23,10 @@ for anIdx = 1:length(animals)
                 allsessdata(animals(anIdx)).(track).numTrials = [allsessdata(animals(anIdx)).(track).numTrials; sessdata.numTrials];
             
                 %trial duration
-                allsessdata(animals(anIdx)).(track).trialdur = [allsessdata(animals(anIdx)).(track).trialdur; sessdata.trialdur];
-                allsessdata(animals(anIdx)).(track).trialdurAvg = [allsessdata(animals(anIdx)).(track).trialdurAvg; sessdata.trialdurAvg];
-                allsessdata(animals(anIdx)).(track).trialdurSem = [allsessdata(animals(anIdx)).(track).trialdurSem; sessdata.trialdurSem];
+                allsessdata(animals(anIdx)).(track).trialDur = [allsessdata(animals(anIdx)).(track).trialDur; sessdata.trialDur];
+                allsessdata(animals(anIdx)).(track).trialDurCorrect = [allsessdata(animals(anIdx)).(track).trialDurCorrect; sessdata.trialDur(sessdata.logicalCorrect)];
+                allsessdata(animals(anIdx)).(track).trialDurFailed = [allsessdata(animals(anIdx)).(track).trialDurFailed; sessdata.trialDur(sessdata.sessOutcomes == -1)];
+                allsessdata(animals(anIdx)).(track).trialDurIncorrect = [allsessdata(animals(anIdx)).(track).trialDurIncorrect; sessdata.trialDur(sessdata.sessOutcomes == 0)];
             end
         end
     end
@@ -58,20 +59,22 @@ for anIdx = 1:length(animals)
         numSessions = length(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).perCorrect);
         numTrials = allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).numTrials;
         figure; hold on;
-        plot(1:sum(numTrials),allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).trialdur,'b-','LineWidth',2);
+        plot(1:sum(numTrials),allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).trialDur,'b-','LineWidth',2);
         xlabel('Trial'); ylabel('Duration (s)');
         title(['S' num2str(animals(anIdx)) ' trial duration on ' trainingoptions{trackIdx} ' track '])
         filename = [dirs.behaviorfigdir 'trialdur_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
         saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
         
         figure; hold on;
-        trialavgs = allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).trialdurAvg;
-        trialsems = allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).trialdurSem;
-        plot(1:numSessions,trialavgs,'b-','LineWidth',2);
-        errorbar2(1:numSessions, trialavgs,trialsems, 0.25) 
-        xlabel('Trial'); ylabel('Duration (s)');
+        numCorrectTrials = length(allsessdata(animals(anIdx)).(track).trialDurCorrect);
+        numIncorrectTrials = length(allsessdata(animals(anIdx)).(track).trialDurIncorrect);
+        numFailedTrials = length(allsessdata(animals(anIdx)).(track).trialDurFailed);
+        plot(1:numCorrectTrials,allsessdata(animals(anIdx)).(track).trialDurCorrect,'g-','LineWidth',2);
+        plot(1:numIncorrectTrials,allsessdata(animals(anIdx)).(track).trialDurIncorrect,'r-','LineWidth',2);
+        plot(1:numFailedTrials,allsessdata(animals(anIdx)).(track).trialDurFailed,'k-','LineWidth',2);
+        xlabel('Trial'); ylabel('Duration (s)'); legend('Correct', 'Incorrect','Failed');
         title(['S' num2str(animals(anIdx)) ' trial duration on ' trainingoptions{trackIdx} ' track '])
-        filename = [dirs.behaviorfigdir 'avgtrialdur_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
+        filename = [dirs.behaviorfigdir 'trialdurcorrectvincorrect_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
         saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
     end
 end
@@ -84,21 +87,23 @@ for anIdx = 1:length(animals)
         for sessIdx = 1:size(inclsess,1)
             sessindex = indices.behaviorindex(inclsess(sessIdx),:);
             sessdata = behaviordata.bySession{sessindex(1)}{sessindex(2)}{sessindex(3)};
+            trialdata = behaviordata.byTrial{sessindex(1)}{sessindex(2)}{sessindex(3)};
             if strcmp(sessdata.trainingtype,track)
+                clr = 'rmygcbkrmygcbkrmygcbkrmygcbkrmygcbkrmygcbkrygcbk';
                 figure; hold on;
                 for trialIdx = 1:sessdata.numTrials
-                    phaseInds = round(sessdata.phaseInds{trialIdx});
-                    clr = 'rmbk';
-                    for phaseIdx = 1:size(sessdata.phase,2)
-                        xpos = sessdata.phase(phaseIdx).posXNormSouth(trialIdx,:);
-                        ypos = sessdata.phase(phaseIdx).posYNormSouth(trialIdx,:);
-                        plot(xpos, ypos, [clr(phaseIdx)],'LineWidth',2);
+                    phaseInds = trialdata{trialIdx}.phaseInds;
+                    for phaseIdx = 1:size(phaseInds,1)
+                        xpos = trialdata{trialIdx}.positionX(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
+                        ypos = trialdata{trialIdx}.positionY(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
+                        plot(xpos, ypos, [clr(trialIdx) 'o'],'MarkerSize',2);
                         xlabel('x-axis'); ylabel('y-axis');
-                        title(['S' num2str(animals(anIdx)) ' position over North starting trials - sess ' num2str(sessIdx)])
-
+                        ylim([0 700]); xlim([-200 200]);
+                        title(['S' num2str(animals(anIdx)) ' position over trials - sess ' num2str(sessIdx)])
                     end
-                    pause
                 end
+                filename = [dirs.behaviorfigdir 'position_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx)) '_' num2str(sessindex(2))];
+                saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
             end
         end
     end

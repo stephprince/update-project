@@ -3,9 +3,10 @@ function getDiamondTrackBehavior(dirs, indices, makenewfiles)
 %this function generates and plots the behavioral data for the Diamond
 %Track behavioral paradigm
 
-params.binsize = 2; %binsize for licking and velocity data
+params.newSampSize = 10000; %set number of samples for behavioral outputs
 dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\'];
-if ~exist(dirs.behaviorfigdir); mkdir(dirs.behaviorfigdir); end;
+dirs.savedatadir = [dirs.behaviorfigdir 'data\'];
+if ~exist(dirs.savedatadir); mkdir(dirs.savedatadir); end;
 
 %% generate the data structures
 behaviordata = getDiamondTrackBehaviorMetrics(dirs,indices,params,makenewfiles);
