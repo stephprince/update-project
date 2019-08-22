@@ -57,7 +57,11 @@ if ~exist(filename) || makenewfiles
     behaviorDataDiamondBySess.trainingtype = sessdata.params.trainingtype;
     
     %% concatenate trial outputs
+    %its a little confusing but in this scenario any variables that start
+    %with 'trial' are the concatenation of all the trials and any variables
+    %that don't are the single outcome/parameter for that trial 
     trialDur = []; trialStartLoc = []; trialChoiceLoc = []; trialCorrectEncLoc = []; trialCorrectChoiceLoc = [];
+    trialTurnDirEnc = []; trialTurnDirChoice = [];
     for trialIdx = 1:size(trialdata,2)
         %the easy stuff, duration, starting locations in string format
         trialDur = [trialDur; trialdata{trialIdx}.trialdur]; %trial duration
@@ -95,6 +99,8 @@ if ~exist(filename) || makenewfiles
         else
             behaviorDataDiamondBySess.phase(3).turnDir(trialIdx,:) = nan;
         end
+        trialTurnDirEnc = [trialTurnDirEnc; turnDirEnc];
+        trialTurnDirChoice = [trialTurnDirChoice;  turnDirChoice];
     end
     
     %save output data to data structure
@@ -103,8 +109,8 @@ if ~exist(filename) || makenewfiles
     behaviorDataDiamondBySess.trialCorrectEncLoc = trialCorrectEncLoc;
     behaviorDataDiamondBySess.trialCorrectChoiceLoc = trialCorrectChoiceLoc;
     behaviorDataDiamondBySess.trialDur = trialDur;
-    behaviorDataDiamondBySess.turnDirEnc = turnDirEnc;
-    behaviorDataDiamondBySess.turnDirChoice = turnDirChoice;
+    behaviorDataDiamondBySess.trialTurnDirEnc = trialTurnDirEnc;
+    behaviorDataDiamondBySess.trialTurnDirChoice = trialTurnDirChoice;
     
     %% save filename
     save(filename, 'behaviorDataDiamondBySess');
