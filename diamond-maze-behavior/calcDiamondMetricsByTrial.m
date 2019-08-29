@@ -40,8 +40,8 @@ if ~exist(filename) || makenewfiles
         behaviorDataDiamondByTrial{trialIdx}.rewardInds = find(diff(behaviorDataDiamondByTrial{trialIdx}.numRewards))+1;
         
         %get phase switch times (690 and 160 are the north and south start points)
-        phaseStartsTemp = [1; find(diff(behaviorDataDiamondByTrial{trialIdx}.currentPhase))+1]; 
-        phaseEndsTemp = [find(diff(behaviorDataDiamondByTrial{trialIdx}.currentPhase)); length(behaviorDataDiamondByTrial{trialIdx}.currentPhase)];
+        phaseStartsTemp = [1; find(diff(behaviorDataDiamondByTrial{trialIdx}.currentWorld))+1]; 
+        phaseEndsTemp = [find(diff(behaviorDataDiamondByTrial{trialIdx}.currentWorld)); length(behaviorDataDiamondByTrial{trialIdx}.currentWorld)];
         phaseIndsTemp = [phaseStartsTemp phaseEndsTemp];
         behaviorDataDiamondByTrial{trialIdx}.phaseInds = [];
         for phaseIdx = 1:size(phaseIndsTemp,1)
