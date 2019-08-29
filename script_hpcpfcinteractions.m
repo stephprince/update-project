@@ -3,15 +3,15 @@
 % this script will generate all the analyses for the hpc-pfc diamond maze analyses
 
 %% sets up animals, dates, directories
-animals = [7,8];
-excldates = []; incldates = [];
+animals = [7];
+excldates = []; incldates = [190816];
 
 %gets data directories and indices
 dirs = getdefaultdirectorieshpcpfcinteractions;
 indices = getdefaultindiceshpcpfcinteractions(animals,dirs,excldates,incldates); 
 
 %set flags for what you want to do
-makenewfiles = 0; % this flag generates new data structures, when set to 0 it uses preexisting data structures
+makenewfiles = 1; % this flag generates new data structures, when set to 0 it uses preexisting data structures
 behavior = 1;  
 
 %% perform behavioral analyses

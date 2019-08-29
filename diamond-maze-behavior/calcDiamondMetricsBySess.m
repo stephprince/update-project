@@ -12,6 +12,7 @@ disp(['Calculating session metrics for ' animalID num2str(index(1)) ' ' num2str(
 
 if ~exist(filename) || makenewfiles
     %% resample vectors so can combine across trials
+    figure; hold on;
     for trialIdx = 1:size(trialdata,2)
         numSamples = length(trialdata{trialIdx}.time); %initial sample number
         
@@ -32,29 +33,33 @@ if ~exist(filename) || makenewfiles
         %adjust position
         %caveat here, need to separate phases bc otherwise you will smooth over the really big jumps in position
         %so for the adjusted position vectors, each phase will be numSamples x 1
-        for phaseIdx = 1:4 %encoding (1), delay (2), choice (3), intertrial interval (4)
+        for phaseIdx = 1:4 %encoding (1), delay (2), choice (3), intertrial interval (4) usually
             phaseInds = trialdata{trialIdx}.phaseInds;
             incompletePhases = [(size(trialdata{trialIdx}.phaseInds,1)+1):4];
             if ismember(phaseIdx, incompletePhases)
                 behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:) = nan(1, params.newSampSize);
                 behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:) = nan(1, params.newSampSize);
             else
-                numSamplesPhase = length(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
-                behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:) = resample(trialdata{trialIdx}.positionX(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2)), params.newSampSize, numSamplesPhase);
-                behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:) = resample(trialdata{trialIdx}.positionY(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2)), params.newSampSize, numSamplesPhase);
+                posX = trialdata{trialIdx}.positionX(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
+                posY = trialdata{trialIdx}.positionY(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
+                padFactor = 100;
+                padLength = ceil(length(posX)/params.newSampSize)*padFactor; %get ratio of downsampling and multiply by padFactor to add pad on either side
+                posXpad = [repmat(posX(1),padLength,1); posX; repmat(posX(end),padLength,1)];
+                posYpad = [repmat(posY(1),padLength,1); posY; repmat(posY(end),padLength,1)];
+                numSamplesPhase = length(posXpad);
+                
+                posXtemp = resample(posXpad, params.newSampSize+padFactor*2, numSamplesPhase);
+                posYtemp = resample(posYpad, params.newSampSize+padFactor*2, numSamplesPhase);
+                if length(posY) == 1
+                    posYtemp = repmat(posY,params.newSampSize+padFactor*2,1);
+                    posXtemp = repmat(posX,params.newSampSize+padFactor*2,1);
+                end
+                behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:) = posXtemp(padFactor:end-padFactor-1);
+                behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:) = posYtemp(padFactor:end-padFactor-1);
+                plot(behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:), behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:))
             end
         end
     end
-    
-    %% get percent correct
-    temp = []; temp = cellfun(@(x) [temp; x.outcome], trialdata, 'UniformOutput', 0);
-    behaviorDataDiamondBySess.sessOutcomes = cell2mat(temp);
-    behaviorDataDiamondBySess.logicalCorrect = behaviorDataDiamondBySess.sessOutcomes == 1;
-    behaviorDataDiamondBySess.numCorrect = length(find(behaviorDataDiamondBySess.sessOutcomes == 1));
-    behaviorDataDiamondBySess.numFailed = length(find(behaviorDataDiamondBySess.sessOutcomes == -1));
-    behaviorDataDiamondBySess.numIncorrect = length(find(behaviorDataDiamondBySess.sessOutcomes == 0));
-    behaviorDataDiamondBySess.numTrials = size(trialdata,2);
-    behaviorDataDiamondBySess.trainingtype = sessdata.params.trainingtype;
     
     %% concatenate trial outputs
     %its a little confusing but in this scenario any variables that start
@@ -111,6 +116,25 @@ if ~exist(filename) || makenewfiles
     behaviorDataDiamondBySess.trialDur = trialDur;
     behaviorDataDiamondBySess.trialTurnDirEnc = trialTurnDirEnc;
     behaviorDataDiamondBySess.trialTurnDirChoice = trialTurnDirChoice;
+    
+    %% get percent correct
+    %get outcomes for all trials
+    temp = []; temp = cellfun(@(x) [temp; x.outcome], trialdata, 'UniformOutput', 0);
+    behaviorDataDiamondBySess.sessOutcomes = cell2mat(temp);
+    behaviorDataDiamondBySess.logicalCorrect = behaviorDataDiamondBySess.sessOutcomes == 1;
+    behaviorDataDiamondBySess.numCorrect = length(find(behaviorDataDiamondBySess.sessOutcomes == 1));
+    behaviorDataDiamondBySess.numFailed = length(find(behaviorDataDiamondBySess.sessOutcomes == -1));
+    behaviorDataDiamondBySess.numIncorrect = length(find(behaviorDataDiamondBySess.sessOutcomes == 0));
+    behaviorDataDiamondBySess.numTrials = size(trialdata,2);
+    behaviorDataDiamondBySess.trainingtype = sessdata.params.trainingtype;
+    
+    %get outcomes for right vs. left turn trials (right or left turns during choice phase
+    behaviorDataDiamondBySess.sessOutcomesLeft = behaviorDataDiamondBySess.sessOutcomes(trialTurnDirChoice == 1); %left turns
+    behaviorDataDiamondBySess.sessOutcomesRight = behaviorDataDiamondBySess.sessOutcomes(trialTurnDirChoice == 2); %right turns
+    behaviorDataDiamondBySess.numCorrectLeft = length(find(behaviorDataDiamondBySess.sessOutcomesLeft == 1));
+    behaviorDataDiamondBySess.numCorrectRight = length(find(behaviorDataDiamondBySess.sessOutcomesRight == 1));
+    behaviorDataDiamondBySess.numTrialsLeft = length(behaviorDataDiamondBySess.sessOutcomesLeft);
+    behaviorDataDiamondBySess.numTrialsRight = length(behaviorDataDiamondBySess.sessOutcomesRight);
     
     %% save filename
     save(filename, 'behaviorDataDiamondBySess');
