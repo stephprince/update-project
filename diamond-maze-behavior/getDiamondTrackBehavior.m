@@ -4,7 +4,7 @@ function getDiamondTrackBehavior(dirs, indices, makenewfiles)
 %Track behavioral paradigm
 
 params.newSampSize = 10000; %set number of samples for behavioral outputs
-dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\'];
+dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' num2str(yyyymmdd(datetime('now'))) '\'];
 dirs.savedatadir = [dirs.behaviorfigdir 'data\'];
 if ~exist(dirs.savedatadir); mkdir(dirs.savedatadir); end;
 

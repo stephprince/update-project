@@ -14,8 +14,8 @@ disp(['Calculating trial metrics for ' animalID num2str(index(1)) ' ' num2str(in
 
 if ~exist(filename) || makenewfiles
     %% get trial times
-    trialStarts = [1; find(diff(sessdata.numTrials)) + 1];
-    trialEnds = [find(diff(sessdata.numTrials)); length(sessdata.numTrials)];
+    trialStarts = [1; find(diff(ismember(sessdata.currentPhase,[3 4])) == -1) + 1]; %looks for when reward or punishment phase happened and finds the end
+    trialEnds = [find(diff(ismember(sessdata.currentPhase,[3 4])) == -1); length(sessdata.currentPhase)];
     
     %% make new trial data structure
     fnames = fieldnames(sessdata);
@@ -40,10 +40,10 @@ if ~exist(filename) || makenewfiles
         behaviorDataDiamondByTrial{trialIdx}.rewardInds = find(diff(behaviorDataDiamondByTrial{trialIdx}.numRewards))+1;
         
         %get phase switch times (690 and 160 are the north and south start points)
-        phaseStartsTemp = [1; find(diff(behaviorDataDiamondByTrial{trialIdx}.currentWorld))+1]; 
-        phaseEndsTemp = [find(diff(behaviorDataDiamondByTrial{trialIdx}.currentWorld)); length(behaviorDataDiamondByTrial{trialIdx}.currentWorld)];
+        phaseStartsTemp = [1; find(diff(behaviorDataDiamondByTrial{trialIdx}.currentPhase))+1]; 
+        phaseEndsTemp = [find(diff(behaviorDataDiamondByTrial{trialIdx}.currentPhase)); length(behaviorDataDiamondByTrial{trialIdx}.currentPhase)];
         phaseIndsTemp = [phaseStartsTemp phaseEndsTemp];
-        behaviorDataDiamondByTrial{trialIdx}.phaseInds = [];
+        behaviorDataDiamondByTrial{trialIdx}.phaseInds = []; behaviorDataDiamondByTrial{trialIdx}.worldByPhase = []; behaviorDataDiamondByTrial{trialIdx}.phaseType = [];
         for phaseIdx = 1:size(phaseIndsTemp,1)
             %get window of time to look at for incorrectly separated phase times
             windowLength = 19; %default is to look at first 20 samples
@@ -63,6 +63,14 @@ if ~exist(filename) || makenewfiles
             %get new end times
             endPosRaw = behaviorDataDiamondByTrial{trialIdx}.positionY(phaseIndsTemp(phaseIdx,2)-windowLength:phaseIndsTemp(phaseIdx,2));
             behaviorDataDiamondByTrial{trialIdx}.phaseInds = [behaviorDataDiamondByTrial{trialIdx}.phaseInds; phaseStartsNew phaseIndsTemp(phaseIdx,2)];
+            
+            %get current worlds for each phase
+            %1 = main track, 2 = delay box, 3 = intertrial interval box
+            behaviorDataDiamondByTrial{trialIdx}.worldByPhase = [behaviorDataDiamondByTrial{trialIdx}.worldByPhase; behaviorDataDiamondByTrial{trialIdx}.currentWorld(phaseStartsNew)]; 
+            
+            %get phase types for each phase
+            % 0 = end, 1 = delay, 2 = choice, 3 = reward, 4 = punish
+            behaviorDataDiamondByTrial{trialIdx}.phaseType = [behaviorDataDiamondByTrial{trialIdx}.phaseType; behaviorDataDiamondByTrial{trialIdx}.currentPhase(phaseStartsNew)]; 
         end
     end
     
@@ -74,33 +82,32 @@ if ~exist(filename) || makenewfiles
     
     %% get incorrect/correct trial %0 = incorrect, 1 = correct, -1 = failed
     for trialIdx = 1:size(trialStarts,1)
-        if strcmp(sessdata.params.trainingtype,'linear') %linear track does not have correct/incorrect zone and only has failed/correct trials
+        if strcmp(sessdata.params.trainingtype,'linear') %linear track does not have correct/incorrect zone and only has failed trials
             behaviorDataDiamondByTrial{trialIdx}.outcome = -1; %failed trial
-        else
-            %automatically failed if there were less than 4 phases
-            if size(behaviorDataDiamondByTrial{trialIdx}.phaseInds,1) < 4
-                behaviorDataDiamondByTrial{trialIdx}.outcome = -1; %failed trial occurred if the animal had less than 4 phases (must have been encoding, delay, punish or encode, punish)
-            else %if animal at least made it to the choice phase
-                %check if correct zone (1/2 depending on track)
-                choicePhaseInds = behaviorDataDiamondByTrial{trialIdx}.phaseInds(3,1):behaviorDataDiamondByTrial{trialIdx}.phaseInds(3,2);
-                rightZoneVect = behaviorDataDiamondByTrial{trialIdx}.correctZone(choicePhaseInds) - behaviorDataDiamondByTrial{trialIdx}.currentZone(choicePhaseInds);
-                isCorrect = find(rightZoneVect == 0); %at one point the correct zone was equal to the current zone
-                gotReward = find(behaviorDataDiamondByTrial{trialIdx}.currentZone ~= 0); %at one point the animal entered a reward zone
-                if isempty(gotReward)
-                    behaviorDataDiamondByTrial{trialIdx}.outcome = -1; %failed trial occurred if the animal never reached a reward zone
-                elseif ~isempty(gotReward) && isempty(isCorrect)
-                    behaviorDataDiamondByTrial{trialIdx}.outcome = 0; %incorrect trial if animal reached a reward zone but was not the correct one
-                elseif ~isempty(gotReward) && ~isempty(isCorrect) %animal got a reward and it was the correct zone
-                    behaviorDataDiamondByTrial{trialIdx}.outcome = 1;
-                end
+        elseif ~ismember(2,behaviorDataDiamondByTrial{trialIdx}.phaseType) %if animal never reached choice phase then it was failed
+            behaviorDataDiamondByTrial{trialIdx}.outcome = -1;
+        elseif ismember(3,behaviorDataDiamondByTrial{trialIdx}.phaseType) %if animal entered post reward phase then it was correct
+            behaviorDataDiamondByTrial{trialIdx}.outcome = 1;
+        elseif ismember(2,behaviorDataDiamondByTrial{trialIdx}.phaseType) && ismember(4,behaviorDataDiamondByTrial{trialIdx}.phaseType) %if the animal get to choice but goes to punishment, need to determine if fail or incorrect
+            choicePhase = find(behaviorDataDiamondByTrial{trialIdx}.phaseType == 2);
+            choicePhaseInds = behaviorDataDiamondByTrial{trialIdx}.phaseInds(choicePhase,1):behaviorDataDiamondByTrial{trialIdx}.phaseInds(choicePhase,2);
+            rightZoneVect = behaviorDataDiamondByTrial{trialIdx}.correctZone(choicePhaseInds) - behaviorDataDiamondByTrial{trialIdx}.currentZone(choicePhaseInds);
+            isCorrect = find(rightZoneVect == 0); %at one point the correct zone was equal to the current zone
+            gotReward = find(behaviorDataDiamondByTrial{trialIdx}.currentZone ~= 0); %at one point the animal entered a reward zone
+            if isempty(gotReward)
+                behaviorDataDiamondByTrial{trialIdx}.outcome = -1; %failed trial occurred if the animal never reached a reward zone
+            else
+                behaviorDataDiamondByTrial{trialIdx}.outcome = 0; %incorrect trial if animal reached a reward zone but still entered punishment phase
             end
+        else %only other option is an early end of virmen ([0 1 2]) which counts as a fail
+            behaviorDataDiamondByTrial{trialIdx}.outcome = -1;
         end
     end
     
     %% get north or south trial
     for trialIdx = 1:size(trialStarts,1)
         %initial encoding location
-        startPos = behaviorDataDiamondByTrial{trialIdx}.positionY(behaviorDataDiamondByTrial{trialIdx}.phaseInds(1,1)); %have to start at 2 bc north trials have start at 0,0
+        startPos = behaviorDataDiamondByTrial{trialIdx}.positionY(behaviorDataDiamondByTrial{trialIdx}.phaseInds(1,1));
         if startPos > 600 %arbitrary designations, the starting north position is above this point
             behaviorDataDiamondByTrial{trialIdx}.trialStartLoc = 'north';
         elseif startPos < 200
@@ -109,8 +116,9 @@ if ~exist(filename) || makenewfiles
         
         %choice location if that phase occurred
         %phases are encoding (1), delay (2), choice (3), intertrial interval (4)
-        if size(behaviorDataDiamondByTrial{trialIdx}.phaseInds,1) >= 3 %if a choice phase even occurred
-            choicePos = behaviorDataDiamondByTrial{trialIdx}.positionY(behaviorDataDiamondByTrial{trialIdx}.phaseInds(3,1));
+        if ismember(2,behaviorDataDiamondByTrial{trialIdx}.phaseType) %if there's a choice phase
+            choicePhase = find(behaviorDataDiamondByTrial{trialIdx}.phaseType == 2);
+            choicePos = behaviorDataDiamondByTrial{trialIdx}.positionY(behaviorDataDiamondByTrial{trialIdx}.phaseInds(choicePhase,1));
             if choicePos > 600 %arbitrary designations, the starting north position is above this point
                 behaviorDataDiamondByTrial{trialIdx}.trialChoiceLoc = 'north';
             elseif choicePos < 200

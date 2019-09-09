@@ -12,7 +12,6 @@ disp(['Calculating session metrics for ' animalID num2str(index(1)) ' ' num2str(
 
 if ~exist(filename) || makenewfiles
     %% resample vectors so can combine across trials
-    figure; hold on;
     for trialIdx = 1:size(trialdata,2)
         numSamples = length(trialdata{trialIdx}.time); %initial sample number
         
@@ -33,31 +32,38 @@ if ~exist(filename) || makenewfiles
         %adjust position
         %caveat here, need to separate phases bc otherwise you will smooth over the really big jumps in position
         %so for the adjusted position vectors, each phase will be numSamples x 1
-        for phaseIdx = 1:4 %encoding (1), delay (2), choice (3), intertrial interval (4) usually
-            phaseInds = trialdata{trialIdx}.phaseInds;
-            incompletePhases = [(size(trialdata{trialIdx}.phaseInds,1)+1):4];
-            if ismember(phaseIdx, incompletePhases)
-                behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:) = nan(1, params.newSampSize);
-                behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:) = nan(1, params.newSampSize);
-            else
-                posX = trialdata{trialIdx}.positionX(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
-                posY = trialdata{trialIdx}.positionY(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
-                padFactor = 100;
-                padLength = ceil(length(posX)/params.newSampSize)*padFactor; %get ratio of downsampling and multiply by padFactor to add pad on either side
-                posXpad = [repmat(posX(1),padLength,1); posX; repmat(posX(end),padLength,1)];
-                posYpad = [repmat(posY(1),padLength,1); posY; repmat(posY(end),padLength,1)];
-                numSamplesPhase = length(posXpad);
-                
-                posXtemp = resample(posXpad, params.newSampSize+padFactor*2, numSamplesPhase);
-                posYtemp = resample(posYpad, params.newSampSize+padFactor*2, numSamplesPhase);
-                if length(posY) == 1
-                    posYtemp = repmat(posY,params.newSampSize+padFactor*2,1);
-                    posXtemp = repmat(posX,params.newSampSize+padFactor*2,1);
-                end
-                behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:) = posXtemp(padFactor:end-padFactor-1);
-                behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:) = posYtemp(padFactor:end-padFactor-1);
-                plot(behaviorDataDiamondBySess.phase(phaseIdx).posXNorm(trialIdx,:), behaviorDataDiamondBySess.phase(phaseIdx).posYNorm(trialIdx,:))
+        possiblePhaseTypes = [0 1 2 3 4]; %encoding (0), delay (1), choice (2), reward (3) punish (4) usually
+        incompletePhases = possiblePhaseTypes(~ismember(possiblePhaseTypes, trialdata{trialIdx}.phaseType));
+        completePhases = trialdata{trialIdx}.phaseType;
+        phaseInds = trialdata{trialIdx}.phaseInds;
+        behaviorDataDiamondBySess.completePhases = completePhases+1;
+        
+        %fill in incomplete phases with nans
+        for phaseIdx = 1:length(incompletePhases)
+            phaseType = incompletePhases(phaseIdx);
+            behaviorDataDiamondBySess.phase(phaseType+1).posXNorm(trialIdx,:) = nan(1, params.newSampSize); %since encoding is 0, have to shift phases by 1
+            behaviorDataDiamondBySess.phase(phaseType+1).posYNorm(trialIdx,:) = nan(1, params.newSampSize); %so now enc = 1, del = 2, choice = 3, reward = 4, punish = 5;
+        end
+        
+        %fill in complete phases with data
+        for phaseIdx = 1:length(completePhases)
+            phaseType = completePhases(phaseIdx);
+            posX = trialdata{trialIdx}.positionX(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
+            posY = trialdata{trialIdx}.positionY(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
+            padFactor = 100;
+            padLength = ceil(length(posX)/params.newSampSize)*padFactor; %get ratio of downsampling and multiply by padFactor to add pad on either side
+            posXpad = [repmat(posX(1),padLength,1); posX; repmat(posX(end),padLength,1)];
+            posYpad = [repmat(posY(1),padLength,1); posY; repmat(posY(end),padLength,1)];
+            numSamplesPhase = length(posXpad);
+            
+            posXtemp = resample(posXpad, params.newSampSize+padFactor*2, numSamplesPhase);
+            posYtemp = resample(posYpad, params.newSampSize+padFactor*2, numSamplesPhase);
+            if length(posY) == 1
+                posYtemp = repmat(posY,params.newSampSize+padFactor*2,1);
+                posXtemp = repmat(posX,params.newSampSize+padFactor*2,1);
             end
+            behaviorDataDiamondBySess.phase(phaseType+1).posXNorm(trialIdx,:) = posXtemp(padFactor:end-padFactor-1);
+            behaviorDataDiamondBySess.phase(phaseType+1).posYNorm(trialIdx,:) = posYtemp(padFactor:end-padFactor-1);
         end
     end
     
