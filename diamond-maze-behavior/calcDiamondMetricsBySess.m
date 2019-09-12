@@ -72,7 +72,7 @@ if ~exist(filename) || makenewfiles
     %with 'trial' are the concatenation of all the trials and any variables
     %that don't are the single outcome/parameter for that trial 
     trialDur = []; trialStartLoc = []; trialChoiceLoc = []; trialCorrectEncLoc = []; trialCorrectChoiceLoc = [];
-    trialTurnDirEnc = []; trialTurnDirChoice = [];
+    trialTurnDirEnc = []; trialTurnDirChoice = []; trialSameTurn = [];
     for trialIdx = 1:size(trialdata,2)
         %the easy stuff, duration, starting locations in string format
         trialDur = [trialDur; trialdata{trialIdx}.trialdur]; %trial duration
@@ -112,6 +112,15 @@ if ~exist(filename) || makenewfiles
         end
         trialTurnDirEnc = [trialTurnDirEnc; turnDirEnc];
         trialTurnDirChoice = [trialTurnDirChoice;  turnDirChoice];
+        
+        %classify trials as same or alternate turning direction for correct choice
+        sameoralt = turnDirEnc - turnDirChoice; %if encoding and choice are the same then result is 0, otherwise +/- 2 since it's 4 and 2 reward locations
+        if sameoralt
+            sameTurn = 0; %if theres a positive or negative value, encoding and choice turning values were different
+        else
+            sameTurn = 1; %if 0, turn and choice were the same
+        end
+        trialSameTurn = [trialSameTurn; sameTurn];  
     end
     
     %save output data to data structure
@@ -122,6 +131,7 @@ if ~exist(filename) || makenewfiles
     behaviorDataDiamondBySess.trialDur = trialDur;
     behaviorDataDiamondBySess.trialTurnDirEnc = trialTurnDirEnc;
     behaviorDataDiamondBySess.trialTurnDirChoice = trialTurnDirChoice;
+    behaviorDataDiamondBySess.trialSameTurn = trialSameTurn;
     
     %% get percent correct
     %get outcomes for all trials
@@ -134,13 +144,21 @@ if ~exist(filename) || makenewfiles
     behaviorDataDiamondBySess.numTrials = size(trialdata,2);
     behaviorDataDiamondBySess.trainingtype = sessdata.params.trainingtype;
     
-    %get outcomes for right vs. left turn trials (right or left turns during choice phase
+    %get outcomes for right vs. left turn trials (right or left turns during choice phase)
     behaviorDataDiamondBySess.sessOutcomesLeft = behaviorDataDiamondBySess.sessOutcomes(trialTurnDirChoice == 1); %left turns
     behaviorDataDiamondBySess.sessOutcomesRight = behaviorDataDiamondBySess.sessOutcomes(trialTurnDirChoice == 2); %right turns
     behaviorDataDiamondBySess.numCorrectLeft = length(find(behaviorDataDiamondBySess.sessOutcomesLeft == 1));
     behaviorDataDiamondBySess.numCorrectRight = length(find(behaviorDataDiamondBySess.sessOutcomesRight == 1));
     behaviorDataDiamondBySess.numTrialsLeft = length(behaviorDataDiamondBySess.sessOutcomesLeft);
     behaviorDataDiamondBySess.numTrialsRight = length(behaviorDataDiamondBySess.sessOutcomesRight);
+    
+    %get outcomes for same vs. alt turn trials (encoding and choice phases had the same turn to be correct or not)
+    behaviorDataDiamondBySess.sessOutcomesSame = behaviorDataDiamondBySess.sessOutcomes(trialSameTurn == 1); %same turn
+    behaviorDataDiamondBySess.sessOutcomesAlt = behaviorDataDiamondBySess.sessOutcomes(trialSameTurn == 0); %alternate turns
+    behaviorDataDiamondBySess.numCorrectSame = length(find(behaviorDataDiamondBySess.sessOutcomesSame == 1));
+    behaviorDataDiamondBySess.numCorrectAlt = length(find(behaviorDataDiamondBySess.sessOutcomesAlt == 1));
+    behaviorDataDiamondBySess.numTrialsSame = length(behaviorDataDiamondBySess.sessOutcomesSame);
+    behaviorDataDiamondBySess.numTrialsAlt = length(behaviorDataDiamondBySess.sessOutcomesAlt);
     
     %% save filename
     save(filename, 'behaviorDataDiamondBySess');

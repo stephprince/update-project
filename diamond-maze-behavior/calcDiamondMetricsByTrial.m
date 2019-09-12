@@ -46,13 +46,14 @@ if ~exist(filename) || makenewfiles
         behaviorDataDiamondByTrial{trialIdx}.phaseInds = []; behaviorDataDiamondByTrial{trialIdx}.worldByPhase = []; behaviorDataDiamondByTrial{trialIdx}.phaseType = [];
         for phaseIdx = 1:size(phaseIndsTemp,1)
             %get window of time to look at for incorrectly separated phase times
-            windowLength = 19; %default is to look at first 20 samples
-            if (phaseIndsTemp(phaseIdx,2) - phaseIndsTemp(phaseIdx,1)) < 20
+            windowLength = 20; %default is to look at first 20 samples
+            if (phaseIndsTemp(phaseIdx,2) - phaseIndsTemp(phaseIdx,1)) < windowLength
                  windowLength = (phaseIndsTemp(phaseIdx,2) - phaseIndsTemp(phaseIdx,1)); %if less than 20 samples, just take the max
+                 if windowLength == 0; windowLength = 1; end; %corrects if phase is only one sample
             end
             
             %get new start times
-            startPosRaw = behaviorDataDiamondByTrial{trialIdx}.positionY(phaseIndsTemp(phaseIdx,1):phaseIndsTemp(phaseIdx,1)+windowLength); %look at first 20 samples
+            startPosRaw = behaviorDataDiamondByTrial{trialIdx}.positionY(phaseIndsTemp(phaseIdx,1):phaseIndsTemp(phaseIdx,1)+windowLength-1); %look at first 20 samples
             if length(startPosRaw) == 1; startPosRaw = [startPosRaw; startPosRaw]; end %control so if only one data point the code below works
             startpoints = [690 160 0]; %north, south, delay/intertrial interval
             [minval, closestpos] = min(abs(startPosRaw - repmat(startpoints,length(startPosRaw),1))); %find which of first 20 samples is the closest to one of the startpoints

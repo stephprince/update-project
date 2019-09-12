@@ -1,6 +1,6 @@
 function statsoutput = plotDiamondTrackBehaviorMetrics(dirs,indices,behaviordata);
 
-trainingoptions = {'linear','shaping','choice1side'};
+trainingoptions = {'linear','shaping','choice1side','choice2side'};
 animals = unique(indices.behaviorindex(:,1));
 
 %% concatenate data across sessions
@@ -17,7 +17,9 @@ for anIdx = 1:length(animals)
         allsessdata(animals(anIdx)).(track).perCorrectLeft = []; allsessdata(animals(anIdx)).(track).posXEnc = [];
         allsessdata(animals(anIdx)).(track).posYEnc = []; allsessdata(animals(anIdx)).(track).posXChoice = [];
         allsessdata(animals(anIdx)).(track).posYChoice = []; allsessdata(animals(anIdx)).(track).sessOutcomesRightAll = [];
-        allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll = [];
+        allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll = []; allsessdata(animals(anIdx)).(track).rewardLocEncAll = [];
+        allsessdata(animals(anIdx)).(track).rewardLocChoiceAll = []; allsessdata(animals(anIdx)).(track).sessOutcomesSameAll = [];
+        allsessdata(animals(anIdx)).(track).sessOutcomesAltAll = [];
         sesscounter = 1; %keep track of how many sessions on each track there are
         for sessIdx = 1:size(inclsess,1)
             sessindex = indices.behaviorindex(inclsess(sessIdx),:);
@@ -28,25 +30,33 @@ for anIdx = 1:length(animals)
                 perCorrect = sessdata.numCorrect/sessdata.numTrials;
                 perCorrectRight = sessdata.numCorrectRight/sessdata.numTrialsRight;
                 perCorrectLeft = sessdata.numCorrectLeft/sessdata.numTrialsLeft;
+                perCorrectSame = sessdata.numCorrectSame/sessdata.numTrialsSame;
+                perCorrectAlt = sessdata.numCorrectAlt/sessdata.numTrialsAlt;
                 allsessdata(animals(anIdx)).(track).perCorrect = [allsessdata(animals(anIdx)).(track).perCorrect; perCorrect];
                 allsessdata(animals(anIdx)).(track).perCorrectRight = [allsessdata(animals(anIdx)).(track).perCorrectRight; perCorrectRight];
                 allsessdata(animals(anIdx)).(track).perCorrectLeft = [allsessdata(animals(anIdx)).(track).perCorrectLeft; perCorrectLeft];
                 allsessdata(animals(anIdx)).(track).numTrials = [allsessdata(animals(anIdx)).(track).numTrials; sessdata.numTrials];
                 
-                %trial performance
-                allsessdata(animals(anIdx)).(track).sessOutcomes{sesscounter} = sessdata.sessOutcomes;
-                allsessdata(animals(anIdx)).(track).sessOutcomesRight{sesscounter} = sessdata.sessOutcomesRight;
-                allsessdata(animals(anIdx)).(track).sessOutcomesLeft{sesscounter} = sessdata.sessOutcomesLeft;
-                allsessdata(animals(anIdx)).(track).correctTrials{sesscounter} = sessdata.logicalCorrect;
-                allsessdata(animals(anIdx)).(track).sessOutcomesAll = [allsessdata(animals(anIdx)).(track).sessOutcomesAll sessdata.sessOutcomes];
-                allsessdata(animals(anIdx)).(track).sessOutcomesRightAll = [allsessdata(animals(anIdx)).(track).sessOutcomesRightAll sessdata.sessOutcomesRight];
-                allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll = [allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll sessdata.sessOutcomesLeft];
-
                 %trial params
                 allsessdata(animals(anIdx)).(track).turnDirEnc{sesscounter} = sessdata.trialTurnDirEnc; %1 = left, 2 = right
                 allsessdata(animals(anIdx)).(track).turnDirChoice{sesscounter} = sessdata.trialTurnDirChoice; %1 = left, 2 = right
                 allsessdata(animals(anIdx)).(track).startLoc{sesscounter} = sessdata.trialStartLoc; %1 = north, 2 = east, 3 = south, 4 = west 
                 allsessdata(animals(anIdx)).(track).choiceLoc{sesscounter} = sessdata.trialChoiceLoc; %1 = north, 2 = east, 3 = south, 4 = west 
+                allsessdata(animals(anIdx)).(track).rewardLocEnc{sesscounter} = sessdata.trialCorrectEncLoc;
+                allsessdata(animals(anIdx)).(track).rewardLocChoice{sesscounter} = sessdata.trialCorrectChoiceLoc;
+                
+                %trial performance
+                allsessdata(animals(anIdx)).(track).sessOutcomes{sesscounter} = sessdata.sessOutcomes;
+                allsessdata(animals(anIdx)).(track).sessOutcomesRight{sesscounter} = sessdata.sessOutcomesRight;
+                allsessdata(animals(anIdx)).(track).sessOutcomesLeft{sesscounter} = sessdata.sessOutcomesLeft;
+                allsessdata(animals(anIdx)).(track).sessOutcomesSame{sesscounter} = sessdata.sessOutcomesSame; 
+                allsessdata(animals(anIdx)).(track).sessOutcomesAlt{sesscounter} = sessdata.sessOutcomesAlt;
+                allsessdata(animals(anIdx)).(track).correctTrials{sesscounter} = sessdata.logicalCorrect;
+                allsessdata(animals(anIdx)).(track).sessOutcomesAll = [allsessdata(animals(anIdx)).(track).sessOutcomesAll sessdata.sessOutcomes];
+                allsessdata(animals(anIdx)).(track).sessOutcomesRightAll = [allsessdata(animals(anIdx)).(track).sessOutcomesRightAll sessdata.sessOutcomesRight];
+                allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll = [allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll sessdata.sessOutcomesLeft];
+                allsessdata(animals(anIdx)).(track).sessOutcomesSameAll = [allsessdata(animals(anIdx)).(track).sessOutcomesSameAll sessdata.sessOutcomesSame];
+                allsessdata(animals(anIdx)).(track).sessOutcomesAltAll = [allsessdata(animals(anIdx)).(track).sessOutcomesAltAll sessdata.sessOutcomesAlt]; 
                 
                 %trial duration
                 allsessdata(animals(anIdx)).(track).trialDur = [allsessdata(animals(anIdx)).(track).trialDur; sessdata.trialDur];
@@ -88,6 +98,16 @@ for anIdx = 1:length(animals)
         legend('Right Turn','Left Turn')
         title(['S' num2str(animals(anIdx)) ' performance on ' trainingoptions{trackIdx} ' track '])
         filename = [dirs.behaviorfigdir 'percentcorrecttrials_rightvsleft_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
+        saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+        
+        %percent correct same vs. alternate side
+        figure; hold on;
+        plot(1:numSessions,allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).perCorrectSame,'go-','LineWidth',2);
+        plot(1:numSessions,allsessdata(animals(anIdx)).(trainingoptions{trackIdx}).perCorrectAlt,'mo-','LineWidth',2);
+        xlabel('Session'); ylabel('% Correct Trials');
+        legend('Same Turn','Alt Turn')
+        title(['S' num2str(animals(anIdx)) ' performance on ' trainingoptions{trackIdx} ' track '])
+        filename = [dirs.behaviorfigdir 'percentcorrecttrials_samevsalt_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
         saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
         
         %number correct trials
@@ -233,6 +253,7 @@ for anIdx = 1:length(animals)
             subplot(1,2,2); hold on;
             plot(allsessdata(animals(anIdx)).(track).posXChoice(trialsToPlot,:)',allsessdata(animals(anIdx)).(track).posYChoice(trialsToPlot,:)',clr(trialTypeIdx));
             title('Choice'); xlabel('X position'); ylabel('Y position');
+            pause
         end
         sgtitle(['S' num2str(animals(anIdx)) ' individual trajectories during choice/encoding'])
         filename = [dirs.behaviorfigdir 'trajectoriesindiv_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
@@ -260,19 +281,19 @@ for anIdx = 1:length(animals)
             southwestTrials = intersect(intersect(trialStartSouth,turnPathWest),trialOutcomes);
 
             %plot the averages
-            subplot(1,2,1); hold on;
-            posXAvg = nanmean(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1);
-            posXSEM = nanstd(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1)/sqrt(size(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1));
-            posYAvg = nanmean(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1);
-            posYSEM = nanstd(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1)/sqrt(size(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1));
-            plot(posXAvg,posYAvg,clr(trialTypeIdx),'LineWidth',2);
-            ciplot(posXAvg-posXSEM,posXAvg+posXSEM
-            plot(nanmean(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1),nanmean(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1),clr(trialTypeIdx),'LineWidth',2);
-            
-            title('Encoding'); xlabel('X position'); ylabel('Y position');
-            subplot(1,2,2); hold on;
-            plot(allsessdata(animals(anIdx)).(track).posXChoice(trialsToPlot,:)',allsessdata(animals(anIdx)).(track).posYChoice(trialsToPlot,:)',clr(trialTypeIdx));
-            title('Choice'); xlabel('X position'); ylabel('Y position');
+%             subplot(1,2,1); hold on;
+%             posXAvg = nanmean(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1);
+%             posXSEM = nanstd(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1)/sqrt(size(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1));
+%             posYAvg = nanmean(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1);
+%             posYSEM = nanstd(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1)/sqrt(size(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1));
+%             plot(posXAvg,posYAvg,clr(trialTypeIdx),'LineWidth',2);
+%             ciplot(posXAvg-posXSEM,posXAvg+posXSEM);
+%             plot(nanmean(allsessdata(animals(anIdx)).(track).posXEnc(northeastTrials,:),1),nanmean(allsessdata(animals(anIdx)).(track).posYEnc(northeastTrials,:),1),clr(trialTypeIdx),'LineWidth',2);
+%             
+%             title('Encoding'); xlabel('X position'); ylabel('Y position');
+%             subplot(1,2,2); hold on;
+%             plot(allsessdata(animals(anIdx)).(track).posXChoice(trialsToPlot,:)',allsessdata(animals(anIdx)).(track).posYChoice(trialsToPlot,:)',clr(trialTypeIdx));
+%             title('Choice'); xlabel('X position'); ylabel('Y position');
         end
         sgtitle(['S' num2str(animals(anIdx)) ' individual trajectories during choice/encoding'])
         filename = [dirs.behaviorfigdir 'trajectoriesavg_' trainingoptions{trackIdx} '_S' num2str(animals(anIdx))];
