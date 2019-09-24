@@ -19,7 +19,8 @@ for anIdx = 1:length(animals)
         allsessdata(animals(anIdx)).(track).posYChoice = []; allsessdata(animals(anIdx)).(track).sessOutcomesRightAll = [];
         allsessdata(animals(anIdx)).(track).sessOutcomesLeftAll = []; allsessdata(animals(anIdx)).(track).rewardLocEncAll = [];
         allsessdata(animals(anIdx)).(track).rewardLocChoiceAll = []; allsessdata(animals(anIdx)).(track).sessOutcomesSameAll = [];
-        allsessdata(animals(anIdx)).(track).sessOutcomesAltAll = [];
+        allsessdata(animals(anIdx)).(track).sessOutcomesAltAll = []; allsessdata(animals(anIdx)).(track).perCorrectAlt = [];
+        allsessdata(animals(anIdx)).(track).perCorrectSame = [];
         sesscounter = 1; %keep track of how many sessions on each track there are
         for sessIdx = 1:size(inclsess,1)
             sessindex = indices.behaviorindex(inclsess(sessIdx),:);
@@ -35,6 +36,8 @@ for anIdx = 1:length(animals)
                 allsessdata(animals(anIdx)).(track).perCorrect = [allsessdata(animals(anIdx)).(track).perCorrect; perCorrect];
                 allsessdata(animals(anIdx)).(track).perCorrectRight = [allsessdata(animals(anIdx)).(track).perCorrectRight; perCorrectRight];
                 allsessdata(animals(anIdx)).(track).perCorrectLeft = [allsessdata(animals(anIdx)).(track).perCorrectLeft; perCorrectLeft];
+                allsessdata(animals(anIdx)).(track).perCorrectSame = [allsessdata(animals(anIdx)).(track).perCorrectSame; perCorrectSame];
+                allsessdata(animals(anIdx)).(track).perCorrectAlt = [allsessdata(animals(anIdx)).(track).perCorrectAlt; perCorrectAlt];
                 allsessdata(animals(anIdx)).(track).numTrials = [allsessdata(animals(anIdx)).(track).numTrials; sessdata.numTrials];
                 
                 %trial params
