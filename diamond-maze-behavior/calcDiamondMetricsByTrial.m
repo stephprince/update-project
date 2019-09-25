@@ -43,7 +43,7 @@ if ~exist(filename) || makenewfiles
         [phaseInds worldByPhase phaseType] = getPhaseInds(behaviorDataDiamondByTrial{trialIdx});
         behaviorDataDiamondByTrial{trialIdx}.phaseInds = phaseInds;
         behaviorDataDiamondByTrial{trialIdx}.worldByPhase = worldByPhase;
-        behaviorDataDiamondByTrial{trialIdx}.phaseType = phaseType
+        behaviorDataDiamondByTrial{trialIdx}.phaseType = phaseType;
     end
     
     %% get trial duration
