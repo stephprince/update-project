@@ -1,52 +1,51 @@
-function [output eventsOutput] = resampleDiamondMazeTrials(trialdata,params);
+function output = resampleDiamondMazeTrials(trialdata,params);
 % SP 190924
+% SP changed on 191119 to move this function to the trial section of the code
 
-%% adjust position
-%caveat here, need to separate phases well bc otherwise you will smooth over the really big jumps in position
-%so for the adjusted position vectors, each phase will be numSamples x 1
+%gets fields to resample (vectors of behavioral data)
+numSamples = length(trialdata.time);
+fnames = fieldnames();
+counter = 1;
+for i = 1:length(fnames)
+  if size(trialdata.(fnames{i}),1) == numSamples
+    fnames2resample{counter} = fnames{i};
+    counter = counter + 1;
+  end
+end
+
+%sets time window for resampling to constant sampling rate (in time)
+newTrialSampSize = round(trialdata.trialdur/params.constSampRateTime); %find out how many samples should be in new vect
+newTimes = trialdata.time(1):params.constSampRateTime:((newTrialSampSize*params.constSampRateTime)+trialdata.time(1)); %get times from start to end with const time window
+for i = 1:length(fnames2resample)
+  resampledVect = interp1(trialdata.time,trialdata.(fnames2resample{i}),newTimes,'linear','extrap'); %added extrap to get rid of accidental nan values in the data
+  output.([fnames2resample{i} 'ConstTime']) = resampledVect;
+end
+
+%for incremental vectors (where values go up in steps need to resample to know where these steps are)
+fnames2findsteppoints = {'numRewards','numLicks','currentZone','correctZone','currentWorld','currentPhase''numTrials'};
+for i = 1:length(fnames2findsteppoints) %replace resampled vectors with 0 and resubstitute switch indices as ones
+  %use old indices/switch times to find new ones
+  oldInds = find(diff(trialdata.(fnames2findsteppoints{i})))+1;
+  oldTimes = trialdata.time(oldInds);
+  newInds = lookup2(oldTimes,output.timeConstTime);
+  %make new vector where new Inds are indicated with ones and the rest of the vector is zeros
+  output.([fnames2findsteppoints{i} 'ConstTime']) = zeros(size(output.([fnames2findsteppoints{i} 'ConstTime'])));
+  output.([fnames2findsteppoints{i} 'ConstTime'])(newInds) = 1; %replace switch indices time points with 1
+  output.([fnames2findsteppoints{i} 'IndsConstTime']) = newInds;
+end
+
+%get when the phases start/end and what the worlds are at that time
+phaseStarts = [1; output.currentPhaseIndsConstTime)];
+phaseEnds = [output.currentPhaseIndsConstTime)-1; length(output.currentPhaseConstTime)];
+phaseStartsEnds = [phaseStarts phaseEnds];
+output.phaseStartsEndsConstTime = phaseStartsEnds;
+output.worldByPhaseConstTime = output.currentWorldConstTime(phaseStartsEnds);
+output.phaseTypeConstTime = output.currentPhaseConstTime(phaseStartsEnds);
+
+%get complete and incomplete phases
 possiblePhaseTypes = [0 1 2 3 4]; %encoding (0), delay (1), choice (2), reward (3) punish (4) usually
-incompletePhases = possiblePhaseTypes(~ismember(possiblePhaseTypes, trialdata.phaseTypeConstTime));
+incompletePhases = possiblePhaseTypes(~ismember(possiblePhaseTypes, output.phaseTypeConstTime));
 completePhases = trialdata.phaseType;
-phaseInds = trialdata.phaseInds;
-eventsOutput.completePhases = completePhases+1;
-
-%fill in incomplete phases with nans
-for phaseIdx = 1:length(incompletePhases)
-    phaseType = incompletePhases(phaseIdx);
-    eventsOutput.phase(phaseType+1).posXNorm = nan(1, params.constSampNum); %since encoding is 0, have to shift phases by 1
-    eventsOutput.phase(phaseType+1).posYNorm = nan(1, params.constSampNum); %so now enc = 1, del = 2, choice = 3, reward = 4, punish = 5;
-end
-
-%fill in complete phases with data (have to pad on either ends to get rid of weird sampling issues)
-for phaseIdx = 1:length(completePhases)
-    phaseType = completePhases(phaseIdx);
-    posX = trialdata.positionX(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
-    posY = trialdata.positionY(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
-    if ~isnan(trialdata.viewAngle)
-        viewAngle = trialdata.viewAngle(phaseInds(phaseIdx,1):phaseInds(phaseIdx,2));
-    else
-        viewAngle = nan;
-    end
-    
-    %get ratio of downsampling and multiply by padFactor to add pad on either side
-    padFactor = 100;
-    padLength = ceil(length(posX)/params.constSampNum)*padFactor; 
-    posXpad = [repmat(posX(1),padLength,1); posX; repmat(posX(end),padLength,1)];
-    posYpad = [repmat(posY(1),padLength,1); posY; repmat(posY(end),padLength,1)];
-    viewAnglePad = [repmat(viewAngle(1),padLength,1); viewAngle; repmat(viewAngle(end),padLength,1)];
-    numSamplesPhase = length(posXpad);
-    
-    posXtemp = resample(posXpad, params.constSampNum+padFactor*2, numSamplesPhase);
-    posYtemp = resample(posYpad, params.constSampNum+padFactor*2, numSamplesPhase);
-    viewAngletemp = resample(viewAnglePad, params.constSampNum+padFactor*2, numSamplesPhase);
-    if length(posY) == 1
-        posYtemp = repmat(posY,params.constSampNum+padFactor*2,1);
-        posXtemp = repmat(posX,params.constSampNum+padFactor*2,1);
-        viewAngletemp = repmat(viewAngle,params.constSampNum+padFactor*2,1);
-    end
-    eventsOutput.phase(phaseType+1).posXNorm = posXtemp(padFactor:end-padFactor-1)';
-    eventsOutput.phase(phaseType+1).posYNorm = posYtemp(padFactor:end-padFactor-1)';
-    eventsOutput.phase(phaseType+1).viewAngle = viewAngletemp(padFactor:end-padFactor-1)';
-end
+output.completePhases = completePhases+1;
 
 end

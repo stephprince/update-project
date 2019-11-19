@@ -49,45 +49,11 @@ if ~exist(filename) || makenewfiles
 
     %% resample trial data so constant time sampling rate
     for trialIdx = 1:size(trialStarts,1)
-        %gets fields to resample (vectors of behavioral data)
-        numSamples = length(behaviorDataDiamondByTrial{trialIdx}.time);
-        fnames = fieldnames(behaviorDataDiamondByTrial{trialIdx});
-        counter = 1;
-        for i = 1:length(fnames)
-            if size(behaviorDataDiamondByTrial{trialIdx}.(fnames{i}),1) == numSamples
-                fnames2resample{counter} = fnames{i};
-                counter = counter + 1;
-            end
-        end
-
-        %sets time window for resampling to constant sampling rate (in time)
-        newTrialSampSize = round(behaviorDataDiamondByTrial{trialIdx}.trialdur/params.constSampRateTime); %find out how many samples should be in new vect
-        newTimes = behaviorDataDiamondByTrial{trialIdx}.time(1):params.constSampRateTime:((newTrialSampSize*params.constSampRateTime)+behaviorDataDiamondByTrial{trialIdx}.time(1)); %get times from start to end with const time window
-        for i = 1:length(fnames2resample)
-            resampledVect = interp1(behaviorDataDiamondByTrial{trialIdx}.time,behaviorDataDiamondByTrial{trialIdx}.(fnames2resample{i}),newTimes,'linear','extrap'); %added extrap to get rid of accidental nan values in the data
-            behaviorDataDiamondByTrial{trialIdx}.([fnames2resample{i} 'ConstTime']) = resampledVect;
-        end
-
-        %for incremental vectors (where values go up in steps need to resample to know where these steps are)
-        fnames2findsteppoints = {'numRewards','numLicks','currentZone','correctZone','currentWorld','currentPhase''numTrials'};
-        for i = 1:length(fnames2findsteppoints) %replace resampled vectors with 0 and resubstitute switch indices as ones
-              %use old indices/switch times to find new ones
-              oldInds = find(diff(behaviorDataDiamondByTrial{trialIdx}.(fnames2findsteppoints{i})))+1;
-              oldTimes = behaviorDataDiamondByTrial{trialIdx}.time(oldInds);
-              newInds = lookup2(oldTimes,behaviorDataDiamondByTrial{trialIdx}.timeConstTime);
-              %make new vector where new Inds are indicated with ones and the rest of the vector is zeros
-              behaviorDataDiamondByTrial{trialIdx}.([fnames2findsteppoints{i} 'ConstTime']) = zeros(size(behaviorDataDiamondByTrial{trialIdx}.([fnames2findsteppoints{i} 'ConstTime'])));
-              behaviorDataDiamondByTrial{trialIdx}.([fnames2findsteppoints{i} 'ConstTime'])(newInds) = 1; %replace switch indices time points with 1
-              behaviorDataDiamondByTrial{trialIdx}.([fnames2findsteppoints{i} 'IndsConstTime']) = newInds;
-        end
-
-        %for current phase, get start and end indices
-        phaseStarts = [1; behaviorDataDiamondByTrial{trialIdx}.currentPhaseIndsConstTime)];
-        phaseEnds = [behaviorDataDiamondByTrial{trialIdx}.currentPhaseIndsConstTime)-1; length(behaviorDataDiamondByTrial{trialIdx}.currentPhaseConstTime)];
-        phaseStartsEnds = [phaseStarts phaseEnds];
-        behaviorDataDiamondByTrial{trialIdx}.phaseStartsEndsConstTime = phaseStartsEnds;
-        behaviorDataDiamondByTrial{trialIdx}.worldByPhaseConstTime = behaviorDataDiamondByTrial{trialIdx}.currentWorldConstTime(phaseStartsEnds);
-        behaviorDataDiamondByTrial{trialIdx}.phaseTypeConstTime = behaviorDataDiamondByTrial{trialIdx}.currentPhaseConstTime(phaseStartsEnds);
+      resampledVects = resampleDiamondMazeTrials(behaviorDataDiamondByTrial{trialIdx},params);
+      fnames2add = fieldnames(resampledVects);
+      for fieldIdx = 1:size(fnames2add,1)
+        behaviorDataDiamondByTrial{trialIdx}.(fnames2add{fieldIdx}) = resampledVects.(fnames2add{fieldIdx})
+      end
     end
 
     %% get incorrect/correct trial %0 = incorrect, 1 = correct, -1 = failed
