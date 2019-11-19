@@ -8,11 +8,11 @@ excldates = []; incldates = [];
 
 %gets data directories and indices
 dirs = getdefaultdirectorieshpcpfcinteractions;
-indices = getdefaultindiceshpcpfcinteractions(animals,dirs,excldates,incldates); 
+indices = getdefaultindiceshpcpfcinteractions(animals,dirs,excldates,incldates);
 
 %set flags for what you want to do
 makenewfiles = 1; % this flag generates new data structures, when set to 0 it uses preexisting data structures
-behavior = 1;  
+behavior = 1;
 
 %% perform behavioral analyses
 if behavior

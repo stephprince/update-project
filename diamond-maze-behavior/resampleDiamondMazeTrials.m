@@ -5,7 +5,7 @@ function [output eventsOutput] = resampleDiamondMazeTrials(trialdata,params);
 %caveat here, need to separate phases well bc otherwise you will smooth over the really big jumps in position
 %so for the adjusted position vectors, each phase will be numSamples x 1
 possiblePhaseTypes = [0 1 2 3 4]; %encoding (0), delay (1), choice (2), reward (3) punish (4) usually
-incompletePhases = possiblePhaseTypes(~ismember(possiblePhaseTypes, trialdata.phaseType));
+incompletePhases = possiblePhaseTypes(~ismember(possiblePhaseTypes, trialdata.phaseTypeConstTime));
 completePhases = trialdata.phaseType;
 phaseInds = trialdata.phaseInds;
 eventsOutput.completePhases = completePhases+1;

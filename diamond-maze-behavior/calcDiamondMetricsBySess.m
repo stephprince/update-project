@@ -22,27 +22,27 @@ if ~exist(filename) || makenewfiles
             behaviorDataDiamondBySess.(fnamesEvents{fieldIdx}){trialIdx,1} = resampledEventTimes.(fnamesEvents{fieldIdx});
         end
     end
-    
-    %% concatenate trial outputs    
+
+    %% concatenate trial outputs
     concatTrialData = concatTrialOutcomes(trialdata);
     fnamesOutcomes = fieldnames(concatTrialData);
     for fieldIdx = 1:length(fnamesOutcomes)
         behaviorDataDiamondBySess.(fnamesOutcomes{fieldIdx}) = concatTrialData.(fnamesOutcomes{fieldIdx});
     end
-    
+
     %% get percent correct
     sessPerformance = calcSessionPerformance(behaviorDataDiamondBySess,trialdata);
     fnamesPerformance = fieldnames(sessPerformance);
     for fieldIdx = 1:length(fnamesPerformance)
         behaviorDataDiamondBySess.(fnamesPerformance{fieldIdx}) = sessPerformance.(fnamesPerformance{fieldIdx});
     end
-        
+
     %% get training session type
     behaviorDataDiamondBySess.trainingtype = sessdata.params.trainingtype;
-    
+
     %% save filename
     save(filename, 'behaviorDataDiamondBySess');
-    
+
 else
     load(filename);
 end
