@@ -15,7 +15,6 @@ phaseIndsTemp = [phaseStartsTemp phaseEndsTemp];
 phaseInds = []; worldByPhase = []; phaseType = [];
 for phaseIdx = 1:size(phaseIndsTemp,1)
     %get window of time to look at for incorrectly separated phase times
-    
     if (phaseIndsTemp(phaseIdx,2) - phaseIndsTemp(phaseIdx,1)) < windowLength
         windowLength = (phaseIndsTemp(phaseIdx,2) - phaseIndsTemp(phaseIdx,1)); %if less than 20 samples, just take the max
         if windowLength == 0; windowLength = 1; end; %corrects if phase is only one sample
@@ -31,7 +30,11 @@ for phaseIdx = 1:size(phaseIndsTemp,1)
     phaseStartsNew = phaseIndsTemp(phaseIdx,1) + phaseStartNewRelative - 1;
     
     %get new end times
-    endPosRaw = trialdata.positionY(phaseIndsTemp(phaseIdx,2)-windowLength:phaseIndsTemp(phaseIdx,2));
+    if phaseIndsTemp(phaseIdx,2) - windowLength < 1
+        endPosRaw = 1;
+    else
+        endPosRaw = trialdata.positionY(phaseIndsTemp(phaseIdx,2)-windowLength:phaseIndsTemp(phaseIdx,2));
+    end
     phaseInds = [phaseInds; phaseStartsNew phaseIndsTemp(phaseIdx,2)];
     
     %get current worlds for each phase

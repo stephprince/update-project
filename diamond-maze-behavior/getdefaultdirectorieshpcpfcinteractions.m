@@ -11,4 +11,4 @@ dirs.virmenephysdatadir = '\\neuro-cloud\labs\singer\Steph\VirmenEphysData\';
 dirs.virmendatadir = '\\neuro-cloud\labs\singer\Virmen Logs\DiamondMaze\';
 dirs.processeddatadir = '\\neuro-cloud\labs\singer\ProcessedData\VR_AnnularTrack\';
 dirs.spreadsheetdir = '\\neuro-cloud.ad.gatech.edu\labs\singer\Steph\Code\spreadsheets\VRDiamondTrack.xlsx';
-dirs.behaviorspreadsheetdir = '\\neuro-cloud.ad.gatech.edu\labs\singer\Steph\Code\spreadsheets\DiamondTrackSummary.xlsx';
+dirs.behaviorspreadsheetdir = '\\neuro-cloud.ad.gatech.edu\labs\singer\Steph\Code\spreadsheets\ContinuousAlternationTrackSummary.xlsx';

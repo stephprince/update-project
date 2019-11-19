@@ -41,17 +41,4 @@ for trialIdx = 1:size(trialdata,2)
     for fieldIdx = 1:length(fnames)
         output.([fnames{fieldIdx} 'All']) = [output.([fnames{fieldIdx} 'All']); eval(fnames{fieldIdx})];
     end
-    
-    %% separate outcomes into their respective phases (this is hardcoded right now which I don't love)
-    % phases are encoding (1), delay (2), choice (3), intertrial interval (4)
-    output.phase(1).startLoc(trialIdx) = startLoc; %encoding phase start point
-    output.phase(1).correctLoc(trialIdx) = correctEncLoc; %encoding correct side
-    output.phase(3).startLoc(trialIdx) = choiceLoc; %choice phase start point
-    output.phase(3).correctLoc(trialIdx) = correctChoiceLoc; %choice correct side 
-    output.phase(1).turnDir(trialIdx,:) = turnDirEnc;
-    if ~isempty(turnDirChoice)
-        output.phase(3).turnDir(trialIdx,:) = turnDirChoice;
-    else
-        output.phase(3).turnDir(trialIdx,:) = nan;
-    end
 end

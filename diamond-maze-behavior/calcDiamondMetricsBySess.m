@@ -19,7 +19,7 @@ if ~exist(filename) || makenewfiles
            behaviorDataDiamondBySess.(fnamesVect{fieldIdx})(trialIdx,:) = resampledTrialVects.(fnamesVect{fieldIdx});
         end
         for fieldIdx = 1:length(fnamesEvents) %have to treat phase, reward, lick event times differently bc uneven amount in each trial
-            behaviorDataDiamondBySess.(fnamesEvents{fieldIdx}){trialIdx} = resampledEventTimes.(fnamesEvents{fieldIdx});
+            behaviorDataDiamondBySess.(fnamesEvents{fieldIdx}){trialIdx,1} = resampledEventTimes.(fnamesEvents{fieldIdx});
         end
     end
     
@@ -36,7 +36,7 @@ if ~exist(filename) || makenewfiles
     for fieldIdx = 1:length(fnamesPerformance)
         behaviorDataDiamondBySess.(fnamesPerformance{fieldIdx}) = sessPerformance.(fnamesPerformance{fieldIdx});
     end
-    
+        
     %% get training session type
     behaviorDataDiamondBySess.trainingtype = sessdata.params.trainingtype;
     
