@@ -11,18 +11,6 @@ filename = [dirs.savedatadir 'behaviorDataDiamondSess_' animalID num2str(index(1
 disp(['Calculating session metrics for ' animalID num2str(index(1)) ' ' num2str(index(2)) ' ' num2str(index(3))]);
 
 if ~exist(filename) || makenewfiles
-    %% resample vectors so can combine across trials
-    for trialIdx = 1:size(trialdata,2)
-        [resampledTrialVects resampledEventTimes] = resampleDiamondMazeTrials(trialdata{trialIdx},params);
-        fnamesVect = fieldnames(resampledTrialVects); fnamesEvents = fieldnames(resampledEventTimes);
-        for fieldIdx = 1:length(fnamesVect)
-           behaviorDataDiamondBySess.(fnamesVect{fieldIdx})(trialIdx,:) = resampledTrialVects.(fnamesVect{fieldIdx});
-        end
-        for fieldIdx = 1:length(fnamesEvents) %have to treat phase, reward, lick event times differently bc uneven amount in each trial
-            behaviorDataDiamondBySess.(fnamesEvents{fieldIdx}){trialIdx,1} = resampledEventTimes.(fnamesEvents{fieldIdx});
-        end
-    end
-
     %% concatenate trial outputs
     concatTrialData = concatTrialOutcomes(trialdata);
     fnamesOutcomes = fieldnames(concatTrialData);
