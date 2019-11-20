@@ -25,7 +25,7 @@ for anIdx = 1:length(animals)
             sessdata = behaviordata.bySession{sessindex(1)}{sessindex(2)}{sessindex(3)};
             trialdata = behaviordata.byTrial{sessindex(1)}{sessindex(2)}{sessindex(3)};
             
-            %hacky way to get choice 1 side for now
+            %hacky way to get choice 1 side for now bc I was dumb and forgot to include it in the raw data structure
             if sessindex(2) > 190922 && sessindex(2) < 191030
                 sessdata.trainingtype = 'choice1side_short';
             end
@@ -35,15 +35,6 @@ for anIdx = 1:length(animals)
                     if isfield(sessdata, fnamesAll{fieldIdx})
                         allsessdata(animals(anIdx)).(track).(fnamesAll{fieldIdx}) = [allsessdata(animals(anIdx)).(track).(fnamesAll{fieldIdx}); sessdata.(fnamesAll{fieldIdx})];
                     end
-                end
-                
-                %trial position
-                for trialIdx = 1:length(sessdata.phase)
-                    allsessdata(animals(anIdx)).(track).posXEnc = [allsessdata(animals(anIdx)).(track).posXEnc; sessdata.phase{trialIdx}(1).posXNorm]; %encoding phase is phase 1
-                    allsessdata(animals(anIdx)).(track).posYEnc = [allsessdata(animals(anIdx)).(track).posYEnc; sessdata.phase{trialIdx}(1).posYNorm]; %encoding phase is phase 1
-                    allsessdata(animals(anIdx)).(track).posXChoice = [allsessdata(animals(anIdx)).(track).posXChoice; sessdata.phase{trialIdx}(3).posXNorm]; %choice phase is phase 3
-                    allsessdata(animals(anIdx)).(track).posYChoice = [allsessdata(animals(anIdx)).(track).posYChoice; sessdata.phase{trialIdx}(3).posYNorm]; %choice phase is phase 3
-                    allsessdata(animals(anIdx)).(track).viewAngle = [allsessdata(animals(anIdx)).(track).viewAngle; sessdata.phase{trialIdx}(3).viewAngle]; %choice phase is phase 3
                 end
                 
                 %sessinfo structure so you can index into trials easily

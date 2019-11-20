@@ -52,4 +52,5 @@ for typeIdx = 1:length(trialTypes)
     output.(['trialsSinceCorrect' trialTypes{typeIdx}]) =  trialsSinceCorrect';
     output.(['trialsSinceLast' trialTypes{typeIdx}]) =  trialsSinceLast';
 end
+
 end

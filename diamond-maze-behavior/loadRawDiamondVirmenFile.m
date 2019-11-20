@@ -45,7 +45,7 @@ if ~exist(filename) || makenewfiles
     %anything over 60 meant there was no max trial duration
     
     if index(2) < 190812 || size(rawdata,2) < 13 %note, after this time period I changed the data structure so it has view angle as well
-        behaviorDataDiamondRaw.viewAngle = nan;
+        behaviorDataDiamondRaw.viewAngle = nan(size(behaviorDataDiamondRaw.time)); %make view Angle nans if it doesn't exist
     else
         behaviorDataDiamondRaw.viewAngle  = rawdata(:,13);
     end

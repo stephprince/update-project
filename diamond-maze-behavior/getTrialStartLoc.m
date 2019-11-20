@@ -8,7 +8,7 @@ northThreshold = 400;
 southThreshold = 200;
 
 %% initial encoding location
-startPos = trialdata.positionYConstTime(trialdata.phaseIndsConstTime(1,1));
+startPos = trialdata.positionYConstTime(trialdata.phaseStartsEndsConstTime(1,1));
 if startPos > northThreshold 
     startLoc = 'north';
 elseif startPos < southThreshold

@@ -34,16 +34,16 @@ if ~exist(filename) || makenewfiles
         for fieldIdx = 1:size(fields,1)
             trialInds = [trialStarts(trialIdx) trialEnds(trialIdx)];
             if ~isnan(sessdata.(fields{fieldIdx}))
-                behaviorDataDiamondByTrial{trialIdx}.(fields{fieldIdx}) = sessdata.(fields{fieldIdx})(trialInds(1):trialInds(2));
+                behaviorDataDiamondByTrial{trialIdx}.([fields{fieldIdx} 'Raw']) = sessdata.(fields{fieldIdx})(trialInds(1):trialInds(2));
             else
-                behaviorDataDiamondByTrial{trialIdx}.(fields{fieldIdx}) = nan;
+                behaviorDataDiamondByTrial{trialIdx}.([fields{fieldIdx} 'Raw']) = nan(size(behaviorDataDiamondByTrial{trialIdx}.timeRaw));
             end
         end
     end
 
     %% get trial duration
     for trialIdx = 1:size(trialStarts,1)
-        timeVect = behaviorDataDiamondByTrial{trialIdx}.time;
+        timeVect = behaviorDataDiamondByTrial{trialIdx}.timeRaw;
         behaviorDataDiamondByTrial{trialIdx}.trialdur = timeVect(end)-timeVect(1); %duration in sec
     end
 
@@ -52,7 +52,7 @@ if ~exist(filename) || makenewfiles
       resampledVects = resampleDiamondMazeTrials(behaviorDataDiamondByTrial{trialIdx},params);
       fnames2add = fieldnames(resampledVects);
       for fieldIdx = 1:size(fnames2add,1)
-        behaviorDataDiamondByTrial{trialIdx}.(fnames2add{fieldIdx}) = resampledVects.(fnames2add{fieldIdx})
+        behaviorDataDiamondByTrial{trialIdx}.(fnames2add{fieldIdx}) = resampledVects.(fnames2add{fieldIdx});
       end
     end
 
@@ -71,12 +71,15 @@ if ~exist(filename) || makenewfiles
     %% get right or left trial
     for trialIdx = 1:size(trialStarts,1)
         %note the first correct zone value will be correct side for encoding only (would switch for choice)
-        if behaviorDataDiamondByTrial{trialIdx}.correctZoneConstTime(1) == 2
+        if behaviorDataDiamondByTrial{trialIdx}.correctZone(1) == 2
             behaviorDataDiamondByTrial{trialIdx}.trialCorrectEncLoc = 'east';
             behaviorDataDiamondByTrial{trialIdx}.trialCorrectChoiceLoc = 'west';
-        elseif behaviorDataDiamondByTrial{trialIdx}.correctZoneConstTime(1) == 1
+        elseif behaviorDataDiamondByTrial{trialIdx}.correctZone(1) == 1
             behaviorDataDiamondByTrial{trialIdx}.trialCorrectEncLoc = 'west';
             behaviorDataDiamondByTrial{trialIdx}.trialCorrectChoiceLoc = 'east';
+        else
+          behaviorDataDiamondByTrial{trialIdx}.trialCorrectEncLoc = 'nan';
+          behaviorDataDiamondByTrial{trialIdx}.trialCorrectChoiceLoc = 'nan';
         end
     end
 

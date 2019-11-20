@@ -7,16 +7,16 @@ function outcome = getTrialOutcomes(sessdata, trialdata)
 %[0 1 2 4] is the pattern of phases for an incorrect or failed trial
 %[0 4] is the pattern of phases for a failed trial
 %[0], [0 1], [0 1 2] are the pattern of phases for early termination trial (for example the end of the session)
-if ~ismember(2,trialdata.phaseTypeConstTime) %if animal never reached choice phase then it was failed
+if ~ismember(2,trialdata.phaseType) %if animal never reached choice phase then it was failed
     outcome = -1;
-elseif ismember(3,trialdata.phaseTypeConstTime) %if animal entered post reward phase then it was correct
+elseif ismember(3,trialdata.phaseType) %if animal entered post reward phase then it was correct
     outcome = 1;
-elseif ismember(2,trialdata.phaseTypeConstTime) && ismember(4,trialdata.phaseTypeConstTime) %if the animal get to choice but goes to punishment, need to determine if fail or incorrect
-    choicePhase = find(trialdata.phaseTypeConstTime == 2);
-    choicePhaseInds = trialdata.phaseIndsConstTime(choicePhase,1):trialdata.phaseIndsConstTime(choicePhase,2);
-    rightZoneVect = trialdata.correctZoneConstTime(choicePhaseInds) - trialdata.currentZoneConstTime(choicePhaseInds);
+elseif ismember(2,trialdata.phaseType) && ismember(4,trialdata.phaseType) %if the animal get to choice but goes to punishment, need to determine if fail or incorrect
+    choicePhase = find(trialdata.phaseType == 2);
+    choicePhaseInds = trialdata.phaseInds(choicePhase,1):trialdata.phaseInds(choicePhase,2);
+    rightZoneVect = trialdata.correctZone(choicePhaseInds) - trialdata.currentZone(choicePhaseInds);
     isCorrect = find(rightZoneVect == 0); %at one point the correct zone was equal to the current zone
-    gotReward = find(trialdata.currentZoneConstTime ~= 0); %at one point the animal entered a reward zone
+    gotReward = find(trialdata.currentZone ~= 0); %at one point the animal entered a reward zone
     if isempty(gotReward)
         outcome = -1; %failed trial occurred if the animal never reached a reward zone
     else
@@ -34,9 +34,9 @@ end
 
 %[0 3], [0 4] are the pattern of phases for continuous alt trials
 if strcmp(sessdata.params.trainingtype,'continuousalt')
-    if ismember(3,trialdata.phaseTypeConstTime) %if animal entered post reward phase then it was correct
+    if ismember(3,trialdata.phaseType) %if animal entered post reward phase then it was correct
         outcome = 1;
-    elseif ismember(4,trialdata.phaseTypeConstTime) %if the animal get to choice but goes to punishment
+    elseif ismember(4,trialdata.phaseType) %if the animal get to choice but goes to punishment
         outcome = 0;
     end
 end
