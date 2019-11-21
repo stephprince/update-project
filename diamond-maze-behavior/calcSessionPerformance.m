@@ -45,8 +45,11 @@ end
 for typeIdx = 1:length(trialTypes)
     trialsSinceCorrect = [];
     correctTrials = find(output.(['sessOutcomes' trialTypes{typeIdx}]) == 1);
-    incorrectIntervals = [correctTrials, [correctTrials(2:end)-1; length(output.(['sessOutcomes' trialTypes{typeIdx}]))]];
     if ~isempty(correctTrials)
+        incorrectIntervals = [correctTrials, [correctTrials(2:end)-1; length(output.(['sessOutcomes' trialTypes{typeIdx}]))]];
+        if incorrectIntervals(1,1) ~= 1 %if the intervals don't start at the first trial
+          incorrectIntervals = [1, incorrectIntervals(1,1)-1; incorrectIntervals];
+        end
         for i = 1:size(incorrectIntervals,1)
             startToEnd = incorrectIntervals(i,:);
             countsSinceLast = [startToEnd(1):startToEnd(2)]-startToEnd(1);

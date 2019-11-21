@@ -1,0 +1,21 @@
+function output = concatTrialBehavior(trialdata,tracktype)
+%SP 191121
+% this function concatenate data from trials like position, view angle, etc.
+
+%% get variables to concatenate
+fnames = fieldnames(trialdata{1});
+counter = 1;
+for fieldIdx = 1:length(fnames)
+    if size(trialdata{1}.(fnames{fieldIdx}),2) == size(trialdata{1}.time,2) %checking which fieldnames are behavior data vectors
+      fnames2concat{counter} = fnames{fieldIdx};
+      counter = counter + 1;
+    end
+end
+
+%% loop through trials to concatenate data
+trialcounter = 1; trialInfo = [];
+for trialIdx = 1:size(trialdata,2)
+    for fieldIdx = 1:length(fnames2concat)
+      output.(fnames{fieldIdx}){trialcounter} = trialdata{trialIdx}.(fnames{fieldIdx}); %change data structure so will be able to concat sessions
+    end
+end

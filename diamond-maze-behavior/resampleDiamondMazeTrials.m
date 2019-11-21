@@ -14,7 +14,7 @@ for i = 1:length(fnames)
 end
 
 %sets time window for resampling to constant sampling rate (in time)
-newTrialSampSize = round(trialdata.trialdur/params.constSampRateTime); %find out how many samples should be in new vect
+newTrialSampSize = round(trialdata.trialdurRaw/params.constSampRateTime); %find out how many samples should be in new vect
 newTimes = trialdata.timeRaw(1):params.constSampRateTime:((newTrialSampSize*params.constSampRateTime)+trialdata.timeRaw(1)); %get times from start to end with const time window
 for i = 1:length(fnames2resample)
   resampledVect = interp1(trialdata.timeRaw,trialdata.([fnames2resample{i} 'Raw']),newTimes,'linear','extrap'); %added extrap to get rid of accidental nan values in the data
@@ -33,11 +33,11 @@ for i = 1:length(fnames2findsteppoints) %replace resampled vectors with 0 and re
   startingValue = trialdata.([fnames2findsteppoints{i} 'Raw'])(1);
   endingValue = trialdata.([fnames2findsteppoints{i} 'Raw'])(end);
   oldValues = [startingValue; trialdata.([fnames2findsteppoints{i} 'Raw'])(oldInds); endingValue]; %gets values at each of the indices for stepping through
-  
+
   %make new vector with step functions with step occurring at each ind
   output.(fnames2findsteppoints{i}) = zeros(size(output.(fnames2findsteppoints{i})))+startingValue;
   for stepIdx = 1:length(oldValues(2:end-1))    %only include value where switch occurred, starting value was already initialized
-    
+
     if stepIdx == length(oldValues(2:end-1))
       inds2change = newInds(stepIdx):length(output.(fnames2findsteppoints{i})); %if last indics then go to end with final value
     else

@@ -21,10 +21,10 @@ if ~isempty(trackdata.sessInfo)
         
     %% plot percent correct trials for each session
     trackdata.trialsSinceCorrectAll
-    plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perCorrect');
-    plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
-    plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numCorrect');
-    plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numTrials');
+    % plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perCorrect');
+    % plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
+    % plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numCorrect');
+    % plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numTrials');
     
 end
     

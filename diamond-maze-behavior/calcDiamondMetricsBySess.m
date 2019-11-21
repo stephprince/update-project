@@ -11,11 +11,18 @@ filename = [dirs.savedatadir 'behaviorDataDiamondSess_' animalID num2str(index(1
 disp(['Calculating session metrics for ' animalID num2str(index(1)) ' ' num2str(index(2)) ' ' num2str(index(3))]);
 
 if ~exist(filename) || makenewfiles
+    %% concatenate trial position, velocity, and viewAngle data
+    concatTrialData = concatTrialBehavior(trialdata,sessdata.params.trainingtype)
+    fnamesBehavior = fieldnames(concatTrialData);
+    for fieldIdx = 1:length(fnamesBehavior)
+        behaviorDataDiamondBySess.(fnamesBehavior{fieldIdx}) = concatTrialData.(fnamesBehavior{fieldIdx});
+    end
+
     %% concatenate trial outputs
-    concatTrialData = concatTrialOutcomes(trialdata,sessdata.params.trainingtype);
-    fnamesOutcomes = fieldnames(concatTrialData);
+    concatTrialResults = concatTrialOutcomes(trialdata,sessdata.params.trainingtype);
+    fnamesOutcomes = fieldnames(concatTrialResults);
     for fieldIdx = 1:length(fnamesOutcomes)
-        behaviorDataDiamondBySess.(fnamesOutcomes{fieldIdx}) = concatTrialData.(fnamesOutcomes{fieldIdx});
+        behaviorDataDiamondBySess.(fnamesOutcomes{fieldIdx}) = concatTrialResults.(fnamesOutcomes{fieldIdx});
     end
 
     %% get percent correct

@@ -11,7 +11,7 @@ lastTrialTurn = 0; %initialize for first trial of continuous alt lookback
 for trialIdx = 1:size(trialdata,2) 
     %% get info from trialdata structure
     %trial duration
-    dur = trialdata{trialIdx}.trialdur;
+    dur = trialdata{trialIdx}.trialdurRaw;
     
     % get start and reward locations
     %finds what the directions/locations are and map to number (ie,1 = north, 2 = east, 3 = south, 4 = west (like a compass lol))
