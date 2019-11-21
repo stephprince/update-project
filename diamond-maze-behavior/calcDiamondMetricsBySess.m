@@ -12,14 +12,14 @@ disp(['Calculating session metrics for ' animalID num2str(index(1)) ' ' num2str(
 
 if ~exist(filename) || makenewfiles
     %% concatenate trial outputs
-    concatTrialData = concatTrialOutcomes(trialdata);
+    concatTrialData = concatTrialOutcomes(trialdata,sessdata.params.trainingtype);
     fnamesOutcomes = fieldnames(concatTrialData);
     for fieldIdx = 1:length(fnamesOutcomes)
         behaviorDataDiamondBySess.(fnamesOutcomes{fieldIdx}) = concatTrialData.(fnamesOutcomes{fieldIdx});
     end
 
     %% get percent correct
-    sessPerformance = calcSessionPerformance(behaviorDataDiamondBySess,trialdata);
+    sessPerformance = calcSessionPerformance(behaviorDataDiamondBySess,trialdata,sessdata.params.trainingtype);
     fnamesPerformance = fieldnames(sessPerformance);
     for fieldIdx = 1:length(fnamesPerformance)
         behaviorDataDiamondBySess.(fnamesPerformance{fieldIdx}) = sessPerformance.(fnamesPerformance{fieldIdx});

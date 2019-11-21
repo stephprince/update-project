@@ -1,4 +1,4 @@
-function output = concatTrialOutcomes(trialdata)
+function output = concatTrialOutcomes(trialdata,tracktype)
 
 %% initialize variables
 fnames = {'dur','startLoc','choiceLoc','correctEncLoc','correctChoiceLoc','turnDirEnc','turnDirChoice','sameTurn'};
@@ -7,6 +7,7 @@ for fieldIdx = 1:length(fnames)
 end
 
 %% loop through trials to concatenate data
+lastTrialTurn = 0; %initialize for first trial of continuous alt lookback
 for trialIdx = 1:size(trialdata,2) 
     %% get info from trialdata structure
     %trial duration
@@ -30,13 +31,20 @@ for trialIdx = 1:size(trialdata,2)
     turnDirChoice = mappingTurns(ismember(mappingTurns(:,1:2),[choiceLoc, correctChoiceLoc],'rows'),3);
     
     %classify trials as same or alternate turning direction for correct choice
-    sameoralt = turnDirEnc - turnDirChoice; %if encoding and choice are the same then result is 0, otherwise +/- 2 since it's 4 and 2 reward locations
+    if strcmp(tracktype,'continuousalt') %same or alt turn with different meanings for continuous alt (previous trial the same or alternate turn)
+      thisTrialTurn = turnDirEnc;
+      sameoralt = thisTrialTurn - lastTrialTurn; 
+      lastTrialTurn = thisTrialTurn; %reset last trial value to this trial
+    else
+      sameoralt = turnDirEnc - turnDirChoice; %if encoding and choice are the same then result is 0, otherwise +/- 2 since it's 4 and 2 reward locations
+    end
+    
     if sameoralt
         sameTurn = 0; %if theres a positive or negative value, encoding and choice turning values were different
     else
         sameTurn = 1; %if 0, turn and choice were the same
     end
-
+    
     %% concatenate across trials
     for fieldIdx = 1:length(fnames)
         output.([fnames{fieldIdx} 'All']) = [output.([fnames{fieldIdx} 'All']); eval(fnames{fieldIdx})];

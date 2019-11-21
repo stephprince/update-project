@@ -1,4 +1,4 @@
-function output = calcSessionPerformance(sessdata,trialdata)
+function output = calcSessionPerformance(sessdata,trialdata,tracktype)
 %SP 190924
 
 trialTypes = {'All','Left','Right','Same','Alt'};
@@ -10,6 +10,14 @@ output.sessOutcomesLeft = output.sessOutcomesAll(sessdata.turnDirChoiceAll == 1)
 output.sessOutcomesRight = output.sessOutcomesAll(sessdata.turnDirChoiceAll == 2); %right turns
 output.sessOutcomesSame = output.sessOutcomesAll(sessdata.sameTurnAll == 1); %same turn (encoding and choice phases had the same turn to be correct or not)
 output.sessOutcomesAlt = output.sessOutcomesAll(sessdata.sameTurnAll == 0); %alternate turns
+
+%different for continuous alternation task since there is no encoding vs. choice phase so all based on the encoding phases
+if strcmp(tracktype,'continuousalt')
+  output.sessOutcomesLeft = output.sessOutcomesAll(sessdata.turnDirEncAll == 1); %left turns (right or left turns were correct during choice phase)
+  output.sessOutcomesRight = output.sessOutcomesAll(sessdata.turnDirEncAll == 2); %right turns
+  output.sessOutcomesSame = output.sessOutcomesAll(sessdata.sameTurnAll == 1); %same turn (encoding and choice phases had the same turn to be correct or not)
+  output.sessOutcomesAlt = output.sessOutcomesAll(sessdata.sameTurnAll == 0); %alternate turns
+end
 
 %% calculate number correct for each trial type
 for typeIdx = 1:length(trialTypes)

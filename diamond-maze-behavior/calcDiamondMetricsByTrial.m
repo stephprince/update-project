@@ -19,7 +19,7 @@ filename = [dirs.savedatadir 'behaviorDataDiamondTrial_' animalID num2str(index(
 disp(['Calculating trial metrics for ' animalID num2str(index(1)) ' ' num2str(index(2)) ' ' num2str(index(3))]);
 
 if ~exist(filename) || makenewfiles
-    %% get trial times
+    %% get trial times (why didn't I use numTrials? idk but I think there was a reason...)
     trialStarts = [1; find(diff(ismember(sessdata.currentPhase,[3 4])) == -1) + 1]; %looks for when reward or punishment phase happened and finds the end
     trialEnds = [find(diff(ismember(sessdata.currentPhase,[3 4])) == -1); length(sessdata.currentPhase)];
     if ~ismember(sessdata.currentPhase,[3,4]) %failed trial or linear track, in this case look for large changes in position
@@ -44,12 +44,12 @@ if ~exist(filename) || makenewfiles
     %% get trial duration
     for trialIdx = 1:size(trialStarts,1)
         timeVect = behaviorDataDiamondByTrial{trialIdx}.timeRaw;
-        behaviorDataDiamondByTrial{trialIdx}.trialdur = timeVect(end)-timeVect(1); %duration in sec
+        behaviorDataDiamondByTrial{trialIdx}.trialdurRaw = timeVect(end)-timeVect(1); %duration in sec
     end
 
     %% resample trial data so constant time sampling rate
     for trialIdx = 1:size(trialStarts,1)
-      resampledVects = resampleDiamondMazeTrials(behaviorDataDiamondByTrial{trialIdx},params);
+      resampledVects = resampleDiamondMazeTrials(behaviorDataDiamondByTrial{trialIdx},params,sessdata.params.trainingtype);
       fnames2add = fieldnames(resampledVects);
       for fieldIdx = 1:size(fnames2add,1)
         behaviorDataDiamondByTrial{trialIdx}.(fnames2add{fieldIdx}) = resampledVects.(fnames2add{fieldIdx});
