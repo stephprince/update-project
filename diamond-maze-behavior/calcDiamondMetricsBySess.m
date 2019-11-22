@@ -26,7 +26,7 @@ if ~exist(filename) || makenewfiles
     end
 
     %% get percent correct
-    sessPerformance = calcSessionPerformance(behaviorDataDiamondBySess,trialdata,sessdata.params.trainingtype);
+    sessPerformance = calcSessionPerformance(behaviorDataDiamondBySess,trialdata,sessdata.params.trainingtype, index);
     fnamesPerformance = fieldnames(sessPerformance);
     for fieldIdx = 1:length(fnamesPerformance)
         behaviorDataDiamondBySess.(fnamesPerformance{fieldIdx}) = sessPerformance.(fnamesPerformance{fieldIdx});
