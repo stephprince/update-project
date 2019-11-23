@@ -28,15 +28,19 @@ for anIdx = 1:length(animals)
     end
 end
 
-%% plot view angle averages throughout the trial
+%% plot licking (as a function of distance from reward and trials since correct)
 for anIdx = 1:length(animals)
     for trackIdx = 2:length(trainingoptions)
-        plotViewAngle(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs); 
+        plotDiamondTrackLicks(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
     end
 end
 
-%% plot licking (as a function of distance from reward and trials since correct)
-
+%% plot view angle averages throughout the trial
+for anIdx = 1:length(animals)
+    for trackIdx = 2:length(trainingoptions)
+        plotViewAngle(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+    end
+end
 
 %% plot velocity throughout the track
 

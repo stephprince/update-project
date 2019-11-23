@@ -16,7 +16,7 @@ if ~isempty(trackdata.sessInfo) && ~isempty(trackdata.viewAngle)
     %find when animal is in main part of track and large position jumps
     altTrackInds = find(trackdata.currentWorld{trialIdx} == 1);
     teleportEvents = find(abs(diff(trackdata.positionY{trialIdx})) > 10);
-    if isempty(teleportEvent);
+    if isempty(teleportEvents);
       bins2keep = altTrackInds;
     else
       bins2throw = find(ismember(altTrackInds,teleportEvents));
@@ -45,11 +45,15 @@ if ~isempty(trackdata.sessInfo) && ~isempty(trackdata.viewAngle)
   for trialIdx = 1:size(trackdata.time,1)
     [n edg binsUsedX] = histcounts(positionXClean{trialIdx},posXbins);
     [n edg binsUsedY] = histcounts(positionYClean{trialIdx},posYbins);
-    angleHistX(trialIdx,binsUsedX) = viewAngleClean{trialIdx};
-    angleHistY(trialIdx,binsUsedY) = viewAngleClean{trialIdx};
-    angleHistX(angleHistX == 0) = nan;
-    angleHistY(angleHistY == 0) = nan;
+    angleHistXTemp = []; angleHistYTemp = [];
+    for binIdx = 1:size(binsUsedX,2)
+      data2addX = nan(size(binsUsedX));
+      angleHistX(trialIdx,binsUsedX) = viewAngleClean{trialIdx};
+      angleHistY(trialIdx,binsUsedY) = viewAngleClean{trialIdx};
+    end
   end
+  angleHistX(angleHistX == 0) = nan;
+  angleHistY(angleHistY == 0) = nan;
   angleHistXCorrectRight = angleHistX(union(correctTrials,rightTrials),:);
   angleHistXIncorrectRight = angleHistX(union(incorrectTrials,rightTrials),:);
   angleHistYCorrectRight = angleHistY(union(correctTrials,rightTrials),:);
