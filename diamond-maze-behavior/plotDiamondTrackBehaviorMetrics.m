@@ -1,4 +1,4 @@
-function statsoutput = plotDiamondTrackBehaviorMetrics(dirs,indices,behaviordata);
+function statsoutput = plotDiamondTrackBehaviorMetrics(dirs,indices,params,behaviordata);
 
 animals = unique(indices.behaviorindex(:,1));
 trainingoptions = {'linear','shaping','choice1side','choice2side','choice1side_short','continuousalt'};
@@ -31,7 +31,7 @@ end
 %% plot licking (as a function of distance from reward and trials since correct)
 for anIdx = 1:length(animals)
     for trackIdx = 2:length(trainingoptions)
-        plotDiamondTrackLicks(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+        plotDiamondTrackLicks(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs, params);
     end
 end
 
