@@ -9,7 +9,8 @@ allsessdata = concatDiamondMazeSessions(animals, indices, behaviordata, training
 
 %% plot percent correct
 for anIdx = 1:length(animals)
-    for trackIdx = 2:length(trainingoptions) %don't really care about linear track performance
+    %don't really care about linear track performance
+    for trackIdx = 2:length(trainingoptions);
         plotDiamondTrackCorrectPerformance(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
     end
 end
@@ -42,7 +43,16 @@ for anIdx = 1:length(animals)
     end
 end
 
-%% plot velocity throughout the track
-
-
 %% plot position as a function of time
+for anIdx = 1:length(animals)
+    for trackIdx = 2:length(trainingoptions)
+        plotDiamondTrackPosition(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+    end
+end
+
+%% plot velocity as a function of position
+for anIdx = 1:length(animals)
+    for trackIdx = 2:length(trainingoptions)
+        plotDiamondTrackVelocity(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+    end
+end
