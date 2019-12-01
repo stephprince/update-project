@@ -12,6 +12,9 @@ function plotInfo = getDiamondTrackPlotInfo(trackdata, animal, track, dirs)
   plotInfo.backgroundInfoDays = plotInfo.dayIntervalsBySession(1:2:end,:)+[-0.5 0.5];
   plotInfo.backgroundInfoDays = [plotInfo.backgroundInfoDays, fliplr(plotInfo.backgroundInfoDays)];
   plotInfo.fillInfoDays = repmat([0 0 1.01 1.01],size(plotInfo.backgroundInfoDays,1),1);
+  plotInfo.backgroundInfoTrials = plotInfo.dayIntervalsByTrial(1:2:end,:)+[-0.5 0.5];
+  plotInfo.backgroundInfoTrials = [plotInfo.backgroundInfoTrials, fliplr(plotInfo.backgroundInfoTrials)];
+  plotInfo.fillInfoTrials = repmat([0 0 1.01 1.01],size(plotInfo.backgroundInfoTrials,1),1);
 
   %define color mappings
   plotInfo.trialSubtype = {'All','Left','Right','Same','Alt'};
