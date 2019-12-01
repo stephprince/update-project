@@ -39,10 +39,20 @@ if ~isempty(trackdata.sessInfo)
         % closestRewardInd = (rewardTimeDiffFromZone == min(rewardTimeDiffFromZone));
         % lickWindow = (rewardInds(closestRewardInd) - timeWindow):(rewardInds(closestRewardInd) + timeWindow); %look at time window where the lick happened
         lickWindow = (enteredZoneInd - timeWindow):(enteredZoneInd + timeWindow); %look at time window where the lick happened
-        if max(lickWindow) > size(trackdata.numLicks{trialIdx},2) %if the trial ends before the time window has closed
-          lickDataTemp = diff(trackdata.numLicks{trialIdx}(lickWindow(1):end));
-          extraSamples2Add = nan(1,(timeWindow*2)-length(lickDataTemp));
-          lickData = [lickDataTemp, extraSamples2Add];
+        if max(lickWindow) > size(trackdata.numLicks{trialIdx},2) || min(lickWindow) < 1%if the trial ends before the time window has closed
+          if max(lickWindow) > size(trackdata.numLicks{trialIdx},2) && min(lickWindow) < 1
+            lickDataTemp = diff(trackdata.numLicks{trialIdx});
+            extraSamples2AddFirst = nan(1,abs(1-min(lickWindow)));
+            extraSamples2AddLast = nan(1,abs(size(trackdata.numLicks{trialIdx},2) - max(lickWindow)));
+          elseif max(lickWindow) > size(trackdata.numLicks{trialIdx},2)
+            lickDataTemp = diff(trackdata.numLicks{trialIdx}(lickWindow(1):end));
+            extraSamples2Add = nan(1,(timeWindow*2)-length(lickDataTemp));
+            lickData = [lickDataTemp, extraSamples2Add];
+          elseif min(lickWindow) < 1
+            lickDataTemp = diff(trackdata.numLicks{trialIdx}(1:lickWindow(end)));
+            extraSamples2Add = nan(1,(timeWindow*2)-length(lickDataTemp));
+            lickData = [extraSamples2Add, lickDataTemp];
+          end
         else
           lickData = diff(trackdata.numLicks{trialIdx}(lickWindow)); %find lick times
         end
