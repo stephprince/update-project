@@ -14,6 +14,10 @@ if ~isempty(trackdata.sessInfo)
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numCorrect');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numTrials');
+
+    %% plot percent correct trials in trial blocks
+    plotDiamondTrackMetricsByTrial(trackdata,animal,track,dirs,plotInfo,'perCorrect');
+    plotDiamondTrackMetricsByTrial(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
 end
 
 end

@@ -24,8 +24,8 @@ if ~isempty(trackdata.sessInfo)
     colorToPlot = 'k';
     for i = 1:size(plotInfo.backgroundInfoDays)
       fill(plotInfo.backgroundInfoDays(i,:),plotInfo.fillInfoDays(i,:),[0.5 0 1],'LineStyle','none','FaceAlpha',0.25); end  %show background of single days performance
-      plot(1:plotInfo.numSessions,avgTrialsSinceLastCorrect,[colorToPlot 'o-'],'LineWidth',2);
-      plot(1:plotInfo.numSessions,repmat(0.5,plotInfo.numSessions,1),'k--','LineWidth',2);
+      plot(1:length(sessions),avgTrialsSinceLastCorrect,[colorToPlot 'o-'],'LineWidth',2);
+      plot(1:length(sessions),repmat(0.5,length(sessions),1),'k--','LineWidth',2);
       xlabel('Session'); ylabel('avgTrialsSinceCorrect');
       set(gca,'tickdir','out'); ylim([0 1.01*max(m)]);
       title(['S' num2str(animal) ' performance on ' track ' track - avgTrialsSinceLastCorrect']);
