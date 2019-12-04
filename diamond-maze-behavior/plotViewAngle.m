@@ -72,7 +72,8 @@ if ~isempty(trackdata.sessInfo) && ~isempty(trackdata.viewAngle)
         angleHist = eval(['angleHist' trialPlottype{axIdx}]);
         angleHistSubtype = angleHist(intersect(trialtype1, trialtype2),:);
         angleHistData.(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).all = angleHistSubtype;
-        posBins = eval(['pos' trialPlottype{axIdx} 'bins']);
+        posBinsRaw = eval(['pos' trialPlottype{axIdx} 'bins']);
+        posBins = posBinsRaw;
 
         %clean the data from nans
         tempmean = nanmean(angleHistSubtype);
@@ -83,6 +84,7 @@ if ~isempty(trackdata.sessInfo) && ~isempty(trackdata.viewAngle)
         angleHistData.(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).avg =  tempmean;
         angleHistData.(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).sem = tempsem;
         angleHistData.(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).posbins = posBins;
+        angleHistData.(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).posbinsraw = posBinsRaw;
         angleHistData.(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).numtrials = numtrials;
       end
     end
@@ -102,6 +104,7 @@ if ~isempty(trackdata.sessInfo) && ~isempty(trackdata.viewAngle)
       numTrialsLeft = angleHistData.(trialPlottype{axIdx}).left.(trialOutcome{outIdx}).numtrials;
       numTrials = numTrialsRight + numTrialsLeft;
 
+      %plot averages
       if strcmp(trialPlottype{axIdx},'X');
         avg2plotRight = abs(avg2plotRight);
         sem2plotRight = abs(sem2plotRight);
@@ -114,6 +117,15 @@ if ~isempty(trackdata.sessInfo) && ~isempty(trackdata.viewAngle)
       xlabel([trialPlottype{axIdx} ' Position']); ylabel('View Angle'); set(gca,'tickdir','out');
       title(['S' num2str(animal) ' performance on ' track ' track - viewAngle - ' trialOutcome{outIdx} 'n=' num2str(numTrials)]);
       filename = [dirs.behaviorfigdir 'viewAngle_' track  '_S' num2str(animal) '_pos' trialPlottype{axIdx} '_' trialOutcome{outIdx}];
+      saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+
+      %plot individual traces
+      figure; hold on;
+      plot(angleHistData.(trialPlottype{axIdx}).right.(trialOutcome{outIdx}).all',angleHistData.(trialPlottype{axIdx}).right.(trialOutcome{outIdx}).posbinsraw,'r'); alpha(0.3);
+      plot(angleHistData.(trialPlottype{axIdx}).left.(trialOutcome{outIdx}).all',angleHistData.(trialPlottype{axIdx}).left.(trialOutcome{outIdx}).posbinsraw,'b'); alpha(0.3);
+      xlabel([trialPlottype{axIdx} ' Position']); ylabel('View Angle'); set(gca,'tickdir','out');
+      title(['S' num2str(animal) ' performance on ' track ' track - viewAngle - ' trialOutcome{outIdx} 'n=' num2str(numTrials)]);
+      filename = [dirs.behaviorfigdir 'viewAngle_' track  '_S' num2str(animal) '_pos' trialPlottype{axIdx} '_' trialOutcome{outIdx} '_indivtrials'];
       saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
     end
   end
