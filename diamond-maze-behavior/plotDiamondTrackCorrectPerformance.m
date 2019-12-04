@@ -10,6 +10,7 @@ if ~isempty(trackdata.sessInfo)
     trackInfo = trackdata.sessInfo;
 
     %% plot percent correct trials for each session
+    plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numRewards');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perCorrect');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numCorrect');

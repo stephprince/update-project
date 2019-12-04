@@ -43,16 +43,9 @@ for anIdx = 1:length(animals)
     end
 end
 
-%% plot position as a function of time
+%% plot position and velocity as a function of time
 for anIdx = 1:length(animals)
     for trackIdx = 2:length(trainingoptions)
         plotDiamondTrackPosition(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
-    end
-end
-
-%% plot velocity as a function of position
-for anIdx = 1:length(animals)
-    for trackIdx = 2:length(trainingoptions)
-        plotDiamondTrackVelocity(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
     end
 end

@@ -21,33 +21,59 @@ for blockIdx = 1:length(params.trialBlockSize)
 
   %% loop through fieldnames to bin the data
   %concatenate all the binned data into trial blocks
-  perCorrectPerBlock = []; perCorrectPerBlockRight = []; perCorrectPerBlockLeft = [];
+  perCorrectPerBlock = []; perCorrectPerBlockRight = []; perCorrectPerBlockLeft = []; perCorrectTrialBlockDistBySess = []; sessGroupVect = [];
   for sessIdx = 1:max(trackdata.sessInfo(:,4))
     trials2Bin = trackdata.sessOutcomesAll(find(trackdata.sessInfo(:,4) == sessIdx));
     trialSubType = trackdata.turnDirEncAll(find(trackdata.sessInfo(:,4) == sessIdx));
     trials2BinLeft = trials2Bin(trialSubType == 1);
     trials2BinRight = trials2Bin(trialSubType == 2);
-    trialBins = 1:params.trialBlockSize:length(find(trackdata.sessInfo(:,4) == sessIdx));
-    trialBinsLeft = 1:params.trialBlockSize:length(trials2BinLeft);
-    trialBinsRight = 1:params.trialBlockSize:length(trials2BinRight);
+    if length(find(trackdata.sessInfo(:,4) == sessIdx)) >= blockSize
+      trialBins = 1:blockSize:length(find(trackdata.sessInfo(:,4) == sessIdx));
+      trialBinsLeft = 1:blockSize:length(trials2BinLeft);
+      trialBinsRight = 1:blockSize:length(trials2BinRight);
 
-    %loop through bins to calc percent correct
-    for binIdx = 1:length(trialBins)-1
-      trialBlockOutcomes = trials2Bin(trialBins(binIdx):trialBins(binIdx+1));
-      perCorrectTemp = sum(trialBlockOutcomes == 1)/length(trialBlockOutcomes);
-      perCorrectPerBlock = [perCorrectPerBlock; perCorrectTemp];
-    end
-    for binIdx = 1:length(trialBinsRight)-1
-      trialBlockOutcomesRight = trials2BinRight(trialBinsRight(binIdx):trialBinsRight(binIdx+1));
-      perCorrectTempRight = sum(trialBlockOutcomesRight == 1)/length(trialBlockOutcomesRight);
-      perCorrectPerBlockRight = [perCorrectPerBlockRight; perCorrectTempRight];
-    end
-    for binIdx = 1:length(trialBinsLeft)-1
-      trialBlockOutcomesLeft = trials2BinLeft(trialBinsLeft(binIdx):trialBinsLeft(binIdx+1));
-      perCorrectTempLeft = sum(trialBlockOutcomesLeft == 1)/length(trialBlockOutcomesLeft);
-      perCorrectPerBlockLeft = [perCorrectPerBlockLeft; perCorrectTempLeft];
+      %loop through bins to calc percent correct
+      perCorrectPerSess{sessIdx} = []; perCorrectPerSessRight{sessIdx} = []; perCorrectPerSessLeft{sessIdx} = [];
+      for binIdx = 1:length(trialBins)-1
+        trialBlockOutcomes = trials2Bin(trialBins(binIdx):trialBins(binIdx+1));
+        perCorrectTemp = sum(trialBlockOutcomes == 1)/length(trialBlockOutcomes);
+        perCorrectPerBlock = [perCorrectPerBlock; perCorrectTemp];
+        perCorrectPerSess{sessIdx} = [perCorrectPerSess{sessIdx}; perCorrectTemp];
+      end
+      for binIdx = 1:length(trialBinsRight)-1
+        trialBlockOutcomesRight = trials2BinRight(trialBinsRight(binIdx):trialBinsRight(binIdx+1));
+        perCorrectTempRight = sum(trialBlockOutcomesRight == 1)/length(trialBlockOutcomesRight);
+        perCorrectPerBlockRight = [perCorrectPerBlockRight; perCorrectTempRight];
+        perCorrectPerSessRight{sessIdx} = [perCorrectPerSessRight{sessIdx}; perCorrectTemp];
+      end
+      for binIdx = 1:length(trialBinsLeft)-1
+        trialBlockOutcomesLeft = trials2BinLeft(trialBinsLeft(binIdx):trialBinsLeft(binIdx+1));
+        perCorrectTempLeft = sum(trialBlockOutcomesLeft == 1)/length(trialBlockOutcomesLeft);
+        perCorrectPerBlockLeft = [perCorrectPerBlockLeft; perCorrectTempLeft];
+        perCorrectPerSessLeft{sessIdx} = [perCorrectPerSessLeft{sessIdx}; perCorrectTemp];
+      end
+
+      %get distribution of trial block percent correct for the session
+      perCorrectTrialBlockDistBySess = [perCorrectTrialBlockDistBySess; perCorrectPerSess{sessIdx}];
+      sessGroupVect = [sessGroupVect; ones(size(perCorrectPerSess{sessIdx}))*sessIdx];
+    else
+      perCorrectTrialBlockDistBySess = [perCorrectTrialBlockDistBySess; nan];
+      sessGroupVect = [sessGroupVect; sessIdx];
     end
   end
+
+  %plot boxplot distribution
+  % if sum(~ismember([1:max(trackdata.sessInfo(:,4))],sessGroupVect))
+  %     missingval = find(~ismember([1:max(trackdata.sessInfo(:,4))],sessGroupVect));
+  %     trialDurs = [trialDurs; nan(size(missingval))']; groupVect = [groupVect; missingval'];
+  % end
+  figure; hold on;
+  boxplot(perCorrectTrialBlockDistBySess,sessGroupVect); hold on;
+  ylabel('percent correct trial blocks'); set(gca,'tickdir','out');
+  xlabel('Session'); ylim([0 1.01])
+  title(['S' num2str(animal) ' performance on ' track ' track']);
+  filename = [dirs.behaviorfigdir 'sessPerformanceAll_' track  '_S' num2str(animal) '_blocksize' num2str(blockSize) '_trialblocks_boxplotdist'];
+  saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 
   %get the distribution of percentages
   edges = 0:stepsize:1; plotedges = edges(2:end)-stepsize*0.5;
