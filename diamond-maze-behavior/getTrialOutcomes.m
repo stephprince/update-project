@@ -13,7 +13,7 @@ elseif ismember(3,trialdata.phaseType) %if animal entered post reward phase then
     outcome = 1;
 elseif ismember(2,trialdata.phaseType) && ismember(4,trialdata.phaseType) %if the animal get to choice but goes to punishment, need to determine if fail or incorrect
     choicePhase = find(trialdata.phaseType == 2);
-    choicePhaseInds = trialdata.phaseInds(choicePhase,1):trialdata.phaseInds(choicePhase,2);
+    choicePhaseInds = trialdata.phaseStartsEnds(choicePhase,1):trialdata.phaseStartsEnds(choicePhase,2);
     rightZoneVect = trialdata.correctZone(choicePhaseInds) - trialdata.currentZone(choicePhaseInds);
     isCorrect = find(rightZoneVect == 0); %at one point the correct zone was equal to the current zone
     gotReward = find(trialdata.currentZone ~= 0); %at one point the animal entered a reward zone
@@ -26,7 +26,7 @@ else %only other option is an early end of virmen ([0 1 2]) which counts as a fa
     outcome = -1;
 end
 
-%% separate linear track trials and continuous alt trials 
+%% separate linear track trials and continuous alt trials
 if strcmp(sessdata.params.trainingtype,'linear') %linear track does not have correct/incorrect zone and only has failed trials
     outcome = -1; %failed trial
     return
