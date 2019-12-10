@@ -16,7 +16,7 @@ if ~isempty(trackdata.sessInfo)
 
   %get histogram of position for the vector and apply the indices to other metrics
   for metricIdx = 1:size(metrics2plot,1)
-    hists2plot.([metrics2plot{metricIdx} 'Hists']) = calcHistByPosition(trackdataClean,metrics2plot{metricIdx});
+    hists2plot.([metrics2plot{metricIdx} 'Hists']) = calcHistByPosition(trackDataClean,metrics2plot{metricIdx});
   end
 
   % compile all the data and clean it up

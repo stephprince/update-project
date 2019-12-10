@@ -7,45 +7,24 @@ statsoutput = [];
 %% concatenate data across sessions
 allsessdata = concatDiamondMazeSessions(animals, indices, behaviordata, trainingoptions);
 
-%% plot percent correct
+%% plot all behavior metrics (don't really care about linear track performance so track options start at 2)
 for anIdx = 1:length(animals)
-    %don't really care about linear track performance
-    for trackIdx = 2:length(trainingoptions);
+    for trackIdx = 2:length(trainingoptions)
+        % plot percent correct
         plotDiamondTrackCorrectPerformance(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
-    end
-end
 
-%% plot continuous alt performance
-for anIdx = 1:length(animals)
-    for trackIdx = find(strcmp(trainingoptions, 'continuousalt'))
-        plotContinuousAltPerformance(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
-    end
-end
-
-%% plot average trial duration for correct, failed, incorrect trials for each session
-for anIdx = 1:length(animals)
-    for trackIdx = 2:length(trainingoptions)
-        plotDiamondTrackBoxplotDist(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}),animals(anIdx),trainingoptions{trackIdx},dirs,'dur');
-    end
-end
-
-%% plot licking (as a function of distance from reward and trials since correct)
-for anIdx = 1:length(animals)
-    for trackIdx = 2:length(trainingoptions)
+        % plot licking (as a function of distance from reward and trials since correct)
         plotDiamondTrackLicks(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs, params);
-    end
-end
 
-%% plot view angle averages throughout the trial
-for anIdx = 1:length(animals)
-    for trackIdx = 2:length(trainingoptions)
-        plotViewAngle(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
-    end
-end
+        % plot average trial duration for correct, failed, incorrect trials for each session
+        plotDiamondTrackBoxplotDist(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}),animals(anIdx),trainingoptions{trackIdx},dirs,'dur');
 
-%% plot position and velocity as a function of time
-for anIdx = 1:length(animals)
-    for trackIdx = 2:length(trainingoptions)
-        plotDiamondTrackPosition(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+        % plot metrics as a function of position throughout the trial
+        plotDiamondTrackMetricsByPosition(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+
+        % plot continuous alt performance
+        if strcmp(trainingoptions{trackIdx},'continuousalt')
+          plotContinuousAltPerformance(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+        end
     end
 end
