@@ -4,7 +4,7 @@ function [startLoc choiceLoc] = getTrialStartLoc(trialdata)
 
 %arbitrary designations, the starting north position is above this point
 %for both short and long trials
-northThreshold = 400;
+northThreshold = 350;
 southThreshold = 200;
 
 %% initial encoding location

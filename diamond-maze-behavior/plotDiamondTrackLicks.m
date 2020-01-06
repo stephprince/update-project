@@ -7,8 +7,12 @@ if ~isempty(trackdata.sessInfo)
   plotInfo = getDiamondTrackPlotInfo(trackdata, animal, track, dirs);
   correctTrials = find(trackdata.sessOutcomesAll == 1);
   incorrectTrials = find(trackdata.sessOutcomesAll == 0);
-  rightTrials = find(cell2mat(cellfun(@(x) ismember(1, x), trackdata.currentZone, 'UniformOutput',0))); %need to check which value is right vs left
-  leftTrials = find(cell2mat(cellfun(@(x) ismember(2, x), trackdata.currentZone, 'UniformOutput',0)));
+  eastTrials = find(cell2mat(cellfun(@(x) ismember(2, x), trackdata.currentZone, 'UniformOutput',0))); %need to check which value is right vs left
+  westTrials = find(cell2mat(cellfun(@(x) ismember(1, x), trackdata.currentZone, 'UniformOutput',0)));
+  northTrials = find(trackdata.startLocAll == 1);
+  southTrials = find(trackdata.startLocAll == 3);
+  rightTrials = sort(([intersect(southTrials, eastTrials); intersect(northTrials,westTrials)]));
+  leftTrials = sort([intersect(southTrials, westTrials); intersect(northTrials,eastTrials)]);
 
   % get lick data from set time around reward
   timeWindow = 300; %looks at 300 samples before and after (3*0.01s = 3 secs)

@@ -19,6 +19,10 @@ if ~isempty(trackdata.sessInfo)
     %% plot percent correct trials in trial blocks
     plotDiamondTrackMetricsByTrial(trackdata,animal,track,dirs,plotInfo,'perCorrect');
     plotDiamondTrackMetricsByTrial(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
+
+    %% plot percent correct trials in sliding window
+    plotDiamondTrackMetricsByTrial_SlidingWindow(trackdata,animal,track,dirs,plotInfo,'perCorrect');
+    plotDiamondTrackMetricsByTrial_SlidingWindow(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
 end
 
 end

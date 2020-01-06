@@ -10,6 +10,9 @@ allsessdata = concatDiamondMazeSessions(animals, indices, behaviordata, training
 %% plot all behavior metrics (don't really care about linear track performance so track options start at 2)
 for anIdx = 1:length(animals)
     for trackIdx = 2:length(trainingoptions)
+        % plot metrics as a function of position throughout the trial
+        plotDiamondTrackMetricsByPosition(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
+
         % plot percent correct
         plotDiamondTrackCorrectPerformance(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
 
@@ -18,9 +21,6 @@ for anIdx = 1:length(animals)
 
         % plot average trial duration for correct, failed, incorrect trials for each session
         plotDiamondTrackBoxplotDist(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}),animals(anIdx),trainingoptions{trackIdx},dirs,'dur');
-
-        % plot metrics as a function of position throughout the trial
-        plotDiamondTrackMetricsByPosition(allsessdata(animals(anIdx)).(trainingoptions{trackIdx}), animals(anIdx), trainingoptions{trackIdx}, dirs);
 
         % plot continuous alt performance
         if strcmp(trainingoptions{trackIdx},'continuousalt')

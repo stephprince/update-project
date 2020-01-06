@@ -8,8 +8,12 @@ if ~isempty(trackdata.sessInfo)
   plotInfo = getDiamondTrackPlotInfo(trackdata, animal, track, dirs);
   trialtypes.correctTrials = find(trackdata.sessOutcomesAll == 1);
   trialtypes.incorrectTrials = find(trackdata.sessOutcomesAll == 0);
-  trialtypes.rightTrials = find(cell2mat(cellfun(@(x) ismember(2, x), trackdata.currentZone, 'UniformOutput',0)));
-  trialtypes.leftTrials = find(cell2mat(cellfun(@(x) ismember(1, x), trackdata.currentZone, 'UniformOutput',0)));
+  eastTrials = find(cell2mat(cellfun(@(x) ismember(2, x), trackdata.currentZone, 'UniformOutput',0))); %need to check which value is right vs left
+  westTrials = find(cell2mat(cellfun(@(x) ismember(1, x), trackdata.currentZone, 'UniformOutput',0)));
+  northTrials = find(trackdata.startLocAll == 1);
+  southTrials = find(trackdata.startLocAll == 3);
+  trialtypes.rightTrials = sort(([intersect(southTrials, eastTrials); intersect(northTrials,westTrials)]));
+  trialtypes.leftTrials = sort([intersect(southTrials, westTrials); intersect(northTrials,eastTrials)]);
 
   %clean the data to get rid of teleportation events for plotting
   trackDataClean = cleanTeleportEvents(trackdata);
@@ -24,5 +28,5 @@ if ~isempty(trackdata.sessInfo)
 
   % plot averages and individual traces
   plotHistByPosition(hists2plotConcat, trialtypes, metrics2plot, animal, track, dirs);
-  
+
 end

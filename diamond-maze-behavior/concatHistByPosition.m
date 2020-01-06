@@ -12,6 +12,7 @@ for metricIdx = 1:size(metrics,2)
         trialtype1 = trialtypes.([trialOutcome{outIdx} 'Trials']);
         trialtype2 = trialtypes.([trialTurn{turnIdx} 'Trials']);
         metricHist = hists2plot.([metric2plot 'Hists']).(['hist' trialPlottype{axIdx}]);
+        metricVals = hists2plot.([metric2plot 'Hists']).(['allvals' trialPlottype{axIdx}]);
 
         %get histogram info for specific trial subtypes
         metricHistTrialType = metricHist(intersect(trialtype1, trialtype2),:);
@@ -24,6 +25,15 @@ for metricIdx = 1:size(metrics,2)
         tempmean = nanmean(metricHistTrialType);
         tempsem = nanstd(metricHistTrialType)/sqrt(size(metricHistTrialType,1));
         numTrials = size(metricHistTrialType,1);
+
+        %get all values for specific trial subtypes
+        trials2use = intersect(trialtype1, trialtype2);
+        counter = 1;
+        for trialIdx = 1:length(trials2use)
+          metricAllValsTrialType{counter} = metricVals{trials2use(trialIdx)};
+          counter = counter + 1;
+        end
+        output.(metric2plot).(trialPlottype{axIdx}).(trialTurn{turnIdx}).(trialOutcome{outIdx}).allvalsperbin = metricAllValsTrialType;
 
         %clean the data from nans and fill structure
         posBinsAll(isnan(tempmean)) = []; tempmean(isnan(tempmean)) = []; tempsem(isnan(tempsem)) = [];

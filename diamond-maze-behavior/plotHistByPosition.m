@@ -16,6 +16,17 @@ for metricIdx = 1:size(fnames,1)
         end
       end
       data2plot.numTrialsTotal = data2plot.numTrialsright + data2plot.numTrialsleft;
+      indivTracesRight = hists2plotConcat.(metric2plot).(trialPlottype{axIdx}).right.(trialOutcome{outIdx}).all';
+      indivTracesLeft = hists2plotConcat.(metric2plot).(trialPlottype{axIdx}).left.(trialOutcome{outIdx}).all';
+
+      %correct averages and individual traces to account for north/south starting point
+      if strcmp(metric2plot,'viewAngle')
+        data2plot.allleft = data2plot.allleft - pi;
+        data2plot.avgleft = data2plot.avgleft - pi;
+        indivTracesLeft = indivTracesLeft - pi;
+        data2plot.posBinsleft = abs(data2plot.posBinsleft - max(data2plot.posBinsleft));
+        data2plot.posBinsright = data2plot.posBinsright - min(data2plot.posBinsright);
+      end
 
       %plot the averages
       figure; hold on;
@@ -30,12 +41,10 @@ for metricIdx = 1:size(fnames,1)
 
       %plot the individual traces
       figure; hold on;
-      indivTracesRight = hists2plotConcat.(metric2plot).(trialPlottype{axIdx}).right.(trialOutcome{outIdx}).all';
-      indivTracesLeft = hists2plotConcat.(metric2plot).(trialPlottype{axIdx}).left.(trialOutcome{outIdx}).all';
       posBins2Plot = hists2plotConcat.(metric2plot).(trialPlottype{axIdx}).right.(trialOutcome{outIdx}).posBinsRaw;
-      plot(indivTracesRight, posBins2Plot,'r'); alpha(0.3);
-      plot(indivTracesLeft, posBins2Plot,'b'); alpha(0.3);
-      xlabel([trialPlottype{axIdx} ' Position']); ylabel(metric2plot); set(gca,'tickdir','out');
+      plot(indivTracesRight, posBins2Plot-min(posBins2Plot),'r'); alpha(0.3);
+      plot(indivTracesLeft, abs(posBins2Plot-max(posBins2Plot)),'b'); alpha(0.3);
+      ylabel([trialPlottype{axIdx} ' Position']); xlabel(metric2plot); set(gca,'tickdir','out');
       title(['S' num2str(animal) ' performance on ' track ' track - ' metric2plot ' - ' trialOutcome{outIdx} 'n=' num2str(data2plot.numTrialsTotal) 'right = red, left = blue']);
       filename = [dirs.behaviorfigdir metric2plot '_' track  '_S' num2str(animal) '_pos' trialPlottype{axIdx} '_' trialOutcome{outIdx} '_indivtrials'];
       saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
@@ -50,19 +59,44 @@ for metricIdx = 1:size(fnames,1)
       edges = linspace(minAll, maxAll, 40);
       figure('units','normalized','outerposition',[0 0 1 1]); hold on;
       for subIdx = 1:length(subplotInds)
-        subHistRight = histcounts(indivTracesRight(subplotInds(subIdx),:),edges);
+        for turnIdx = 1:2
+          valsInSubBin.(trialTurn{turnIdx}) = [];
+          for trialIdx = 1:size(data2plot.(['allvalsperbin' (trialTurn{turnIdx})]),2)
+              valsInSubBin.(trialTurn{turnIdx}) = [valsInSubBin.(trialTurn{turnIdx}), data2plot.(['allvalsperbin' (trialTurn{turnIdx})]){trialIdx}{subplotInds(subIdx)}];
+              if strcmp(trialTurn{turnIdx},'left') && strcmp(metric2plot, 'viewAngle')
+                valsInSubBin.(trialTurn{turnIdx}) = valsInSubBin.(trialTurn{turnIdx}) - pi;
+              end
+          end
+        end
+        subHistRight = histcounts(valsInSubBin.right,edges);
         subHistsNormRight(subIdx,:) = subHistRight/nansum(subHistRight);
-        subHistLeft = histcounts(indivTracesLeft(subplotInds(subIdx),:),edges);
+        subHistLeft = histcounts(valsInSubBin.left,edges);
         subHistsNormLeft(subIdx,:) = subHistLeft/nansum(subHistLeft);
         subplot(length(subplotInds),1,subIdx); hold on;
         plot(edges(1:end-1), subHistsNormRight(subIdx,:), 'r');
         plot(edges(1:end-1), subHistsNormLeft(subIdx,:), 'b');
-        xlabel([trialPlottype{axIdx} ' Position']); ylabel(metric2plot); set(gca,'tickdir','out');
+        xlabel('Percent Total'); xlabel(metric2plot); set(gca,'tickdir','out');
         title([metric2plot ' dist at ' num2str(posBins2Plot(subplotInds(subIdx))) ' ' trialPlottype{axIdx} ' Position'])
       end
       sgtitle(['S' num2str(animal) ' performance on ' track ' track - ' metric2plot ' - ' trialOutcome{outIdx} 'n=' num2str(data2plot.numTrialsTotal) 'right = red, left = blue']);
-      filename = [dirs.behaviorfigdir metric2plot '_' track  '_S' num2str(animal) '_pos' trialPlottype{axIdx} '_' trialOutcome{outIdx} '_indivtrialsdists'];
+      filename = [dirs.behaviorfigdir metric2plot '_' track  '_S' num2str(animal) '_pos' trialPlottype{axIdx} '_' trialOutcome{outIdx} '_indivtrialsdistsNOTaveraged'];
       saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+
+      % figure('units','normalized','outerposition',[0 0 1 1]); hold on;
+      % for subIdx = 1:length(subplotInds)
+      %   subHistRight = histcounts(indivTracesRight(subplotInds(subIdx),:),edges);
+      %   subHistsNormRight(subIdx,:) = subHistRight/nansum(subHistRight);
+      %   subHistLeft = histcounts(indivTracesLeft(subplotInds(subIdx),:),edges);
+      %   subHistsNormLeft(subIdx,:) = subHistLeft/nansum(subHistLeft);
+      %   subplot(length(subplotInds),1,subIdx); hold on;
+      %   plot(edges(1:end-1), subHistsNormRight(subIdx,:), 'r');
+      %   plot(edges(1:end-1), subHistsNormLeft(subIdx,:), 'b');
+      %   xlabel([trialPlottype{axIdx} ' Position']); ylabel(metric2plot); set(gca,'tickdir','out');
+      %   title([metric2plot ' dist at ' num2str(posBins2Plot(subplotInds(subIdx))) ' ' trialPlottype{axIdx} ' Position'])
+      % end
+      % sgtitle(['S' num2str(animal) ' performance on ' track ' track - ' metric2plot ' - ' trialOutcome{outIdx} 'n=' num2str(data2plot.numTrialsTotal) 'right = red, left = blue']);
+      % filename = [dirs.behaviorfigdir metric2plot '_' track  '_S' num2str(animal) '_pos' trialPlottype{axIdx} '_' trialOutcome{outIdx} '_indivtrialsdists'];
+      % saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
     end
   end
 end
