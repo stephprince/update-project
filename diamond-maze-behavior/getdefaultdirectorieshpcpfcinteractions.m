@@ -9,6 +9,6 @@ if ~exist(dirs.savedfiguresdir); mkdir(dirs.savedfiguresdir); end;
 %% directories to get data from
 dirs.virmenephysdatadir = '\\neuro-cloud\labs\singer\Steph\VirmenEphysData\';
 dirs.virmendatadir = '\\neuro-cloud\labs\singer\Virmen Logs\DiamondMaze\';
-dirs.processeddatadir = '\\neuro-cloud\labs\singer\ProcessedData\VR_AnnularTrack\';
+dirs.processeddatadir = '\\neuro-cloud\labs\singer\ProcessedData\VR_AlternationTask\';
 dirs.spreadsheetdir = '\\neuro-cloud.ad.gatech.edu\labs\singer\Steph\Code\spreadsheets\VRDiamondTrack.xlsx';
-dirs.behaviorspreadsheetdir = '\\neuro-cloud.ad.gatech.edu\labs\singer\Steph\Code\spreadsheets\ContinuousAlternationTrackSummary.xlsx';
+dirs.behaviorspreadsheetdir = '\\neuro-cloud.ad.gatech.edu\labs\singer\Steph\Code\spreadsheets\VisualGuidedContinuousAltTrackSummary.xlsx';

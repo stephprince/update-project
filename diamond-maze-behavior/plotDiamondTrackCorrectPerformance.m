@@ -28,7 +28,7 @@ if ~isempty(trackdata.sessInfo)
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perCorrect');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'perIncorrect');
     plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numCorrect');
-    plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numTrials');
+    %plotDiamondTrackMetricsBySession(trackdata,animal,track,dirs,plotInfo,'numTrials');
     
     %% plot number correct trials for each session
     % fieldsToPlot = find(~cellfun(@isempty,strfind(fnames,'numTrials'))); %finds all the fieldname indices in the data structure that match
