@@ -2,7 +2,7 @@ function plotDiamondTrackMetricsByTrial_SlidingWindow(trackdata,animal,track,dir
 %SP 191130
 
 metricToPlot = 'sessOutcomes';
-params.trialBlockSize = [10, 20, 30, 40];
+params.trialBlockSize = [20, 30, 40, 50, 60];
 stepsize = 0.2;
 
 %% get fieldnames to plot
@@ -102,7 +102,7 @@ for blockIdx = 1:length(params.trialBlockSize)
   for i = 1:size(fillInfoDays);
     fill(backgroundInfoDays(i,:),fillInfoDays(i,:),[0.5 0 1],'LineStyle','none','FaceAlpha',0.25);
   end %show background of single days performance
-  perCorrectSlidingWindowAllSmooth = gaussSmooth(perCorrectSlidingWindowAll',2);
+  perCorrectSlidingWindowAllSmooth = perCorrectSlidingWindowAll;
   plot([1 length(perCorrectSlidingWindowAll)], [0.5 0.5], 'k--'); hold on;
   %plot(perCorrectSlidingWindowAll, 'k', 'LineWidth', 2); hold on;
   plot(perCorrectSlidingWindowAllSmooth, 'k', 'LineWidth', 2);
