@@ -1,6 +1,6 @@
 function plotDiamondTrackMetricsByPosition(trackdata, animal, track, dirs);
 
-metrics2plot = {'velocRot','velocTrans','position','viewAngle'};
+metrics2plot = {'velocRot','velocTrans','positionX','positionY','viewAngle'};
 
 if ~isempty(trackdata.sessInfo)
 
@@ -19,7 +19,7 @@ if ~isempty(trackdata.sessInfo)
   trackDataClean = cleanTeleportEvents(trackdata);
 
   %get histogram of position for the vector and apply the indices to other metrics
-  for metricIdx = 1:size(metrics2plot,1)
+  for metricIdx = 1:size(metrics2plot,2)
     hists2plot.([metrics2plot{metricIdx} 'Hists']) = calcHistByPosition(trackDataClean,metrics2plot{metricIdx});
   end
 
