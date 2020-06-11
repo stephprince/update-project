@@ -15,8 +15,8 @@ if ~isempty(trackdata.sessInfo)
   leftTrials = sort([intersect(southTrials, westTrials); intersect(northTrials,eastTrials)]);
 
   % get lick data from set time around reward
-  timeWindow = 300; %looks at 300 samples before and after (3*0.01s = 3 secs)
-  lickBinSize = 20; %bin licks 20 samples before and after
+  timeWindow = 1500; %looks at 300 samples before and after (3*0.01s = 3 secs)
+  lickBinSize = 50; %bin licks 20 samples before and after
   licksAroundRewardTemp = [];
 
   %get edges for plotting and pooling of data
@@ -48,6 +48,7 @@ if ~isempty(trackdata.sessInfo)
             lickDataTemp = diff(trackdata.numLicks{trialIdx});
             extraSamples2AddFirst = nan(1,abs(1-min(lickWindow)));
             extraSamples2AddLast = nan(1,abs(size(trackdata.numLicks{trialIdx},2) - max(lickWindow)));
+            lickData = [extraSamples2AddFirst, lickDataTemp, extraSamples2AddLast];
           elseif max(lickWindow) > size(trackdata.numLicks{trialIdx},2)
             lickDataTemp = diff(trackdata.numLicks{trialIdx}(lickWindow(1):end));
             extraSamples2Add = nan(1,(timeWindow*2)-length(lickDataTemp));
