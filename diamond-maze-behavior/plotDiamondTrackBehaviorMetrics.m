@@ -34,7 +34,7 @@ close all;
 blockSizesAll = [20 30 40 50 60 70];
 subplotSizesAll = [100 200 300];
 for anIdx = 1:length(animals) 
-  for subplotSizeIdx = 2:numel(subplotSizesAll) 
+  for subplotSizeIdx = 1:numel(subplotSizesAll) 
       subplotSize = subplotSizesAll(subplotSizeIdx); %size for sliding window and size for subplot figs
       for blockIdx = 4%1:numel(blockSizesAll)
           trackdata = allsessdata(animals(anIdx)).continuousalt;
@@ -59,14 +59,21 @@ for anIdx = 1:length(animals)
             end
             perCorrectPerSubplot(subplotIdx,1:numel(perCorrectPerBlock(trialBins))) = perCorrectPerBlock(trialBins);
           end
+          figure; hold on; 
+          plot(1:numel(perCorrectPerBlock),repmat([0.25 0.5 0.75],numel(perCorrectPerBlock)),'k--');
+          plot(1:numel(perCorrectPerBlock), perCorrectPerBlock, 'k-'); xlabel('Trials'); ylabel('Proportion correct'); title(['S' num2str(animals(anIdx)) ' performance'])
+          ylim([0 1.01])
+          filename = [dirs.behaviorfigdir 'proportioncorrect_S' num2str(animals(anIdx)) '_blocksize' num2str(blockSize)];
+          saveas(gcf,filename,'png'); saveas(gcf,filename,'fig'); print(gcf, [filename '.pdf'],'-dpdf','-r300','-painters')
 
           %concat licks pre reward data
           timeWindow = 1000; %looks at 300 samples before and after (3*0.01s = 3 secs)
-          lickBinSize = 50; %bin licks 20 samples before and after
+          lickBinSize = 100; %bin licks 20 samples before and after %was 50
           binedges = -timeWindow:lickBinSize:timeWindow; rawedges = -timeWindow+0.5:timeWindow-0.5;
           [counts, idx] = histc(rawedges',binedges);
           correctLicksAvg = nan(1,timeWindow/lickBinSize*2); incorrectLicksAvg = nan(1,timeWindow/lickBinSize*2);
           correctLicksSEM = nan(1,timeWindow/lickBinSize*2); incorrectLicksSEM = nan(1,timeWindow/lickBinSize*2); %this will be the metric to plot
+          correctLicksAll = []; incorrectLicksAll = [];
           for subplotIdx = 1:numSubplots
             if subplotStartEnds(subplotIdx,2) > numTrials
               trialBins = subplotStartEnds(subplotIdx,1):numTrials; %if up to the last trials, just average whatever is there
@@ -87,6 +94,7 @@ for anIdx = 1:length(animals)
                     lickDataTemp = diff(trackdata.numLicks{trialIdx});
                     extraSamples2AddFirst = nan(1,abs(1-min(lickWindow)));
                     extraSamples2AddLast = nan(1,abs(size(trackdata.numLicks{trialIdx},2) - max(lickWindow)));
+                    lickData = [extraSamples2AddFirst, lickDataTemp, extraSamples2AddLast];
                   elseif max(lickWindow) > size(trackdata.numLicks{trialIdx},2)
                     lickDataTemp = diff(trackdata.numLicks{trialIdx}(lickWindow(1):end));
                     extraSamples2Add = nan(1,(timeWindow*2)-length(lickDataTemp));
@@ -109,6 +117,8 @@ for anIdx = 1:length(animals)
             licksAroundReward = licksAroundRewardTemp(:,1:end-1); %get rid of extra bin
             correctTrialsInBlock = find(trackdata.sessOutcomesAll(trialBins) == 1);
             incorrectTrialsInBlock = find(trackdata.sessOutcomesAll(trialBins) == 0);
+            correctLicksAll{subplotIdx} = licksAroundReward(correctTrialsInBlock,:);
+            incorrectLicksAll{subplotIdx} = licksAroundReward(incorrectTrialsInBlock,:);
             correctLicksAvg(subplotIdx,:) = nanmean(licksAroundReward(correctTrialsInBlock,:));
             correctLicksSEM(subplotIdx,:) = nanstd(licksAroundReward(correctTrialsInBlock,:))/sqrt(size(licksAroundReward(correctTrialsInBlock,:),1));
             incorrectLicksAvg(subplotIdx,:) = nanmean(licksAroundReward(incorrectTrialsInBlock,:));
@@ -164,7 +174,6 @@ for anIdx = 1:length(animals)
 
             %percent correct data
             ax1(subplotIdx) = subplot(5,numSubplots,subplotIdx); hold on;
-            plot(1:subplotSize, repmat([0.25 0.5 0.75],subplotSize,1), 'Color', [0 0 0 0.1])
             plot(1:subplotSize, perCorrectPerSubplot(subplotIdx,:), 'm-', 'LineWidth', 2);
             xlabel('Trials (moving average)'); ylim([0 1.01]);
             title(['Trials ' num2str(subplotStartEnds(subplotIdx,1)) ' to ' num2str(subplotStartEnds(subplotIdx,2))])
@@ -211,12 +220,12 @@ for anIdx = 1:length(animals)
             %licks around reward zone
             ax5(subplotIdx) = subplot(5,numSubplots,numSubplots*4+subplotIdx); hold on;
             plotedges = [-timeWindow+0.5:lickBinSize:timeWindow-0.5]*params.constSampRateTime; %get edges for plotting and pooling of data
-            plot([0 0],[0 max(max(correctLicksAvg*1.1))], 'k--');
-            plot(plotedges, correctLicksAvg(subplotIdx,:), 'g-', 'LineWidth', 2);
-            ciplot(correctLicksAvg(subplotIdx,:)-correctLicksSEM(subplotIdx,:), correctLicksAvg(subplotIdx,:)+correctLicksSEM(subplotIdx,:),plotedges,'g-');
-            plot(plotedges, incorrectLicksAvg(subplotIdx,:), 'k-', 'LineWidth', 2);
-            ciplot(incorrectLicksAvg(subplotIdx,:)-incorrectLicksSEM(subplotIdx,:), incorrectLicksAvg(subplotIdx,:)+incorrectLicksSEM(subplotIdx,:),plotedges,'k-');
-            alpha(0.5); xlabel('Time (s)'); ylim([0 max(max(correctLicksAvg*1.1))]);
+            plot([0 0],[0 2], 'k--');
+            plot(plotedges, correctLicksAvg(subplotIdx,:), 'g-', 'LineWidth', 2,'Color',[0 1 0]);
+            plot(plotedges, incorrectLicksAvg(subplotIdx,:), 'k-', 'LineWidth', 2, 'Color', [0 0 0]);
+            ciplot(correctLicksAvg(subplotIdx,:)-correctLicksSEM(subplotIdx,:), correctLicksAvg(subplotIdx,:)+correctLicksSEM(subplotIdx,:),plotedges,'g-'); alpha(0.5);
+            ciplot(incorrectLicksAvg(subplotIdx,:)-incorrectLicksSEM(subplotIdx,:), incorrectLicksAvg(subplotIdx,:)+incorrectLicksSEM(subplotIdx,:),plotedges,'k-'); alpha(0.5);
+            xlabel('Time (s)'); xlim([[-timeWindow+0.5, 500]*params.constSampRateTime]);
             if subplotIdx == 1; ylabel('Lick rate (Hz)'); else; set(ax5(subplotIdx),'yticklabel',[]); end;
             if subplotIdx == round(numSubplots/2); title('Licks around reward'); end;
           end
@@ -225,65 +234,116 @@ for anIdx = 1:length(animals)
           %save the figure
           sgtitle(['S' num2str(animals(anIdx)) ' performance']);
           filename = [dirs.behaviorfigdir 'sessPerformanceAll_S' num2str(animals(anIdx)) '_blocksize' num2str(blockSize) '_subplotsize' num2str(subplotSize) '_allmetrics'];
-          saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
-          
-          %plot the view angle distributions throughout the track 
-          figure('units','normalized','position',[0 0 0.4 0.8]); hold on;
-          viewAnglesRightCorrectAll = []; viewAnglesLeftCorrectAll = [];
-          viewAnglesRightIncorrectAll = []; viewAnglesLeftIncorrectAll = [];
-          for subplotIdx = 1:numSubplots
-              viewAnglesRightCorrectAll = [viewAnglesRightCorrectAll; viewAnglesRightCorrect{subplotIdx}];
-              viewAnglesLeftCorrectAll = [viewAnglesLeftCorrectAll; viewAnglesLeftCorrect{subplotIdx}];
-              viewAnglesRightIncorrectAll = [viewAnglesRightIncorrectAll; viewAnglesRightIncorrect{subplotIdx}];
-              viewAnglesLeftIncorrectAll = [viewAnglesLeftIncorrectAll; viewAnglesLeftIncorrect{subplotIdx}];
-          end
-          ybins = hists2plot.positionXHists.posYbins - min(hists2plot.positionXHists.posYbins); ybinsShort = ybins(4:22);
-          viewAnglesRightCorrectAllTemp = -1*(fliplr(viewAnglesRightCorrectAll(:,1:end-1)-pi));
-          viewAnglesLeftCorrectAllTemp = -1*viewAnglesLeftCorrectAll;
-          viewAnglesRightCorrectAllTemp = viewAnglesRightCorrectAllTemp(:,4:22);
-          viewAnglesLeftCorrectAllTemp = viewAnglesLeftCorrectAllTemp(:,4:22);    
-          viewAnglesRightIncorrectAllTemp = -1*(fliplr(viewAnglesRightIncorrectAll(:,1:end-1)-pi));
-          viewAnglesLeftIncorrectAllTemp = -1*viewAnglesLeftIncorrectAll;
-          viewAnglesRightIncorrectAllTemp = viewAnglesRightIncorrectAllTemp(:,4:22);
-          viewAnglesLeftIncorrectAllTemp = viewAnglesLeftIncorrectAllTemp(:,4:22);
-          
-          edges = -2:0.1:2; histBins = [1:2:ybinsShort]; plotNums = [1:2:ybinsShort; 2:2:ybinsShort+1]';
-          for posIdx = 1:numel(histBins)
-              rightCorrectTrialsViewAnglesDist = histcounts(viewAnglesRightCorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges); %second half of track
-              leftCorrectTrialsViewAnglesDist = histcounts(viewAnglesLeftCorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges);
-              rightCorrectTrialsViewAnglesDist = rightCorrectTrialsViewAnglesDist/nansum(rightCorrectTrialsViewAnglesDist);
-              leftCorrectTrialsViewAnglesDist = leftCorrectTrialsViewAnglesDist/nansum(leftCorrectTrialsViewAnglesDist);
-              rightIncorrectTrialsViewAnglesDist = histcounts(viewAnglesRightIncorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges); %second half of track
-              leftIncorrectTrialsViewAnglesDist = histcounts(viewAnglesLeftIncorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges);
-              rightIncorrectTrialsViewAnglesDist = rightIncorrectTrialsViewAnglesDist/nansum(rightIncorrectTrialsViewAnglesDist);
-              leftIncorrectTrialsViewAnglesDist = leftIncorrectTrialsViewAnglesDist/nansum(leftIncorrectTrialsViewAnglesDist);
-              
-              %plot correct trials
-              ax10(posIdx) = subplot(numel(histBins),2,plotNums(numel(histBins)-posIdx+1,1)); hold on;
-              h1 = histogram('BinCounts', rightCorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
-              h2 = histogram('BinCounts', leftCorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
-              h1.FaceAlpha = 0.2; h2.FaceAlpha = 0.2; xlim([-90 90]);
-              h1.FaceColor = [1 0 0]; h2.FaceColor = [0 0 1];
-              if posIdx ~= 1; set(ax10(posIdx),'xticklabel',[]); end;
-              if posIdx == numel(histBins); title('View Angle Distributions on Correct Trials'); end;
-              if mod(posIdx,2); ylabel(['y pos -' num2str(round(nanmean(ybinsShort(histBins(posIdx):histBins(posIdx)+1))))]); end;
-              set(gca,'tickdir','out')
-              
-              %plot incorrect trials
-              ax11(posIdx) = subplot(numel(histBins),2,plotNums(numel(histBins)-posIdx+1,2)); hold on;
-              h1 = histogram('BinCounts', rightIncorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
-              h2 = histogram('BinCounts', leftIncorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
-              h1.FaceAlpha = 0.2; h2.FaceAlpha = 0.2; xlim([-90 90]);
-              h1.FaceColor = [1 0 0]; h2.FaceColor = [0 0 1];
-              if posIdx ~= 1; set(ax11(posIdx),'xticklabel',[]); end;
-              if posIdx == numel(histBins); title('View Angle Distributions on Incorrect Trials'); end;
-              if mod(posIdx,2); ylabel(['y pos -' num2str(round(nanmean(ybinsShort(histBins(posIdx):histBins(posIdx)+1))))]); end;
-              set(gca,'tickdir','out')
-          end
-          if subplotIdx == round(numSubplots/2); title('View Angle Distribution in Second Half of Track - Correct Trials'); end
-          filename = [dirs.behaviorfigdir 'viewAngleDistVsYPos_S' num2str(animals(anIdx))];
-          saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');          
+          saveas(gcf,filename,'png'); saveas(gcf,filename,'fig'); print(gcf, [filename '.pdf'],'-dpdf','-r300','-painters');
       end
   end
+  
+  %plot the trajectories throughout the track and their averages all properly aligned
+  trajectoriesRightCorrectAll = []; trajectoriesLeftCorrectAll = [];
+  trajectoriesRightIncorrectAll = []; trajectoriesLeftIncorrectAll = [];
+  for subplotIdx = 1:numSubplots
+      trajectoriesRightCorrectAll = [trajectoriesRightCorrectAll; trajectoriesRightCorrect{subplotIdx}];
+      trajectoriesLeftCorrectAll = [trajectoriesLeftCorrectAll; trajectoriesLeftCorrect{subplotIdx}];
+      trajectoriesRightIncorrectAll = [trajectoriesRightIncorrectAll; trajectoriesRightIncorrect{subplotIdx}];
+      trajectoriesLeftIncorrectAll = [trajectoriesLeftIncorrectAll; trajectoriesLeftIncorrect{subplotIdx}];
+  end
+  ybins = hists2plot.positionXHists.posYbins - min(hists2plot.positionXHists.posYbins); ybinstemp = ybins(1:22);
+  trajectoriesRightCorrectAllTemp = -1*fliplr(trajectoriesRightCorrectAll(:,1:end-1));
+  trajectoriesRightIncorrectAllTemp = -1*fliplr(trajectoriesRightIncorrectAll(:,1:end-1));
+  trajectoriesRightCorrectAllTemp = trajectoriesRightCorrectAllTemp(:,1:22);
+  trajectoriesRightIncorrectAllTemp = trajectoriesRightIncorrectAllTemp(:,1:22);
+  trajectoriesLeftCorrectAllTemp = trajectoriesLeftCorrectAll(:,1:22);
+  trajectoriesLeftIncorrectAllTemp = trajectoriesLeftIncorrectAll(:,1:22); %remove nans
+  
+  figure('units','normalized','position',[0 0 0.8 0.8]); hold on;
+  ax12(1) = subplot(2,2,1); hold on;
+  plot(trajectoriesRightCorrectAllTemp, ybinstemp, 'Color', [1 0 0 0.2], 'LineWidth', 1);
+  plot(trajectoriesLeftCorrectAllTemp, ybinstemp, 'Color', [0 0 1 0.2], 'LineWidth', 1);
+  numRightTrials = size(trajectoriesRightCorrectAllTemp,1); numLeftTrials = size(trajectoriesLeftCorrectAllTemp,1);
+  ylim([0 140]); xlim([-35 35]); xlabel('X position'); ylabel('X position'); title(['Trajectories - Correct Trials n = ' num2str(size(trajectoriesRightCorrectAllTemp,1) + size(trajectoriesLeftCorrectAllTemp,1)) 'right lft n = ' num2str(numRightTrials) ' ' num2str(numLeftTrials)]);
+  ax12(2) = subplot(2,2,2); hold on;
+  plot(trajectoriesRightIncorrectAllTemp, ybinstemp, 'Color', [1 0 0 0.2], 'LineWidth', 1); hold on;
+  plot(trajectoriesLeftIncorrectAllTemp, ybinstemp, 'Color', [0 0 1 0.2], 'LineWidth', 1);
+  numRightTrials = size(trajectoriesRightIncorrectAllTemp,1); numLeftTrials = size(trajectoriesLeftIncorrectAllTemp,1);
+  ylim([0 140]); xlim([-35 35]); xlabel('X position'); ylabel('X position'); title(['Trajectories - Incorrect Trials n = ' num2str(size(trajectoriesRightIncorrectAllTemp,1) + size(trajectoriesLeftIncorrectAllTemp,1)) 'right lft n = ' num2str(numRightTrials) ' ' num2str(numLeftTrials)]);
+  ax12(3) = subplot(2,2,3); hold on;
+  avg2plot = nanmean(trajectoriesRightCorrectAllTemp); sem2plot = nanstd(trajectoriesRightCorrectAllTemp);%/sqrt(size(trajectoriesRightCorrectAllTemp,1));
+  ciplot(avg2plot-sem2plot,avg2plot+sem2plot,ybinstemp,'r-'); alpha(0.5);
+  avg2plot = nanmean(trajectoriesLeftCorrectAllTemp); sem2plot = nanstd(trajectoriesLeftCorrectAllTemp);%/sqrt(size(trajectoriesLeftCorrectAllTemp,1));
+  ciplot(avg2plot-sem2plot,avg2plot+sem2plot,ybinstemp,'b-'); alpha(0.5);
+  plot(ybinstemp, nanmean(trajectoriesRightCorrectAllTemp), 'Color', [1 0 0 0.2], 'LineWidth', 1);
+  plot(ybinstemp, nanmean(trajectoriesLeftCorrectAllTemp), 'Color', [0 0 1 0.2], 'LineWidth', 1);
+  set(gca,'YDir','reverse'); %camroll(90)
+  ax12(4) = subplot(2,2,4); hold on;
+  avg2plot = nanmean(trajectoriesRightIncorrectAllTemp); sem2plot = nanstd(trajectoriesRightIncorrectAllTemp);%/sqrt(size(trajectoriesRightIncorrectAllTemp,1));
+  ciplot(avg2plot-sem2plot,avg2plot+sem2plot,ybinstemp,'r-'); alpha(0.5);
+  avg2plot = nanmean(trajectoriesLeftIncorrectAllTemp); sem2plot = nanstd(trajectoriesLeftIncorrectAllTemp);%/sqrt(size(trajectoriesLeftIncorrectAllTemp,1));
+  ciplot(avg2plot-sem2plot,avg2plot+sem2plot,ybinstemp,'b-'); alpha(0.5);
+  plot(ybinstemp, nanmean(trajectoriesRightIncorrectAllTemp), 'Color', [1 0 0 0.2], 'LineWidth', 2);
+  plot(ybinstemp, nanmean(trajectoriesLeftIncorrectAllTemp), 'Color', [0 0 1 0.2], 'LineWidth', 2);
+  set(gca,'YDir','reverse'); %camroll(90)
+  sgtitle(['Trajectories on correct vs incorrect trials - S' num2str(animals(anIdx))]);
+  filename = [dirs.behaviorfigdir 'trajectoriesxvsy' num2str(animals(anIdx))];
+  saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+  
+  %plot the view angle distributions throughout the track
+  figure('units','normalized','position',[0 0 0.4 0.8]); hold on;
+  viewAnglesRightCorrectAll = []; viewAnglesLeftCorrectAll = [];
+  viewAnglesRightIncorrectAll = []; viewAnglesLeftIncorrectAll = [];
+  for subplotIdx = 1:numSubplots
+      viewAnglesRightCorrectAll = [viewAnglesRightCorrectAll; viewAnglesRightCorrect{subplotIdx}];
+      viewAnglesLeftCorrectAll = [viewAnglesLeftCorrectAll; viewAnglesLeftCorrect{subplotIdx}];
+      viewAnglesRightIncorrectAll = [viewAnglesRightIncorrectAll; viewAnglesRightIncorrect{subplotIdx}];
+      viewAnglesLeftIncorrectAll = [viewAnglesLeftIncorrectAll; viewAnglesLeftIncorrect{subplotIdx}];
+  end
+  ybins = hists2plot.positionXHists.posYbins - min(hists2plot.positionXHists.posYbins); ybinsShort = ybins(4:22);
+  viewAnglesRightCorrectAllTemp = -1*(fliplr(viewAnglesRightCorrectAll(:,1:end-1)-pi));
+  viewAnglesLeftCorrectAllTemp = -1*viewAnglesLeftCorrectAll;
+  viewAnglesRightCorrectAllTemp = viewAnglesRightCorrectAllTemp(:,4:22);
+  viewAnglesLeftCorrectAllTemp = viewAnglesLeftCorrectAllTemp(:,4:22);
+  viewAnglesRightIncorrectAllTemp = -1*(fliplr(viewAnglesRightIncorrectAll(:,1:end-1)-pi));
+  viewAnglesLeftIncorrectAllTemp = -1*viewAnglesLeftIncorrectAll;
+  viewAnglesRightIncorrectAllTemp = viewAnglesRightIncorrectAllTemp(:,4:22);
+  viewAnglesLeftIncorrectAllTemp = viewAnglesLeftIncorrectAllTemp(:,4:22);
+  
+  edges = -2:0.1:2; histBins = [1:2:ybinsShort]; plotNums = [1:2:ybinsShort; 2:2:ybinsShort+1]';
+  for posIdx = 1:numel(histBins)
+      rightCorrectTrialsViewAnglesDist = histcounts(viewAnglesRightCorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges); %second half of track
+      leftCorrectTrialsViewAnglesDist = histcounts(viewAnglesLeftCorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges);
+      rightCorrectTrialsViewAnglesDist = rightCorrectTrialsViewAnglesDist/nansum(rightCorrectTrialsViewAnglesDist);
+      leftCorrectTrialsViewAnglesDist = leftCorrectTrialsViewAnglesDist/nansum(leftCorrectTrialsViewAnglesDist);
+      rightIncorrectTrialsViewAnglesDist = histcounts(viewAnglesRightIncorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges); %second half of track
+      leftIncorrectTrialsViewAnglesDist = histcounts(viewAnglesLeftIncorrectAllTemp(:,histBins(posIdx):histBins(posIdx)+1), edges);
+      rightIncorrectTrialsViewAnglesDist = rightIncorrectTrialsViewAnglesDist/nansum(rightIncorrectTrialsViewAnglesDist);
+      leftIncorrectTrialsViewAnglesDist = leftIncorrectTrialsViewAnglesDist/nansum(leftIncorrectTrialsViewAnglesDist);
+      
+      %plot correct trials
+      ax10(posIdx) = subplot(numel(histBins),2,plotNums(numel(histBins)-posIdx+1,1)); hold on;
+      h1 = histogram('BinCounts', rightCorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
+      h2 = histogram('BinCounts', leftCorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
+      h1.FaceAlpha = 0.2; h2.FaceAlpha = 0.2; xlim([-90 90]);
+      h1.FaceColor = [1 0 0]; h2.FaceColor = [0 0 1];
+      if posIdx ~= 1; set(ax10(posIdx),'xticklabel',[]); end;
+      if posIdx == numel(histBins); title(['View Angle Distributions on Correct Trials - n = ' num2str(size(viewAnglesRightCorrectAllTemp,1)+size(viewAnglesLeftCorrectAllTemp,1))]); end;
+      %if mod(posIdx,2); ylabel(['y pos -' num2str(round(nanmean(ybinsShort(histBins(posIdx):histBins(posIdx)+1))))]); end;
+      ylabel(['y pos -' num2str(round(nanmean(ybinsShort(histBins(posIdx):histBins(posIdx)+1))))]);
+      set(gca,'tickdir','out')
+      
+      %plot incorrect trials
+      ax11(posIdx) = subplot(numel(histBins),2,plotNums(numel(histBins)-posIdx+1,2)); hold on;
+      h1 = histogram('BinCounts', rightIncorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
+      h2 = histogram('BinCounts', leftIncorrectTrialsViewAnglesDist, 'BinEdges', rad2deg(edges));
+      h1.FaceAlpha = 0.2; h2.FaceAlpha = 0.2; xlim([-90 90]);
+      h1.FaceColor = [1 0 0]; h2.FaceColor = [0 0 1];
+      if posIdx ~= 1; set(ax11(posIdx),'xticklabel',[]); end;
+      if posIdx == numel(histBins); title(['View Angle Distributions on Incorrect Trials - n = ' num2str(size(viewAnglesRightIncorrectAllTemp,1)+size(viewAnglesLeftIncorrectAllTemp,1))]); end;
+      %if mod(posIdx,2); ylabel(['y pos -' num2str(round(nanmean(ybinsShort(histBins(posIdx):histBins(posIdx)+1))))]); end;
+      ylabel(['y pos -' num2str(round(nanmean(ybinsShort(histBins(posIdx):histBins(posIdx)+1))))]);
+      set(gca,'tickdir','out')
+  end
+  linkaxes(ax10,'x'); linkaxes(ax11, 'x')
+  if subplotIdx == round(numSubplots/2); title('View Angle Distribution in Second Half of Track - Correct Trials'); end
+  filename = [dirs.behaviorfigdir 'viewAngleDistVsYPos_S' num2str(animals(anIdx))];
+  saveas(gcf,filename,'png'); saveas(gcf,filename,'fig'); print(gcf, [filename '.pdf'],'-dpdf','-r300','-painters');
   close all;
 end
