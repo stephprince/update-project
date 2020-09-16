@@ -20,11 +20,16 @@ disp(['Calculating trial metrics for ' animalID num2str(index(1)) ' ' num2str(in
 
 if ~exist(filename) || makenewfiles
     %% get trial times (why didn't I use numTrials? idk but I think there was a reason...)
-    trialStarts = [1; find(diff(ismember(sessdata.currentPhase,[3 4])) == -1) + 1]; %looks for when reward or punishment phase happened and finds the end
+    trialStarts = [1; find(diff(ismember(sessdata.currentPhase,[3 4])) == -1) + 1 + 1]; %looks for when reward or punishment phase happened and finds the end pluse one sample
     trialEnds = [find(diff(ismember(sessdata.currentPhase,[3 4])) == -1); length(sessdata.currentPhase)];
     if ~ismember(sessdata.currentPhase,[3,4]) %failed trial or linear track, in this case look for large changes in position
         trialStarts = [1; find(abs(diff(sessdata.positionY)) > 10) + 1]; %10 is arbitraty number but seems to work for catching the teleportation events
         trialEnds = [find(abs(diff(sessdata.positionY)) > 10); length(sessdata.positionY)];
+        if sum(diff(trialStarts) == 1) %finds teleportation events that took 2 samples
+            sample2fix = find(diff(trialStarts) == 1);
+            trialStarts(sample2fix) = []; trialEnds(sample2fix) = [];
+        end
+
     end
 
     %% make new trial data structure

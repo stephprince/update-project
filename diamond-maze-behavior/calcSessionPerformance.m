@@ -1,4 +1,4 @@
-function output = calcSessionPerformance(sessdata,trialdata,tracktype)
+function output = calcSessionPerformance(sessdata,trialdata,tracktype, index)
 %SP 190924
 
 trialTypes = {'All','Left','Right','Same','Alt'};
@@ -18,6 +18,7 @@ if strcmp(tracktype,'continuousalt')
   output.sessOutcomesSame = output.sessOutcomesAll(sessdata.sameTurnAll == 1); %same turn (encoding and choice phases had the same turn to be correct or not)
   output.sessOutcomesAlt = output.sessOutcomesAll(sessdata.sameTurnAll == 0); %alternate turns
 end
+
 
 %% calculate number correct for each trial type
 for typeIdx = 1:length(trialTypes)
@@ -43,25 +44,26 @@ end
 
 %% calculate time since last correct trial (ie btwn correct trials on continuous alternation)
 for typeIdx = 1:length(trialTypes)
-    trialsSinceCorrect = [];
-    correctTrials = find(output.(['sessOutcomes' trialTypes{typeIdx}]) == 1);
-    if ~isempty(correctTrials)
-        incorrectIntervals = [correctTrials, [correctTrials(2:end)-1; length(output.(['sessOutcomes' trialTypes{typeIdx}]))]];
-        if incorrectIntervals(1,1) ~= 1 %if the intervals don't start at the first trial
-          incorrectIntervals = [1, incorrectIntervals(1,1)-1; incorrectIntervals];
-        end
-        for i = 1:size(incorrectIntervals,1)
-            startToEnd = incorrectIntervals(i,:);
-            countsSinceLast = [startToEnd(1):startToEnd(2)]-startToEnd(1);
-            trialsSinceLast = max(countsSinceLast);
-            trialsSinceCorrect = [trialsSinceCorrect, countsSinceLast];
-        end
-    else
-        trialsSinceCorrect = 0;
-        trialsSinceLast = 0;
-    end
+  trialsSinceCorrect = []; trialsSinceLast = [];
+  correctTrials = find(output.(['sessOutcomes' trialTypes{typeIdx}]) == 1);
+  if ~isempty(correctTrials)
+      incorrectIntervals = [correctTrials, [correctTrials(2:end)-1; length(output.(['sessOutcomes' trialTypes{typeIdx}]))]];
+      if incorrectIntervals(1,1) ~= 1 %if the intervals don't start at the first trial
+        incorrectIntervals = [1, incorrectIntervals(1,1)-1; incorrectIntervals];
+      end
+      for i = 1:size(incorrectIntervals,1)
+          startToEnd = incorrectIntervals(i,:);
+          countsSinceLast = [startToEnd(1):startToEnd(2)]-startToEnd(1);
+          trialsSinceLast = [trialsSinceLast; max(countsSinceLast)];
+          trialsSinceCorrect = [trialsSinceCorrect, countsSinceLast];
+      end
+  else
+      trialsSinceCorrect = nan;
+      trialsSinceLast = nan;
+  end
     output.(['trialsSinceCorrect' trialTypes{typeIdx}]) =  trialsSinceCorrect';
-    output.(['trialsSinceLast' trialTypes{typeIdx}]) =  trialsSinceLast';
+    output.(['trialsSinceLast' trialTypes{typeIdx}]) =  trialsSinceLast;
+    output.(['trialsSinceCorrectID' trialTypes{typeIdx}]) = repmat([index(1:3)], size(trialsSinceLast));
 end
 
 end

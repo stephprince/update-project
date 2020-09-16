@@ -4,12 +4,12 @@ function [startLoc choiceLoc] = getTrialStartLoc(trialdata)
 
 %arbitrary designations, the starting north position is above this point
 %for both short and long trials
-northThreshold = 400;
+northThreshold = 350;
 southThreshold = 200;
 
 %% initial encoding location
 startPos = trialdata.positionY(trialdata.phaseStartsEnds(1,1));
-if startPos > northThreshold 
+if startPos > northThreshold
     startLoc = 'north';
 elseif startPos < southThreshold
     startLoc = 'south';
@@ -19,7 +19,7 @@ end
 %phases are encoding (1), delay (2), choice (3), intertrial interval (4)
 if ismember(2,trialdata.phaseType) %if there's a choice phase
     choicePhase = find(trialdata.phaseType == 2);
-    choicePos = trialdata.positionY(trialdata.phaseInds(choicePhase,1));
+    choicePos = trialdata.positionY(trialdata.phaseStartsEnds(choicePhase,1));
     if choicePos > northThreshold %arbitrary designations, the starting north position is above this point
         choiceLoc = 'north';
     elseif choicePos < southThreshold

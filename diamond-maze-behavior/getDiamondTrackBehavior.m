@@ -13,7 +13,7 @@ if ~exist(dirs.savedatadir); mkdir(dirs.savedatadir); end;
 behaviordata = getDiamondTrackBehaviorMetrics(dirs,indices,params,makenewfiles);
 
 %% plot the data
-statsoutput = plotDiamondTrackBehaviorMetrics(dirs,indices,behaviordata);
+statsoutput = plotDiamondTrackBehaviorMetrics(dirs,indices,params, behaviordata);
 
 %% write the stats output file
 %load filename
