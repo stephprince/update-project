@@ -4,7 +4,7 @@ function allsessdata = concatDiamondMazeSessions(animals, indices, behaviordata,
 
 %% initialize fieldnames for data structure
 fnames = fieldnames(behaviordata.bySession{end}{end}{end});
-fnamesPos = {'posXEnc'; 'posYEnc'; 'posXChoice'; 'posYChoice';'viewAngle';'sessInfo'};
+fnamesPos = {'sessInfo'};
 fnamesAll = [fnames; fnamesPos];
 
 %% concatenate data across sessions
@@ -29,7 +29,7 @@ for anIdx = 1:length(animals)
             if sessindex(2) > 190922 && sessindex(2) < 191030
                 sessdata.trainingtype = 'choice1side_short';
             end
-                
+
             if strcmp(sessdata.trainingtype,track)
 
                 %combine all the fields where there is one value per trial/session
@@ -38,10 +38,6 @@ for anIdx = 1:length(animals)
                         allsessdata(animals(anIdx)).(track).(fnamesAll{fieldIdx}) = [allsessdata(animals(anIdx)).(track).(fnamesAll{fieldIdx}); sessdata.(fnamesAll{fieldIdx})];
                     end
                 end
-
-                %combine fields where there are multiple values per trial (ex. viewAngle, positionX, positionY)
-
-
 
                 %sessinfo structure so you can index into trials easily
                 sessInfo = [repmat([sessindex(1:3), sesscounter],sessdata.numTrialsAll,1), [1:sessdata.numTrialsAll]'];

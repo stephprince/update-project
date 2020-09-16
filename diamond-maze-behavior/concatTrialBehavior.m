@@ -16,6 +16,7 @@ end
 trialcounter = 1; trialInfo = [];
 for trialIdx = 1:size(trialdata,2)
     for fieldIdx = 1:length(fnames2concat)
-      output.(fnames{fieldIdx}){trialcounter} = trialdata{trialIdx}.(fnames{fieldIdx}); %change data structure so will be able to concat sessions
+      output.(fnames2concat{fieldIdx}){trialcounter,1} = trialdata{trialIdx}.(fnames2concat{fieldIdx}); %change data structure so will be able to concat sessions
     end
+    trialcounter = trialcounter + 1;
 end
