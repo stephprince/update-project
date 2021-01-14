@@ -17,7 +17,6 @@ if makenewfiles
 else
   folders = dir([dirs.savedfiguresdir 'behavior\']);
   dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' folders(end).name '\']; %get most recent folder
-  dirs.behaviorfigdir = '\\neuro-cloud\labs\singer\Steph\Code\hpc-pfc-interactions\results\behavior\20201129\';
 end
 dirs.savedatadir = [dirs.behaviorfigdir 'data\'];
 
