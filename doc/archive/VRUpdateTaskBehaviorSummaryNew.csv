@@ -1,0 +1,36 @@
+Animal,Date,Session,User,Exclude?,Ephys?,First World,Last World,Total Trials,Percent Correct,Total Rewards,Trial rate,Time Elapsed,Notes,,,
+S1,200903,1,Steph,0,0,linear,linear,13,100,13,1.743562232,629.0998319,first ever mouse on the rig!!!!!,,,
+S1,200916,1,Steph,0,0,ymazeSurprise,ymazeSurprise,2,100,2,2.035865158,74.2142151,0,,,
+S11,200916,1,Steph,0,0,linear,linear,20,100,21,1.105047674,1107.825037,"really good job, needle in front but licking, running ok, short only",,,
+S12,200916,1,Steph,0,0,linear,linear,13,100,18,0.635400612,1270.244317,"ok, awkward on ball and not licking a ton but high weight percentile, got better",,,
+S13,200916,1,Steph,0,0,linear,linear,8,100,11,0.304682591,1641.437192,"ok, awkward on ball and still most of the time, not licking a ton but high weight percentile, got better",,,
+S14,200916,1,Steph,0,0,linear,linear,11,100,16,0.551850539,1302.754703,"ok, awkward on ball and not licking a ton but high weight percentile, got better",,,
+S11,200917,1,Steph,0,0,linear,linear,18,94.44444444,32,0.4268935,2764.179784,ok job, needle farther in front but still no licks recorded, moving ok, not a ton of trials
+S12,200917,1,Steph,0,0,linear,linear,26,96.15384615,33,0.813203506,2064.256054,ok job, no licks counted but was licking a lot in response to reward, moving well, lots of backward motion
+S13,200917,1,Steph,0,0,linear,linear,50,100,55,1.026495561,2926.652574,great job! made it all the way to the long linear track, but no licks being counted so taking off for now, was licking for reward though,
+S14,200917,1,Steph,0,0,linear,linear,7,42.85714286,26,0.1674756,2744.672472,ok job, really bad at running but licking for reward (no licks recorded here though), got better as session went on,
+S11,200918,1,Steph,0,0,linear,linear,51,96.07843137,66,0.954612541,3280.741281,great job! licks recorded here, made it to the long track, seemed to be getting turning basics at the end,
+S12,200918,1,Steph,0,0,linear,ymazeShort,83,59.03614458,55,1.926353718,2588.042303,went all the way to ymazeShort! Great job on linear, licks recorded, started moving fast, not so great on ymaze
+S13,200918,1,Steph,0,0,linear,linear,37,94.59459459,41,0.868419231,2665.874015,recorded some licks but not all probably, ok job, just lots of starting and stopping for a while, short linear the whole time
+S14,200918,1,Steph,0,0,linear,linear,53,100,57,1.2123513439944,2627.5474689,no licks recorded bc kept pushing detector down, got a lot less awkward and made it to the long track and walking better, ok overall 
+S11,200919,1,Steph,0,0,linear,ymazeShort,102,45.0980392156863,49,1.87952837350774,3257.2795237,good job! Almost all on yMazeShort. Seemed to be at chance but was turning in both directions so that's good
+S12,200919,1,Steph,0,0,ymazeShort,ymazeShort,126,24.6031746031746,37,3.23993797833013,2337.589107,not great - bad left bias at first and then bad right bias, but was licking for reward, doing a VR pause here for a few min since he's just running
+S12,200919,2,Steph,0,0,ymazeShort,ymazeShort,29,13.7931034482759,6,3.34417306672202,535.1048716,not good, tried to get him to do more after a break but didn't really work
+S13,200919,1,Steph,0,0,linear,linear,22,95.4545454545455,22,1.31339232322187,1201.491448,linear track, he's licking fine but is just lazy and will sit there for a while. going to pause so he can't get any more rewards
+S1,200919,1,Steph,0,0,linear,linear,3,33.3333333333333,5,0.601005682842623,382.0435013,
+S14,200919,1,Steph,0,0,linear,linear,79,98.7341772151899,79,1.60825925953572,3034.4260137,stopped holding on to the detector! did well with licks and running on the long linear track
+S11,200920,1,Steph,0,0,ymazeShort,ymazeShort,96,47.9166666666667,46,2.78399262241955,2074.5613846,ok job. lots of bias at beginning but some all l/r trials got it out. running in both directions then but performace at chance
+S11,200920,2,Steph,0,0,ymazeShort,ymazeShort,42,33.3333333333333,15,2.27470492022285,1128.4673552,not great, ok at first but went to left bias done for the day
+S12,200920,1,Steph,0,0,ymazeShort,ymazeShort,177,46.8926553672316,87,3.60881529593985,2944.8836319,amazing job! He got it at the end. His overall average isn't as great bc he had bias at beginning, but I think he's learning how to follow the visual cues
+S13,200920,1,Steph,0,0,linear,ymazeShort,54,81.4814814814815,45,1.36056649957734,2519.8098819,good job on linear but not so much on ymaze. Was sitting still so doing a beak for a few mins
+S14,200920,1,Steph,0,0,linear,ymazeShort,141,50.354609929078,75,2.77794104657451,3047.6234339,good job overall for the first day on the ymaze! Most of his time on there, not too much bias so that was promising. maybe a little above chance but hard to tell
+S11,200921,1,Steph,0,0,ymazeShort,ymazeShort,131,44.2748091603053,66,2.60954529171297,3030.3423389,ok job, lots of bias that's hard to break, not following the cues yet but has switched in both directions
+S12,200921,1,Steph,0,0,ymazeShort,ymazeShort,188,79.2553191489362,149,3.59561220557339,3163.2730119,amazing job! Around 80% correct on yMazeShort over 180 trials
+S13,200921,1,Steph,0,0,ymazeShort,linear,52,76.9230769230769,75,1.62948277500917,1957.8220194,ugh the worst he's so unmotivated
+S14,200921,1,Steph,0,0,ymazeShort,ymazeShort,56,57.1428571428571,32,2.70127514658035,1308.9837882,decent job, a little above chance? but developing a right bias and pausing so giving a 5-10 min break
+S14,200921,2,Steph,0,0,ymazeShort,ymazeShort,49,63.265306122449,42,1.5740333748614,1894.5440648,ok job at beginning but bias again about 20 min in and getting tired/stopping more so took off after 30 min
+S1,200922,1,Steph,1,0,ymazeShort,ymazeShort,31,22.5806451612903,8,3.4130381728135,557.0999934,something malfunctioned with the lick detector had to cancel less than 10 min in
+S12,200922,1,Steph,0,0,ymazeShort,ymazeLong,152,67.7631578947369,117,2.64314193063549,3506.433298,first day on long y-maze! it was touch and go at first and biases developed but got to doing well at end. Licks were not recorded for part of it bc something got messed up
+S13,200922,1,Steph,0,0,ymazeShort,ymazeShort,71,50.7042253521127,64,1.84012588880024,2352.6959505,at least he's motivated today but absolutely terrible bias. just let him go bc it's the first day he's actually run 
+S14,200922,1,Steph,0,0,ymazeShort,ymazeShort,46,60.8695652173913,32,1.72580033990763,1671.7883109,did very well in first 30 trials in about 10 min but then developed a bias and slowed down. Taking a pause since he wasn't moving
+S14,200922,2,Steph,0,0,ymazeShort,ymazeShort,30,83.3333333333333,37,1.64819316823932,1258.8693148,ok second session! needed some extra motivation or I gave him too many rewards at beginning idk but was performing above chance when he did move

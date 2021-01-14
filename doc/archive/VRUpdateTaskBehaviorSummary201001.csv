@@ -1,0 +1,77 @@
+Animal,Date,Session,User,Exclude?,Ephys?,First World,Last World,Total Trials,Percent Correct,Total Rewards,Trial rate,Time Elapsed,Notes
+S1,200903,1,Steph,1,0,linear,linear,13,100,13,1.743562232,629.0998319,first ever mouse on the rig!!!!!
+S11,200916,1,Steph,0,0,linear,linear,20,100,21,1.105047674,1107.825037,"really good job, needle in front but licking, running ok, short only"
+S12,200916,1,Steph,0,0,linear,linear,13,100,18,0.635400612,1270.244317,"ok, awkward on ball and not licking a ton but high weight percentile, got better"
+S13,200916,1,Steph,0,0,linear,linear,8,100,11,0.304682591,1641.437192,"ok, awkward on ball and still most of the time, not licking a ton but high weight percentile, got better"
+S14,200916,1,Steph,0,0,linear,linear,11,100,16,0.551850539,1302.754703,"ok, awkward on ball and not licking a ton but high weight percentile, got better"
+S11,200917,1,Steph,0,0,linear,linear,18,94.44444444,32,0.4268935,2764.179784,ok job.  needle farther in front but still no licks recorded.  moving ok.  not a ton of trials
+S12,200917,1,Steph,0,0,linear,linear,26,96.15384615,33,0.813203506,2064.256054,ok job.  no licks counted but was licking a lot in response to reward.  moving well.  lots of backward motion
+S13,200917,1,Steph,0,0,linear,linear,50,100,55,1.026495561,2926.652574,great job! made it all the way to the long linear track.  but no licks being counted so taking off for now.  was licking for reward though
+S14,200917,1,Steph,0,0,linear,linear,7,42.85714286,26,0.1674756,2744.672472,ok job.  really bad at running but licking for reward (no licks recorded here though) . got better as session went on
+S11,200918,1,Steph,0,0,linear,linear,51,96.07843137,66,0.954612541,3280.741281,great job! licks recorded here.  made it to the long track  seemed to be getting turning basics at the end
+S12,200918,1,Steph,0,0,linear,ymazeShort,83,59.03614458,55,1.926353718,2588.042303,went all the way to ymazeShort! Great job on linear.  licks recorded.  started moving fast.  not so great on ymaze
+S13,200918,1,Steph,0,0,linear,linear,37,94.59459459,41,0.868419231,2665.874015,recorded some licks but not all probably.  ok job.  just lots of starting and stopping for a while  short linear the whole time
+S14,200918,1,Steph,0,0,linear,linear,53,100,57,1.212351344,2627.547469,no licks recorded bc kept pushing detector down  got a lot less awkward and made it to the long track and walking better  ok overall 
+S11,200919,1,Steph,0,0,linear,ymazeShort,102,45.09803922,49,1.879528374,3257.279524,good job! Almost all on yMazeShort. Seemed to be at chance but was turning in both directions so that's good
+S12,200919,1,Steph,0,0,ymazeShort,ymazeShort,126,24.6031746,37,3.239937978,2337.589107,not great - bad left bias at first and then bad right bias  but was licking for reward  doing a VR pause here for a few min since he's just running
+S12,200919,2,Steph,0,0,ymazeShort,ymazeShort,29,13.79310345,6,3.344173067,535.1048716,not good  tried to get him to do more after a break but didn't really work
+S13,200919,1,Steph,0,0,linear,linear,22,95.45454545,22,1.313392323,1201.491448,linear track  he's licking fine but is just lazy and will sit there for a while. going to pause so he can't get any more rewards
+S14,200919,1,Steph,0,0,linear,linear,79,98.73417722,79,1.60825926,3034.426014,stopped holding on to the detector! did well with licks and running on the long linear track
+S11,200920,1,Steph,0,0,ymazeShort,ymazeShort,96,47.91666667,46,2.783992622,2074.561385,ok job. lots of bias at beginning but some all l/r trials got it out. running in both directions then but performace at chance
+S11,200920,2,Steph,0,0,ymazeShort,ymazeShort,42,33.33333333,15,2.27470492,1128.467355,not great  ok at first but went to left bias done for the day
+S12,200920,1,Steph,0,0,ymazeShort,ymazeShort,177,46.89265537,87,3.608815296,2944.883632,amazing job! He got it at the end. His overall average isn't as great bc he had bias at beginning  but I think he's learning how to follow the visual cues
+S13,200920,1,Steph,0,0,linear,ymazeShort,54,81.48148148,45,1.3605665,2519.809882,good job on linear but not so much on ymaze. Was sitting still so doing a beak for a few mins
+S14,200920,1,Steph,0,0,linear,ymazeShort,141,50.35460993,75,2.777941047,3047.623434,good job overall for the first day on the ymaze! Most of his time on there  not too much bias so that was promising. maybe a little above chance but hard to tell
+S11,200921,1,Steph,0,0,ymazeShort,ymazeShort,131,44.27480916,66,2.609545292,3030.342339,ok job  lots of bias that's hard to break  not following the cues yet but has switched in both directions
+S12,200921,1,Steph,0,0,ymazeShort,ymazeShort,188,79.25531915,149,3.595612206,3163.273012,amazing job! Around 80% correct on yMazeShort over 180 trials
+S13,200921,1,Steph,0,0,ymazeShort,linear,52,76.92307692,75,1.629482775,1957.822019,ugh the worst he's so unmotivated
+S14,200921,1,Steph,0,0,ymazeShort,ymazeShort,56,57.14285714,32,2.701275147,1308.983788,decent job a little above chance? but developing a right bias and pausing so giving a 5-10 min break
+S14,200921,2,Steph,0,0,ymazeShort,ymazeShort,49,63.26530612,42,1.574033375,1894.544065,ok job at beginning but bias again about 20 min in and getting tired/stopping more so took off after 30 min
+S12,200922,1,Steph,0,0,ymazeShort,ymazeLong,152,67.76315789,117,2.643141931,3506.433298,first day on long y-maze! it was touch and go at first and biases developed but got to doing well at end. Licks were not recorded for part of it bc something got messed up
+S13,200922,1,Steph,0,0,ymazeShort,ymazeShort,71,50.70422535,64,1.840125889,2352.695951,at least he's motivated today but absolutely terrible bias. just let him go bc it's the first day he's actually run 
+S14,200922,1,Steph,0,0,ymazeShort,ymazeShort,46,60.86956522,32,1.72580034,1671.788311,did very well in first 30 trials in about 10 min but then developed a bias and slowed down. Taking a pause since he wasn't moving
+S14,200922,2,Steph,0,0,ymazeShort,ymazeShort,30,83.33333333,37,1.648193168,1258.869315,ok second session! needed some extra motivation or I gave him too many rewards at beginning idk but was performing above chance when he did move
+S11,200923,1,Steph,0,0,ymazeShort,ymazeShort,48,10.41666667,7,2.153779884,1340.386743,horrible bias just runnning to the right the whole time
+S11,200923,1,Steph,0,0,ymazeShort,ymazeShort,39,48.71794872,54,1.295810931,1820.780895,also horrible bias
+S12,200923,1,Steph,0,0,ymazeShort,ymazeLong,52,67.30769231,36,2.956659354,1081.621802,great job! just have to change the view angles so it's smaller
+S12,200923,2,Steph,0,0,ymazeShort,ymazeLong,54,62.96296296,36,2.511990101,1324.571092,good job! performance dropping a bit at the end I think bc frustration that it was so long  but above chance in general
+S13,200923,1,Steph,0,0,ymazeShort,ymazeShort,35,48.57142857,27,1.588111848,1376.000221,bad. unmotivated and not moving very much. going to give a break
+S13,200923,2,Steph,0,0,ymazeShort,linear,18,72.22222222,19,1.581370287,720.8249043,ugh so unmotivated he sucks
+S14,200923,1,Steph,0,0,ymazeShort,ymazeShort,37,29.72972973,15,2.830271668,785.8993183,not great bc had it at first but developed bias quickly. Very late session and cage change day so that could be the problem
+S14,200923,2,Steph,0,0,ymazeShort,ymazeShort,131,61.83206107,94,2.947589165,2668.125077,great job! broke his bias and he finally got it for like 50 trials. 
+S11,200924,1,Steph,0,0,ymazeShort,ymazeShort,101,9.900990099,18,2.158238792,2815.664584,so bad. bias the whole time. can't really turn at all
+S11,200924,2,Steph,0,0,ymazeShort,ymazeShort,54,24.07407407,27,2.047474876,1594.015584,not great but some left trials at the end finally 
+S12,200924,1,Steph,0,0,ymazeShort,ymazeLong,28,25,8,2.797691904,619.3235526,really bad first session.  ended after 10 min
+S12,200924,2,Steph,0,0,ymazeShort,ymazeLong,85,67.05882353,65,2.629500312,1963.471404,great job! bad bias in first 20 trials but got rid of it and performed well in the rest of them
+S14,200924,1,Steph,0,0,ymazeShort,ymazeShort,119,85.71428571,103,2.538655835,2962.229709,great job!!! lots of trials and got rid of the bias quickly
+S11,200925,1,Steph,0,0,ymazeShort,ymazeShort,158,42.40506329,82,2.940321705,3238.313266,ok job! better than previous days for sure. Bias would switch back and forth between sides but at least got rewards
+S12,200925,1,Steph,0,0,ymazeLong,ymazeSurprise,205,74.14634146,165,30.28519792,4011.512024,Amazing!!!!! Introduced a brief delay at the end to the long y maze and it took a bit but he got it!! Yay!!!
+S14,200925,1,Steph,0,0,ymazeShort,ymazeSurprise,138,89.13043478,123,2.477205521,3410.024301,great job! Went from short to long and long to very small delay all in one session with stellar performance
+S13,200925,1,Steph,0,0,ymazeShort,ymazeShort,129,37.20930233,61,2.535599124,3053.241399,Good job! Finally did trials and broke his bias.  started doing ok towards the end of the session
+S11,200926,1,Steph,0,0,ymazeShort,ymazeShort,179,42.5,78,3.093839256,3497.946391,ok job but back and forth bias and definitely below 50 percent correct
+S12,200926,1,Steph,0,0,ymazeLong,ymazeSurprise,28,78.57142857,22,2.187972921,802.7229245,great job on long maze but then something got messed up on the delay one
+S12,200926,3,Steph,0,0,ymazeSurprise,ymazeSurprise,105,72.5,67,2.9066857,2191.674187,good job! Very well on no delay track.  struggled a bit with the delay but I think he stayed above chance *most* of the time
+S13,200926,1,Steph,0,0,ymazeShort,ymazeShort,94,75,65,2.189214084,2772.615086,good job! Got tired 43 min in so giving a 5 min break bc he's standing still.
+S14,200926,1,Steph,0,0,ymazeLong,ymazeLong,111,72.5,83,2.186331228,3189.926425,good job overall! Bias i had to break so didn't do delay but seemed ok for a second day on the long track
+S11,200927,1,Steph,0,0,ymazeShort,ymazeShort,230,97.5,160,42.66976692,3924.806492,great job!!!! He finally got it
+S12,200927,1,Steph,0,0,ymazeLong,ymazeSurprise,170,97.5,152,29.28442643,3968.276143,awesome job!! Introduced 5 and 4 delay and he did phenomenal on them
+S13,200927,1,Steph,0,0,ymazeShort,ymazeShort,43,55,29,1.766864309,1482.804798,Not moving much so doing a VR pause for 5 or 10 min
+S13,200927,2,Steph,0,0,ymazeShort,ymazeShort,29,79.31034483,25,2.363976262,858.4013027,great job percent correct wise but still keeps getting lazy so will do anothe rpause
+S14,200927,1,Steph,0,0,ymazeLong,ymazeLong,98,72.5,79,1.759501307,3343.334131,decent job! Slow moving and some biases to break but ended with a good percent correct
+S11,200928,1,Steph,0,0,ymazeShort,ymazeLong,194,82.5,168,46.77836139,3853.539192,Great job! High percent correct and transitioned to long maze at the very end which he did well on
+S12,200928,1,Steph,0,0,ymazeSurprise,ymazeSurprise,141,90,116,2.473135348,3439.271975,Great job! Mainly the 3-delay part of the track and definitely more difficult for him but he did very well for most of it outside of some bias periods
+S13,200928,1,Steph,0,0,ymazeShort,ymazeShort,88,62.5,68,1.56698784,3413.936682,ok job. Above chance but not super motivated it seemed so didn't get too many trials
+S14,200928,1,Steph,0,0,ymazeLong,ymazeSurprise,160,90,125,17.87762764,4138.432679,Awesome job! Introduced delay today and he had tons of bias at first but eventually got it and did super well
+S11,200929,1,Steph,0,0,ymazeShort,ymazeLong,166,90,136,25.26424729,4043.63849,Great job!! Almost a full day on the long track and did super well
+S12,200929,1,Steph,0,0,ymazeLong,ymazeSurprise,165,95,148,45.29690059,3824.009228,Awesome job!! And on the 2-delay too! crazy good
+S13,200929,1,Steph,0,0,ymazeShort,ymazeShort,41,62.5,32,1.476659772,1739.045752,WHY DOES HE NEVER MOVE. ok job but not good kept sitting still so gave break
+S13,200929,2,Steph,0,0,ymazeShort,ymazeShort,38,52.63157895,20,1.888489656,1235.58642,still the worst
+S14,200929,1,Steph,0,0,ymazeLong,ymazeLong,151,65,112,2.752157299,3296.888135,Not great but ok. Did above chance on long but actually wanted to move him to delay since he did it yesterday but his bias was so bad most of the time
+S11,200930,1,Steph,0,0,ymazeLong,ymazeSurprise,146,62.5,109,10.78439218,4414.298922,ok job. Did very well on the long y maze but delay was difficult for him  maybe started doing better towards the end
+S12,200930,1,Steph,0,0,ymazeLong,ymazeSurprise,138,60,107,2.32572837,3567.43403,good job overall! Switched to 1-delay and he def found it difficult but did ok for the most part
+S13,200930,1,Steph,0,0,ymazeShort,ymazeShort,109,80,81,9.229453529,4309.237411,ok job. Lots of sitting still but did above chance when he wanted to perform...
+S14,200930,1,Steph,0,0,ymazeLong,ymazeSurprise,116,97.5,104,35.05626127,3801.140687,Great job! Did so well with the 4-delay too after I transitioned him
+S11,201001,1,Steph,0,0,ymazeLong,ymazeLong,112,57.5,81,2.054808343,3271.790986,not great. Lots of bias and wasn't able to move him to delay
+S12,201001,1,Steph,0,0,ymazeLong,ymazeSurprise,173,75,122,26.53645567,3993.044477,Amazing job! Some bias in the middle but overall sustained performance in the long delay track
+S13,201001,1,Steph,0,0,ymazeShort,ymazeLong,113,90,101,14.43904932,4097.921878,Great job! Still slow as usual but good performance overall and did the long track FINALLY
+S14,201001,1,Steph,0,0,ymazeLong,ymazeSurprise,157,90,139,36.51714794,3858.959397,Great job!!! moved to the longest delay and he still did great
