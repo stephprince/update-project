@@ -1,4 +1,4 @@
-function getUpdateTaskBehavior(dirs, indices, makenewfiles)
+function getUpdateTaskBehavior(dirs, indices, debugmode, specificdataset, makenewfiles)
 %SP 190813
 %this function generates and plots the behavioral data for the Update Task
 
@@ -13,10 +13,14 @@ params.choiceMap = containers.Map({'incorrect','correct','terminated'},[0 1 2]);
 
 %set directories
 if makenewfiles
-  dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' num2str(yyyymmdd(datetime('now'))) '\'];
+    dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' num2str(yyyymmdd(datetime('now'))) '\'];
+elseif specificdataset
+    dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' num2str(specificdataset) '\']; %uses the date to load specific dataset of interest
+elseif debugmode
+    dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\20210112\']; %just to debug the code I have to write
 else
-  folders = dir([dirs.savedfiguresdir 'behavior\']);
-  dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' folders(end).name '\']; %get most recent folder
+    folders = dir([dirs.savedfiguresdir 'behavior\']);
+    dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' folders(end).name '\']; %get most recent folder
 end
 dirs.savedatadir = [dirs.behaviorfigdir 'data\'];
 

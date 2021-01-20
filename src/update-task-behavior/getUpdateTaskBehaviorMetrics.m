@@ -17,7 +17,7 @@ if ~exist(filename) || makenewfiles
         
         %combine all session info into row on behavior table
         behaviorDataTempTable = struct2table(behaviorDataTemp,'AsArray',1);
-        behaviorDataTable(sessIdx,:) = [rawDataTable(:,1:6), behaviorDataTempTable]; %don't include the raw data bc too big
+        behaviorDataTable(sessIdx,:) = [rawDataTable(:,1:4), behaviorDataTempTable]; %don't include the raw data, protocol log, or params because too big
         clear rawDataTable behaviorDataTempTable behaviorDataTemp
         toc
     end

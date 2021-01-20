@@ -57,7 +57,7 @@ if ~exist(filename1) || ~exist(filename2) %|| makenewfiles
     %going to want to add something for delay when I come across that data
     trialWorld = resampledData.currentWorld(trialEndsBeforeIntertrial);
     
-    %% get trial delay location (if any)
+    %% get trial delay location and duration(if any)
     if index.Date >= 201005
         whenDelay = find((diff(resampledData.delayUpdateOccurred) == 1)) + 1; %this value is more accurate than task state bc closer to when cues actually change (1 ind closer)
     else
@@ -66,6 +66,17 @@ if ~exist(filename1) || ~exist(filename2) %|| makenewfiles
     trialDelayLocation = nan(size(trialOutcomes,1),1);
     whichTrialsWithUpdate = resampledData.trialGroup(whenDelay);
     trialDelayLocation(whichTrialsWithUpdate) = resampledData.yPos(whenDelay);
+    
+    %get trial delay duration in time
+    trialDelayUpdateTime = nan(size(trialOutcomes,1),1);
+    trialDelayUpdateTime(whichTrialsWithUpdate) = resampledData.time(whenDelay);
+    
+    trialChoiceTime = nan(size(trialOutcomes,1),1);
+    whenChoiceMade = find(resampledData.taskState == params.taskStatesMap('choiceMade')); %find when animal makes choice
+    whichTrialsWithChoice = resampledData.trialGroup(whenChoiceMade);
+    trialChoiceTime(whichTrialsWithChoice) = resampledData.time(whenChoiceMade);
+    
+    trialDelayDuration = trialChoiceTime - trialDelayUpdateTime;
     
     %% get trial update location (if any)
     if index.Date >= 201005
@@ -78,8 +89,8 @@ if ~exist(filename1) || ~exist(filename2) %|| makenewfiles
     trialUpdateLocation(whichTrialsWithUpdate) = resampledData.yPos(whenUpdate);
     
     %% concatenate data into table
-    trialArray = [trialNum' trialStarts, trialEnds, trialDurs, trialOutcomes, trialTypesLeftRight, trialDelayLocation, trialUpdateLocation, trialTypesUpdate, trialWorld];
-    trialArrayHeaders = {'trialNum','trialStart','trialEnd', 'trialDur', 'trialOutcomes', 'trialTypesLeftRight', 'trialDelayLocation','trialUpdateLocation','trialTypesUpdate', 'trialWorld'};
+    trialArray = [trialNum' trialStarts, trialEnds, trialDurs, trialOutcomes, trialTypesLeftRight, trialDelayLocation, trialUpdateLocation, trialDelayDuration, trialTypesUpdate, trialWorld];
+    trialArrayHeaders = {'trialNum','trialStart','trialEnd', 'trialDur', 'trialOutcomes', 'trialTypesLeftRight', 'trialDelayLocation','trialUpdateLocation','trialDelayDuration', 'trialTypesUpdate', 'trialWorld'};
     trialTableTemp = array2table(trialArray,'VariableNames',trialArrayHeaders);
     trialTable = [trialTableTemp, resampledTrialData];
     
