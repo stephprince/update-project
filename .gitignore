@@ -19,5 +19,8 @@ octave-workspace
 #R autosave
 .Rhistory
 
+#ipynb temp files
+.ipynb_checkpoints/
+
 #results
 results/*
