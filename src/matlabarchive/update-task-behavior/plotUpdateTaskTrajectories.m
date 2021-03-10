@@ -27,12 +27,8 @@ for anIdx = 1:numel(indices.animals)
         %% make the plots for each track/trial type
         plotHistByPosition(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
         
-        desperate = 1;
-        if ~desperate
-            if params.plotCategories(paramIdx,3) == 2 %if we're in the delay part of the task with update trials
-                plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
-            end
+        if params.plotCategories(paramIdx,3) == 2 %if we're in the delay part of the task with update trials
+            plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
         end
     end
 end
-test 

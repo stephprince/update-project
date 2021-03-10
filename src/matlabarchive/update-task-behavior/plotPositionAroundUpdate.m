@@ -1,3 +1,4 @@
+<<<<<<< HEAD:src/update-task-behavior/plotPositionAroundUpdate.m
 function plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
 
 if ~isempty(trialdata)
@@ -50,7 +51,7 @@ if ~isempty(trialdata)
         trialPosDataRight(isnan(whereUpdateOccurredAdjustedR),:) = [];
         trialPosDataLeft(isnan(whereUpdateOccurredAdjustedL),:) = [];
         trialPosDataUpdateRight = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredR(x)-binWindowToPlot:whichBinUpdateOccurredR(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredR), 'UniformOutput',0)'),trialPosDataRight);
-        trialPosDataUpdateLeft = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredL(x)-binWindowToPlot:whichBinUpdateOccurredL(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredL), 'UniformOutput',0)'),trialPosDataLeft);   
+        trialPosDataUpdateLeft = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredL(x)-binWindowToPlot:whichBinUpdateOccurredL(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredL), 'UniformOutput',0)'),trialPosDataLeft);
 
         %get averages for when update occurred
         meanPosDataRight = varfun(@(x) nanmean(x,1), trialPosDataUpdateRight); %makes meanxMetrics table
@@ -69,7 +70,7 @@ if ~isempty(trialdata)
         %% make a plot for each of the variables/metrics
         varNames = regexprep(meanPosDataLeft.Properties.VariableNames, 'mean', '');
         numTrialsTotal = size(trialPosDataUpdateRight,1) + size(trialPosDataUpdateLeft,1);
-        for varIdx = 5%[2 3 5]
+        for varIdx = [2 3 5]
             %get bins to use and clean relevant data
             meanR = meanPosDataRight.(['mean' varNames{varIdx}]); semR = semPosDataRight.(['sem' varNames{varIdx}]);
             meanL = meanPosDataLeft.(['mean' varNames{varIdx}]); semL = semPosDataLeft.(['sem' varNames{varIdx}]);
@@ -80,9 +81,9 @@ if ~isempty(trialdata)
             figure(varIdx); hold on;
             plot([0 0], [min(min((indivR))) max(max((indivR)))], 'k--');
             ax(outIdx) = subplot(4,3,outIdx); hold on;
-            plot(binsToUseForUpdate, indivR,'Color', [0 1 0 0.2], 'LineWidth', 1); 
+            plot(binsToUseForUpdate, indivR,'Color', [0 1 0 0.2], 'LineWidth', 1);
             plot(binsToUseForUpdate, indivL, 'Color', [1 0 1 0.2], 'LineWidth', 1);
-            xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)]) 
+            xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)])
             xlabel('Position from Update'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
             title([trialOutcome{outIdx} 'trials n=' num2str(numTrialsTotal)]);
 
@@ -94,7 +95,7 @@ if ~isempty(trialdata)
             plot(binsToUseForUpdate, meanL, 'm-', 'LineWidth', 2);
             ciplot(meanL-semL, meanL+semL, binsToUseForUpdate,'m-'); alpha(0.3); hold on;
             xlabel('Position from Update'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
-            alpha(0.5); xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)]) 
+            alpha(0.5); xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)])
 
             %plot the heat maps
             ax3(outIdx) = subplot(4,3,outIdx+6); hold on;
@@ -107,7 +108,7 @@ if ~isempty(trialdata)
             limVal = min([abs(min(min(indivTrialsForHeatmap))) abs(max(max(indivTrialsForHeatmap)))]);
             caxis([-limVal*0.5 limVal*0.5]); set(gca,'YDir','normal');
             title('Velocity towards initial side')
-            
+
             ax3(outIdx) = subplot(4,3,outIdx+9); hold on;
             indivTrialsForHeatmap = [indivR; -1*indivL]; %flip the indivL so they're all the same direction
             [~, sortIdx] = sort(sum(indivTrialsForHeatmap(:,1:binWindowToPlot+1),2));
@@ -119,16 +120,6 @@ if ~isempty(trialdata)
             caxis([-limVal*0.5 limVal*0.5]); set(gca,'YDir','normal');
             title('Velocity towards update side')
 
-%             ax4(outIdx) = subplot(4,3,outIdx+9); hold on;
-%             [~, sortIdx] = sort(sum(indivL(:,1:binWindowToPlot+1),2));
-%             imagesc('CData',indivL(sortIdx,:), 'XData', binsToUseForUpdate)
-%             xlabel('Position from Update'); ylabel('Trials');
-%             cmap = flipud(cbrewer('div', 'RdBu',100));
-%             colormap(cmap); colorbar
-%             limVal = min([abs(min(min(indivL))) abs(max(max(indivL)))]);
-%             caxis([-limVal limVal]); set(gca,'YDir','normal');
-%             title('Initial left trials')
-
             sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories around update']);
             filename = [savedfiguresdir varNames{varIdx} 'trajectoriesaroundupdate_S' num2str(indices.animals(anIdx))];
             saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
@@ -137,7 +128,6 @@ if ~isempty(trialdata)
             figure(varIdx+10)
             ax11(outIdx) = subplot(3,3,outIdx); hold on;
             indivTrialsForHeatmap = [indivR; -1*indivL];
-            %indivTrialsForHeatmapSecondHalf = indivTrialsForHeatmap(:,binWindowToPlot+2:end);
             indivTrialsForHeatmapValAtHalf = indivTrialsForHeatmap(:,binWindowToPlot+1);
             indivTrialsForHeatmapAdjusted = indivTrialsForHeatmap-indivTrialsForHeatmapValAtHalf;
             [~, sortIdx] = sort(sum(indivTrialsForHeatmapAdjusted,2));
@@ -148,10 +138,9 @@ if ~isempty(trialdata)
             limVal = min([abs(min(min(indivTrialsForHeatmapAdjusted))) abs(max(max(indivTrialsForHeatmapAdjusted)))]);
             caxis([-limVal limVal]); set(gca,'YDir','normal');
             title('Velocity towards update side')
-            
+
             ax12(outIdx) = subplot(3,3,outIdx+3); hold on;
             indivTrialsForHeatmap = [-1*indivR; indivL];
-            %indivTrialsForHeatmapSecondHalf = indivTrialsForHeatmap(:,binWindowToPlot+2:end);
             indivTrialsForHeatmapValAtHalf = indivTrialsForHeatmap(:,binWindowToPlot+1);
             indivTrialsForHeatmapAdjusted = indivTrialsForHeatmap-indivTrialsForHeatmapValAtHalf;
             [~, sortIdx] = sort(sum(indivTrialsForHeatmapAdjusted,2));
@@ -162,35 +151,16 @@ if ~isempty(trialdata)
             limVal = min([abs(min(min(indivTrialsForHeatmapAdjusted))) abs(max(max(indivTrialsForHeatmapAdjusted)))]);
             caxis([-limVal limVal]); set(gca,'YDir','normal');
             title('Velocity towards initial side')
-            
-            
-
-%             ax12(outIdx) = subplot(3,3,outIdx+3); hold on;
-%             indivLSecondHalf = indivL(:,binWindowToPlot+2:end);
-%             indivLValAtHalf = indivL(:,binWindowToPlot+1);
-%             indivLAdjusted = indivLSecondHalf-indivLValAtHalf;
-%             [~, sortIdx] = sort(sum(indivLAdjusted,2));
-%             imagesc('CData',indivLAdjusted(sortIdx,:), 'XData', binsToUseForUpdate(binWindowToPlot+2:end))
-%             xlabel('Position from Update'); ylabel('Trials');
-%             cmap = flipud(cbrewer('div', 'RdBu',100));
-%             colormap(cmap); colorbar
-%             limVal = min([abs(min(min(indivLAdjusted))) abs(max(max(indivLAdjusted)))]);
-%             caxis([-limVal limVal]); set(gca,'YDir','normal');
-%             title('Initial left trials')
 
             ax10(outIdx) = subplot(3,3,outIdx+6); hold on;
-            meanRadjusted = mean(indivTrialsForHeatmapAdjusted,1); 
+            meanRadjusted = mean(indivTrialsForHeatmapAdjusted,1);
             semRadjusted = std(indivTrialsForHeatmapAdjusted,[],1)/size(indivTrialsForHeatmapAdjusted,1);
-            %meanLadjusted = mean(indivLAdjusted,1);
-            %semLadjusted = std(indivLAdjusted,[],1)/size(indivLAdjusted,1);
 
             plot([0 0], [min(meanRadjusted) max(meanRadjusted)], 'k--');
             plot(binsToUseForUpdate, meanRadjusted, 'g-', 'LineWidth', 2);
             ciplot(meanRadjusted-semRadjusted, meanRadjusted+semRadjusted, binsToUseForUpdate,'g-'); alpha(0.3); hold on;
-            %plot(binsToUseForUpdate(binWindowToPlot+2:end), meanLadjusted, 'm-', 'LineWidth', 2);
-            %ciplot(meanLadjusted-semLadjusted, meanLadjusted+semLadjusted, binsToUseForUpdate(binWindowToPlot+2:end),'m-'); alpha(0.3); hold on;
             xlabel('Position from Update'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
-            alpha(0.5); xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)]) 
+            alpha(0.5); xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)])
             title([trialOutcome{outIdx} 'trials n=' num2str(numTrialsTotal)]);
 
             sgtitle(['S' num2str(indices.animals(anIdx)) ' velocity change after update']);
@@ -198,4 +168,7 @@ if ~isempty(trialdata)
             saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
         end
     end
+end
+
+>>>>>>> fdf33cd1d08204338cbc10b04f5902a9e92828cc:src/matlabarchive/update-task-behavior/plotPositionAroundUpdate.m
 end

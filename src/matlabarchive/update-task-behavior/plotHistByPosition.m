@@ -64,7 +64,7 @@ if ~isempty(trialdata)
         trackName = trackTypeKeySet{trackTypeValueSet{params.plotCategories(paramIdx,1)}};
         updateType = updateTypeKeySet{updateTypeValueSet{params.plotCategories(paramIdx,3)}};
         if exist('varNames') %if any of the left/right trials have values
-            for varIdx = 5%[2 3 5] %don't really care about the transvelocity or ypos
+            for varIdx = [2 3 5] %don't really care about the transvelocity or ypos
                 %get bins to use and clean relevant data
                 binsToUse = binsTable.yPos - min(binsTable.yPos)';
                 meanR = nan(size(binsToUse))'; semR = nan(size(binsToUse))';
@@ -75,8 +75,6 @@ if ~isempty(trialdata)
                 if ~isempty(trialPosDataLeft)
                     meanL = meanPosDataLeft.(['mean' varNames{varIdx}]); semL = semPosDataLeft.(['sem' varNames{varIdx}]);
                 end
-
-                desperate = 1;
                 
                 %plot the individual traces
                 figure(varIdx); hold on;
@@ -92,31 +90,29 @@ if ~isempty(trialdata)
                     allFullBins = find(sum(~isnan(indivL),1) >= size(indivL,1)/2); %look for bins that are at least half full
                 end
                 
-                if ~desperate
-                    plot(binsToUse, indivR,'Color', [0 1 0 0.2], 'LineWidth', 1); 
-                    plot(binsToUse, indivL, 'Color', [1 0 1 0.2], 'LineWidth', 1);
-                    xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))]) 
-                    xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
-
-                    %plot the averages
-                    ax(outIdx+3) = subplot(2,3,outIdx+3); hold on;
-                    if ~isnan(nansum(meanR))
-                        plot(binsToUse, meanR, 'g-', 'LineWidth', 2);
-                        ciplot(meanR-semR, meanR+semR, binsToUse,'g'); alpha(0.3); hold on;
-                    end
-                    if ~isnan(nansum(meanL))
-                        plot(binsToUse, meanL, 'm-', 'LineWidth', 2);
-                        ciplot(meanL-semL, meanL+semL, binsToUse,'m'); alpha(0.3); hold on;
-                    end
-                    xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
-                    title([trialOutcome{outIdx} 'trials - delay loc: ' num2str(params.plotCategories(paramIdx,2)) ' - trial type:' updateType '  n=' num2str(numTrialsTotal) 'right = red, left = blue']);
-                    alpha(0.5); xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))]) 
-                    linkaxes(ax,'y')
-
-                    sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories on' trackName]);
-                    filename = [savedfiguresdir varNames{varIdx} 'trajectories_' trackName '_S' num2str(indices.animals(anIdx)) 'delayloc' num2str(delayLoc) '_alloutcomes'];
-                    saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+                plot(binsToUse, indivR,'Color', [0 1 0 0.2], 'LineWidth', 1);
+                plot(binsToUse, indivL, 'Color', [1 0 1 0.2], 'LineWidth', 1);
+                xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
+                xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
+                
+                %plot the averages
+                ax(outIdx+3) = subplot(2,3,outIdx+3); hold on;
+                if ~isnan(nansum(meanR))
+                    plot(binsToUse, meanR, 'g-', 'LineWidth', 2);
+                    ciplot(meanR-semR, meanR+semR, binsToUse,'g'); alpha(0.3); hold on;
                 end
+                if ~isnan(nansum(meanL))
+                    plot(binsToUse, meanL, 'm-', 'LineWidth', 2);
+                    ciplot(meanL-semL, meanL+semL, binsToUse,'m'); alpha(0.3); hold on;
+                end
+                xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
+                title([trialOutcome{outIdx} 'trials - delay loc: ' num2str(params.plotCategories(paramIdx,2)) ' - trial type:' updateType '  n=' num2str(numTrialsTotal) 'right = red, left = blue']);
+                alpha(0.5); xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
+                linkaxes(ax,'y')
+                
+                sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories on' trackName]);
+                filename = [savedfiguresdir varNames{varIdx} 'trajectories_' trackName '_S' num2str(indices.animals(anIdx)) 'delayloc' num2str(delayLoc) '_alloutcomes'];
+                saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 
                 %plot the traces as distributions for different parts of track
                 indivRShort = indivR(:,allFullBins); indivLShort = indivL(:,allFullBins);
