@@ -402,11 +402,10 @@ S18,210309,1,Steph,0,0,ymazeLong,ymazeLong,80,65,51,2.101493374,2298.477916,Slow
 S19,210309,1,Steph,0,0,ymazeLong,ymazeSurprise,125,67.5,96,60.54001695,3742.532566,Great job overall. Tried transitioning to latest delay at the end and he struggled a bit but overall good session,
 S20,210310,1,Navya,0,0,ymazeLong,ymazeLong,29,37.93103448,12,0.534557942,3564.207081,did slightly better than yesterday. still not great.,
 S17,210310,1,Steph,0,0,ymazeSurprise,ymazeSurprise,124,90,110,25.14456435,3899.246743,Awesome job on later delay. Good performance the whole time,
-S18,210310,1,Steph,0,0,ymazeLong,ymazeLong,72,77.5,56,2.093027312,2037.021104,Great job in first session. High percent correct just kind of dug himself in a bias correction hole so trying to fix,
+S18,210310,1,Steph,1,0,ymazeLong,ymazeLong,72,77.5,56,2.093027312,2037.021104,Great job in first session. High percent correct just kind of dug himself in a bias correction hole so trying to fix,
 S18,210310,2,Steph,0,0,ymazeLong,ymazeLong,62,80,40,2.339376933,1596.447022,Slow start but still did well in the second session!,
 S19,210310,1,Steph,0,0,ymazeLong,ymazeSurprise,106,57.5,73,9.720594057,4473.905389,Switched to latest delay today. He didn't love it but still was getting a decent amount of rewards for the whole session,
 S20,210311,1,Navya,0,0,ymazeSurprise,ymazeLong,4,50,4,0.224667773,1694.638093,really bad. is not doing well at all and getting stuck around the track.,
-S20,210311,2,Navya,1,0,ymazeSurprise,ymazeLong,0,0,1,0,832.5604966,very bad, did not even finish a single trial. 
 S17,210311,1,Steph,0,0,ymazeSurprise,ymazeSurprise,105,72.5,84,1.984830226,3199.698584,Great job at beginning fell off a bit at the end but stayed above chance the whole time,
 S18,210311,1,Steph,0,0,ymazeLong,ymazeLong,107,52.5,79,2.291433181,2814.888186,Good job. Started dropping around 40 min but overall did ok.,
 S19,210311,1,Steph,0,0,ymazeSurprise,ymazeSurprise,94,75,73,1.578994668,3577.453164,Great job! Seemed to be his first day really getting the latest delay,
@@ -514,106 +513,27 @@ S1,210404,1,Steph,0,0,ymazeSurprise,ymazeSurprise,5,80,4,2.104908647,143.2216719
 S17,210404,1,Steph,0,0,ymazeSurprise,ymazeSurprise,39,43.58974359,20,2.131815432,1098.695788,Not so great,
 S17,210404,2,Steph,0,0,ymazeSurprise,ymazeSurprise,61,65,45,2.237511203,1657.492886,Better second session but started to fall off at the end,
 S20,210404,1,Steph,0,0,ymazeSurprise,ymazeSurprise,59,55,38,1.724151367,2074.262021,Did really well the first 30 min but fell off towards the end so did a pause and took off,
-S20,210405,1,Navya,0,0,ymazeSurprise,ymazeSurprise,83,17.5,39,402.326708676684,3614.954565,started doing really well and dipped off and got bad. not sure why. 
-S17,210405,1,Steph,0,0,ymazeSurprise,ymazeSurprise,67,60,43,2.27259365121001,1799.3481293,did ok but started getting super biased towards 30 min in so stopped
-S17,210405,2,Steph,0,0,ymazeSurprise,ymazeSurprise,29,62.0689655172414,18,2.114886981169,843.2574488,second session ok but fell off faster
-S19,210405,1,Steph,0,0,ymazeLong,ymazeSurprise,36,61.1111111111111,23,1.9934217083624,1120.3174185,did well in the first 15 min but fell off towards 20 so did a pause
-S19,210405,2,Steph,0,0,ymazeLong,ymazeSurprise,90,82.5,71,2.35761737441758,2295.3835748,Great job in the second session
-S20,210406,1,Navya,0,0,ymazeSurprise,ymazeSurprise,81,62.5,65,1.3604562399173,3576.2683967,good job dropped off around 40
-S17,210406,1,Steph,0,0,ymazeSurprise,ymazeSurprise,59,80,49,1.82372699734169,1968.8725018,first session! had a few decent trials but started to drop off at 30 min so taking a pause
-S17,210406,2,Steph,0,0,ymazeSurprise,ymazeSurprise,11,54.5454545454545,6,1.80269749097286,380.6991415,spikegadgets errored out
-S1,210406,1,Steph,0,0,ymazeSurprise,ymazeSurprise,8,25,2,2.30951327007833,235.105567,
-S19,210406,2,Steph,0,0,ymazeSurprise,ymazeSurprise,121,77.5,83,2.1811141948474,3354.2757762,Good session switched to later delay
-S20,210407,1,Navya,0,0,ymazeSurprise,ymazeSurprise,96,75,82,1.65701226879501,3487.3111687,did amazing on first day of later delay.
-S17,210407,1,Steph,0,0,ymazeSurprise,ymazeSurprise,45,45,22,1.9274631372675,1412.9225344,Recording 1 not great behavior and taking a pause bc he was pretty biased
-S17,210407,3,Steph,0,0,ymazeSurprise,ymazeSurprise,49,52.5,27,1.90136076639067,1574.3137346,Got a few decent trials but performance started to drop off at the end
-S19,210407,1,Steph,0,0,ymazeSurprise,ymazeSurprise,67,62.5,43,1.86068987159851,2164.7637675,Did decent at first but started falling off at 35 min so took a pause
-S19,210407,2,Steph,0,0,ymazeSurprise,ymazeSurprise,35,57.1428571428571,21,2.15536264489682,997.9527707,did ok for a bit in the second session but then dropped off
-S20,210408,1,Navya,0,0,ymazeSurprise,ymazeSurprise,47,77.5,35,0.793821032203799,3561.6843013,did well on later delay so great. lots of progress
-S17,210408,1,Steph,0,0,ymazeSurprise,ymazeSurprise,47,57.5,26,1.72731883365552,1639.566521,Ok first session stayed above chance but got more biased at the end
-S17,210408,3,Steph,0,0,ymazeSurprise,ymazeSurprise,52,57.5,33,1.67036431073916,1879.3527977,Better job in the second session did decent but still biased
-S19,210408,1,Steph,0,0,ymazeSurprise,ymazeSurprise,23,30.4347826086957,8,2.02233952442781,687.5447101,Bad start changing the bias correction max
-S19,210408,2,Steph,0,0,ymazeSurprise,ymazeSurprise,30,46.6666666666667,15,2.23181627688409,820.2821875,Better start to second session but fell off eventually
-S20,210409,1,Navya,0,0,ymazeSurprise,ymazeSurprise,85,42.5,53,1.42256993674585,3591.355705,did pretty well for first day on middle delay. 
-S17,210409,1,Steph,0,0,ymazeSurprise,ymazeSurprise,92,62.5,68,2.05741760545663,2696.3978984,AMAZING BEHAVIOR SESSION DURING A RECORDING. Great job overall
-S17,210410,1,Steph,0,0,ymazeSurprise,ymazeSurprise,13,61.5384615384615,8,1.91007466432887,417.0784609,Great job but was getting stuck on update trials in a row idk
-S17,210410,2,Steph,0,0,ymazeSurprise,ymazeSurprise,50,57.5,28,1.96350884266207,1547.7193064,Not so great hovered aruond or just above chance and had an opposite side bias as usual
-S20,210412,1,Steph,0,0,ymazeSurprise,ymazeSurprise,19,42.1052631578947,9,1.87243156591123,612.4000472,Started off a bit biased so doing a little pause
-S20,210412,2,Steph,0,0,ymazeSurprise,ymazeSurprise,94,92.5,71,2.12077433832969,2662.4328463,Great job in second session after a bit of a rough start
-S17,210412,1,Steph,0,0,ymazeSurprise,ymazeSurprise,55,52.5,31,1.92434973015369,1720.0746251,Decent job just fell off after about 30 min 
-S17,210412,1,Steph,0,0,ymazeSurprise,ymazeSurprise,8,87.5,7,1.76793626589761,293.5012156,got stuck in that weird update task loop
-S17,210412,3,Steph,0,0,ymazeSurprise,ymazeSurprise,8,25,2,1.69368326711502,288.4613582,only a few minutes to see if he would keep going but didn't
-S20,210413,1,Navya,0,0,ymazeSurprise,ymazeSurprise,28,25,7,0.653607993937008,2735.8639095,not doing well. will retsart again.
-S20,210413,2,Navya,0,0,ymazeSurprise,ymazeSurprise,1,100,1,0.0633282811437932,956.6896563,did mot do very well on second round. will keep on middle delay. 
-S17,210413,2,Steph,0,0,ymazeSurprise,ymazeSurprise,47,47.5,24,2.12870352896773,1327.44324,did ok but not great. started to drop off after 20 min so doing a pause
-S17,210413,5,Steph,0,0,ymazeSurprise,ymazeSurprise,49,57.5,28,2.13240493934613,1380.5163707,Ok but not great on update part of the task
-S19,210413,2,Steph,0,0,ymazeSurprise,ymazeSurprise,31,45.1612903225806,17,2.39572787622588,787.7842725,Did ok for a bit but fell off after about 15 min so doing a brief brief pause
-S20,210414,1,Navya,0,0,ymazeSurprise,ymazeSurprise,80,40,22,46.7403476313355,3875.3397123,did much better today but still needs improvement
-S17,210414,1,Steph,0,0,ymazeSurprise,ymazeSurprise,25,52,13,1.98416897712121,770.7301645,Not great fell into bias pretty quick but also was above 85 weight
-S17,210414,3,Steph,0,0,ymazeSurprise,ymazeSurprise,15,60,9,1.98465202434506,454.6798664,Ok not great
-S17,210414,4,Steph,0,0,ymazeSurprise,ymazeSurprise,60,50,28,2.03875561153324,1789.7141339,Mainly below chance but maybe had a few good spurts here and there
-S19,210414,1,Steph,0,0,ymazeSurprise,ymazeSurprise,149,57.5,58,25.3593999977307,3973.1031456,Finally got to above chance on the later delay at the end! Took forever to get there though
-S20,210415,1,Navya,0,0,ymazeSurprise,ymazeSurprise,58,30,22,0.986136284034454,3537.9006461,still didnt do great. maybe will try new technique with warmup.
-S17,210415,1,Steph,0,0,ymazeSurprise,ymazeSurprise,33,39.3939393939394,14,2.17950058615357,910.8359525,Not good
-S17,210415,3,Steph,0,0,ymazeSurprise,ymazeSurprise,69,52.5,35,2.23231496993654,1858.2970134,not great maybe one or two update trials and bad performance overall
-S19,210415,1,Steph,0,0,ymazeSurprise,ymazeSurprise,146,7.5,30,2.50342148558632,3519.3943595,So so bad
-S20,210416,1,Navya,0,0,ymazeSurprise,ymazeSurprise,88,35,37,1.49809801136001,3532.0929041,did worse today, but did lots of trials and inconsistent performance.
-S17,210416,1,Steph,0,0,ymazeSurprise,ymazeSurprise,184,52.5,103,9.40505368292191,4795.3451193,No recording today. Better than previous days but not great on update trials
-S19,210416,1,Steph,0,0,ymazeSurprise,ymazeSurprise,52,27.5,20,2.142430422512,1459.9008367,Bad bad 
-S19,210418,1,Steph,0,0,ymazeSurprise,ymazeSurprise,71,40,35,1.9212815759921,2242.057511,Not great but was trying. Doing a brief pause at 37 min
-S19,210418,2,Steph,0,0,ymazeSurprise,ymazeSurprise,52,47.5,23,1.89198465551932,1659.3229906,hovered around 50 percent again
-S19,210418,1,Steph,0,0,ymazeSurprise,ymazeSurprise,125,67.5,103,2.65707286225203,2850.9827779,Did really really well at the beginning. Switched to middle delay at 36 min and dropped off a bit after that
-S1,210419,1,Steph,0,0,ymazeSurprise,ymazeSurprise,51,30,21,0.868636351636485,3529.2361187,
-S19,210419,1,Steph,0,0,ymazeSurprise,ymazeSurprise,86,67.5,43,2.37375946916114,2189.8891559,Ugh rough day but FINALLY did better at the end
-S20,210420,1,Navya,0,0,ymazeLong,ymazeSurprise,86,57.5,51,1.4694223461549,3518.4963683,little better than yesterday. still has lots of work to do. 
-S19,210420,1,Steph,0,0,ymazeLong,ymazeLong,52,7.5,12,2.6295274014454,1189.7635524,horrible horrible
-S20,210421,1,Navya,0,0,ymazeLong,ymazeSurprise,119,55,71,127.42945869251,3665.487631,promising improvement. give longer warm up time. 
-S20,210422,1,Navya,0,0,ymazeLong,ymazeSurprise,89,72.5,73,202.864415150249,3637.8303744,much better today. will continue on middle delay.
-S19,210422,1,Steph,0,0,ymazeLong,ymazeLong,25,48,14,2.77408413612246,561.9929465,think the bias correction was wonky need to fix
-S19,210422,2,Steph,0,0,ymazeLong,ymazeLong,56,5,3,3.03655524497138,1119.0250546,horrible
-S20,210423,1,Navya,0,0,ymazeLong,ymazeSurprise,104,47.5,46,1.82924630654943,3417.2191254,did worse than yesterday but got better after dip.
-S20,210425,1,Steph,0,0,ymazeLong,ymazeSurprise,150,85,123,53.4051731811088,3772.2215044,Great job!! 85% most of the time
-S20,210426,1,Steph,0,0,ymazeLong,ymazeSurprise,133,67.5,97,324.680608674424,3631.0544519,Good job! First day trying the update he didn't get it but stayed above chance performance the whole tim estill
-S20,210427,1,Steph,0,0,ymazeLong,ymazeSurprise,134,67.5,103,2.31764607872444,3470.4282438,Great job! Above chance on update with earlier delay for a bit fell off at very end but otherwise good
-S20,210428,1,Steph,0,0,ymazeLong,ymazeSurprise,130,55,100,2.4061679338637,3251.0022793,Good job overall but fell off at the end. Did really well on update to start and had done a 5 min pre-behavior delay for recording habituation
-S20,210429,1,Steph,0,0,ymazeLong,ymazeSurprise,142,52.5,107,126.655666057173,3670.9512983,A 10 min pre behavior delay and overweight so he was doing fine but with a bit of side bias on the delay task but didn't really get the update trials
-S20,210430,1,Steph,0,0,ymazeLong,ymazeSurprise,133,62.5,100,2.41348357016523,3341.0917068,Stayed above chance on task the whole time but did not do great on the update still at 10 min warmup pause
-S1,210502,1,Steph,0,0,ymazeLong,ymazeLong,0,0,0,0,10.7255147,
-S20,210502,1,Steph,0,0,ymazeLong,ymazeSurprise,188,80,142,12.0877260286891,4572.0130355,Decent job overall was finally doing update trials well at the end but took a while to get there
-S20,210503,1,Steph,0,0,ymazeLong,ymazeSurprise,138,47.5,97,2.4238833304157,3426.7564061,Did 15 min pre behavior and motor moving. Was doing excellent on the warmup but not so great on the update task. Will retry habituation tomorrow
-S20,210504,1,Steph,0,0,ymazeLong,ymazeSurprise,111,57.5,84,2.25775722668764,2967.7475333,lasted longer on the normal task and did ok on a few update trials but got confused and fell off eventually
-S20,210505,1,Steph,0,0,ymazeLong,ymazeSurprise,163,85,136,202.383908616836,3652.775818,Great job overall and with the 20 min delay with shielding. Did great on update too
-S20,210506,1,Steph,0,0,ymazeLong,ymazeSurprise,122,57.5,95,2.60191638962063,2846.3884892,Not great today did really well with warmup but fell off pretty quickly into side bias
-S20,210507,1,Steph,0,0,ymazeLong,ymazeSurprise,67,82.5,55,2.69068020663353,1532.6477986,Did decent at first but them got biased so doing a brief pause
-S20,210507,2,Steph,0,0,ymazeSurprise,ymazeSurprise,70,87.5,63,2.62741558019905,1599.2781386,Awesome second session! Did very well on update too
-S20,210509,1,Steph,0,0,ymazeLong,ymazeSurprise,77,72.5,58,1.69279258747377,2770.47015,Good job overall! Above chance on update pausing at 45 min for a brief bit
-S20,210509,2,Steph,0,0,ymazeLong,ymazeSurprise,76,92.5,67,1.60505677360357,2854.5994482,Great job! Did really really well 
-S20,210510,1,Steph,0,0,ymazeLong,ymazeSurprise,88,70,70,2.06348902384072,2568.5442251,Great job! started falling off at end so did a pause but 100 percent on the update!
-S20,210510,2,Steph,0,0,ymazeLong,ymazeSurprise,27,40.7407407407407,12,1.80544441794478,907.3959852,Not so great session so stopped after 15 min to pull back up
-S20,210511,1,Steph,0,0,ymazeLong,ymazeSurprise,135,80,112,41.586018883133,3804.951056,Great job
-S20,210511,2,Steph,0,0,ymazeSurprise,ymazeSurprise,67,65,51,1.86648243277877,2189.6327743,good job didn't last as long but did ok
-S20,210511,5,Steph,0,0,ymazeLong,ymazeSurprise,99,77.5,80,2.13226121994777,2794.5588902,Great job yet again!
-S20,210512,1,Steph,0,0,ymazeLong,ymazeSurprise,81,72.5,66,2.00581686891987,2517.4871875,Good job overall above chance on update just got pretty biased around 35 or 40 min ibn
-S20,210512,2,Steph,0,0,ymazeLong,ymazeSurprise,54,57.5,36,1.75079961287875,1878.5001437,Did not last very long but ok overall
-S20,210513,1,Steph,0,0,ymazeLong,ymazeSurprise,124,90,114,90.3066054912242,3690.2363328,Great job
-S20,210513,2,Steph,0,0,ymazeSurprise,ymazeSurprise,3,66.6666666666667,2,1.51446312282296,152.5031563,dont use only a few trials
-S20,210513,4,Steph,0,0,ymazeLong,ymazeSurprise,32,62.5,20,1.91780794551827,1044.3630448,Not great behavior took off pretty quick
-S20,210514,1,Steph,0,0,ymazeLong,ymazeSurprise,47,82.5,40,2.07574710333908,1460.0621946,ok job but fell into bias quickly
-S20,210514,3,Steph,0,0,ymazeLong,ymazeSurprise,26,53.8461538461538,15,1.70547720564119,932.1938717,exclude bc I;m not sure he was getting rewards
-S20,210516,1,Steph,0,0,ymazeLong,ymazeSurprise,116,67.5,90,33.7070489381795,3814.1749029,Good job in the task overall but not great on the update
-S20,210516,3,Steph,0,0,ymazeLong,ymazeSurprise,54,77.5,42,1.89546288198111,1712.5460642,Better on update but developed a bias so stopped
-S23,210517,1,Navya,0,0,linear,linear,15,100,15,0.504144346609321,1871.1093402,first day and did pretty well in terms of acclimation.
-S20,210517,1,Steph,0,0,ymazeLong,ymazeSurprise,53,57.5,35,1.29711209006363,2465.9481285,not great fell off in percent correct once I got to the update task and below chance
-S20,210517,3,Steph,0,0,ymazeLong,ymazeSurprise,86,60,60,15.407768381826,3952.7045246,Much better session! Still biased but did the update trials well
-S23,210518,1,Navya,0,0,linear,linear,8,87.5,10,0.191655709683125,2915.195815,tried giving additional rewards but was not motivated. licking well though. 
-S20,210518,1,Steph,0,0,ymazeLong,ymazeSurprise,44,47.5,23,1.71538400560359,1555.260328,Not good really struggled with the warmup
-S20,210518,3,Steph,0,0,ymazeLong,ymazeSurprise,106,45,54,21414.1414141414,3617.858048,still not great behavior
-S23,210519,1,Navya,0,0,linear,linear,53,100,54,0.887785825857181,3586.5642304,started off very slow and unmotivated. offered extra rewards. will continue linear maze. 
-S20,210519,1,Steph,0,0,ymazeLong,ymazeSurprise,6,100,6,2.17072773647365,234.2623242,bad first session aborted quickly
-S20,210519,3,Steph,0,0,ymazeLong,ymazeSurprise,137,67.5,104,5.62997117208192,5075.3516302,Muchhh better second session and lasted for a while too
-S23,210520,1,Navya,0,0,linear,linear,146,100,147,2.43782366909716,3595.8711877,amazing job. moving onto ymaze tommorow. 
-S20,210520,1,Steph,0,0,ymazeLong,ymazeSurprise,56,67.5,42,1.86514864291008,1810.606745,ok not great. Like was above chance on the main task but not on updates
-S20,210520,3,Steph,0,0,ymazeLong,ymazeSurprise,89,65,67,1.66255024622245,3222.6151199,better overall than previous session but fell off eventually
-S23,210521,1,Navya,0,0,ymazeLong,ymazeShort,146,25,52,991.06233736848,3618.928687,used linear long warmup. started to correct bias near end. 
-S20,210521,1,Steph,0,0,ymazeLong,ymazeSurprise,15,66.6666666666667,10,1.89249373899988,483.5492006,went in to bias so stopped pretty quickly and doing a pause
-S20,210521,3,Steph,0,0,ymazeLong,ymazeSurprise,65,65,49,1.56995792915303,2538.8766566,slightly better than the first session but not the best
+S20,210405,1,Navya,0,0,ymazeSurprise,ymazeSurprise,83,17.5,39,402.3267087,3614.954565,started doing really well and dipped off and got bad. not sure why. ,
+S17,210405,1,Steph,0,0,ymazeSurprise,ymazeSurprise,67,60,43,2.272593651,1799.348129,did ok but started getting super biased towards 30 min in so stopped,
+S17,210405,2,Steph,0,0,ymazeSurprise,ymazeSurprise,29,62.06896552,18,2.114886981,843.2574488,second session ok but fell off faster,
+S19,210405,1,Steph,0,0,ymazeLong,ymazeSurprise,36,61.11111111,23,1.993421708,1120.317419,did well in the first 15 min but fell off towards 20 so did a pause,
+S19,210405,2,Steph,0,0,ymazeLong,ymazeSurprise,90,82.5,71,2.357617374,2295.383575,Great job in the second session,
+S20,210406,1,Navya,0,0,ymazeSurprise,ymazeSurprise,81,62.5,65,1.36045624,3576.268397,good job dropped off around 40,
+S17,210406,1,Steph,0,0,ymazeSurprise,ymazeSurprise,59,80,49,1.823726997,1968.872502,first session! had a few decent trials but started to drop off at 30 min so taking a pause,
+S17,210406,2,Steph,0,0,ymazeSurprise,ymazeSurprise,11,54.54545455,6,1.802697491,380.6991415,spikegadgets errored out,
+S1,210406,1,Steph,0,0,ymazeSurprise,ymazeSurprise,8,25,2,2.30951327,235.105567,,
+S19,210406,2,Steph,0,0,ymazeSurprise,ymazeSurprise,121,77.5,83,2.181114195,3354.275776,Good session switched to later delay,
+S20,210407,1,Navya,0,0,ymazeSurprise,ymazeSurprise,96,75,82,1.657012269,3487.311169,did amazing on first day of later delay.,
+S17,210407,1,Steph,0,0,ymazeSurprise,ymazeSurprise,45,45,22,1.927463137,1412.922534,Recording 1 not great behavior and taking a pause bc he was pretty biased,
+S17,210407,3,Steph,0,0,ymazeSurprise,ymazeSurprise,49,52.5,27,1.901360766,1574.313735,Got a few decent trials but performance started to drop off at the end,
+S19,210407,1,Steph,0,0,ymazeSurprise,ymazeSurprise,67,62.5,43,1.860689872,2164.763768,Did decent at first but started falling off at 35 min so took a pause,
+S19,210407,2,Steph,0,0,ymazeSurprise,ymazeSurprise,35,57.14285714,21,2.155362645,997.9527707,did ok for a bit in the second session but then dropped off,
+S20,210408,1,Navya,0,0,ymazeSurprise,ymazeSurprise,47,77.5,35,0.793821032,3561.684301,did well on later delay so great. lots of progress,
+S17,210408,1,Steph,0,0,ymazeSurprise,ymazeSurprise,47,57.5,26,1.727318834,1639.566521,Ok first session stayed above chance but got more biased at the end,
+S17,210408,3,Steph,0,0,ymazeSurprise,ymazeSurprise,52,57.5,33,1.670364311,1879.352798,Better job in the second session did decent but still biased,
+S19,210408,1,Steph,0,0,ymazeSurprise,ymazeSurprise,23,30.43478261,8,2.022339524,687.5447101,Bad start changing the bias correction max,
+S19,210408,2,Steph,0,0,ymazeSurprise,ymazeSurprise,30,46.66666667,15,2.231816277,820.2821875,Better start to second session but fell off eventually,
+S20,210409,1,Navya,0,0,ymazeSurprise,ymazeSurprise,85,42.5,53,1.422569937,3591.355705,did pretty well for first day on middle delay. ,
+S17,210409,1,Steph,0,0,ymazeSurprise,ymazeSurprise,92,62.5,68,2.057417605,2696.397898,AMAZING BEHAVIOR SESSION DURING A RECORDING. Great job overall,
+S17,210410,1,Steph,0,0,ymazeSurprise,ymazeSurprise,13,61.53846154,8,1.910074664,417.0784609,Great job but was getting stuck on update trials in a row idk,
+S17,210410,2,Steph,0,0,ymazeSurprise,ymazeSurprise,50,57.5,28,1.963508843,1547.719306,Not so great hovered aruond or just above chance and had an opposite side bias as usual,
