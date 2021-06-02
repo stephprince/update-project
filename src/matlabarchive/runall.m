@@ -3,7 +3,7 @@
 % this script will generate all the analyses for the hpc-pfc diamond maze analyses
 
 %% sets up animals, dates, directories
-indices.animals = [20];
+indices.animals = [17,18,19,20];
 indices.excldates = []; indices.incldates = [];
 
 %gets data directories and indices

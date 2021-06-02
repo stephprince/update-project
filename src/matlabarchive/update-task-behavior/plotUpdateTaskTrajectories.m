@@ -11,7 +11,7 @@ for anIdx = 1:numel(indices.animals)
     allDelayLocations = [allDelayLocations; delayLocations];
 end
 params.delayLocations = sort(unique(allDelayLocations), 'descend');
-params.plotCategories = [2 nan 1; 3 nan 1; [repmat(4,numel(params.delayLocations),1) params.delayLocations ones(numel(params.delayLocations),1)]; 4 nan 2];
+params.plotCategories = [2 nan 1; 3 nan 1; [repmat(4,numel(params.delayLocations),1) params.delayLocations ones(numel(params.delayLocations),1)]; 4 nan 2; 4 nan 3];
 
 %% create position histograms for all the animals
 for anIdx = 1:numel(indices.animals)
@@ -27,7 +27,7 @@ for anIdx = 1:numel(indices.animals)
         %% make the plots for each track/trial type
         plotHistByPosition(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
         
-        if params.plotCategories(paramIdx,3) == 2 %if we're in the delay part of the task with update trials
+        if params.plotCategories(paramIdx,3) == 2 || (params.plotCategories(paramIdx,3) == 3) %if we're in the delay part of the task with update trials
             plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
         end
     end

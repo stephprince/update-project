@@ -108,7 +108,7 @@ if ~isempty(trialdata)
                 xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
                 title([trialOutcome{outIdx} 'trials - delay loc: ' num2str(params.plotCategories(paramIdx,2)) ' - trial type:' updateType '  n=' num2str(numTrialsTotal) 'right = red, left = blue']);
                 alpha(0.5); xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
-                linkaxes(ax,'y')
+                %linkaxes(ax,'y')
                 
                 sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories on' trackName]);
                 filename = [savedfiguresdir varNames{varIdx} 'trajectories_' trackName '_S' num2str(indices.animals(anIdx)) 'delayloc' num2str(delayLoc) '_alloutcomes'];

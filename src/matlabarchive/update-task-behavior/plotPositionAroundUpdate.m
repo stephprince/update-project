@@ -1,9 +1,12 @@
-<<<<<<< HEAD:src/update-task-behavior/plotPositionAroundUpdate.m
 function plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
 
 if ~isempty(trialdata)
     %initialize variables
-    savedfiguresdir = [dirs.behaviorfigdir 'trajectories\aroundupdate\'];
+    if params.plotCategories(paramIdx,3) == 2
+        savedfiguresdir = [dirs.behaviorfigdir 'trajectories\aroundupdate\'];
+    elseif params.plotCategories(paramIdx,3) == 3
+        savedfiguresdir = [dirs.behaviorfigdir 'trajectories\aroundstay\'];
+    end
     if ~exist(savedfiguresdir); mkdir(savedfiguresdir); end;
 
     updateTypeKeySet = params.updateTypeMap.keys; updateTypeValueSet = params.updateTypeMap.values;
@@ -35,7 +38,11 @@ if ~isempty(trialdata)
         whereUpdateOccurredLeft = positionData.trialUpdateLocation(leftTrialInds);
 
         %manipulate the mean/hist values of the data structures into the format we want
-        whichVarsAreMeans = find(cellfun(@(x) ~isempty(x),(regexp(positionDataToPlotRight{1}.Properties.VariableNames,'mean*')))); %get columns with mean values
+        if ~isempty(positionDataToPlotRight)
+            whichVarsAreMeans = find(cellfun(@(x) ~isempty(x),(regexp(positionDataToPlotRight{1}.Properties.VariableNames,'mean*')))); %get columns with mean values
+        elseif ~isempty(positionDataToPlotLeft)
+            whichVarsAreMeans = find(cellfun(@(x) ~isempty(x),(regexp(positionDataToPlotLeft{1}.Properties.VariableNames,'mean*')))); %get columns with mean values            
+        end
         trialPosDataRight = rowfun(@(x) varfun(@(y) cell2mat(y)',x{1}(:,whichVarsAreMeans)), cell2table(positionDataToPlotRight),'OutputVariableNames','posDataToPlotRight'); %makes nTrialsxMetrics table
         trialPosDataLeft = rowfun(@(x) varfun(@(y) cell2mat(y)',x{1}(:,whichVarsAreMeans)), cell2table(positionDataToPlotLeft),'OutputVariableNames','posDataToPlotLeft');
         trialPosDataRight = trialPosDataRight.posDataToPlotRight; trialPosDataLeft = trialPosDataLeft.posDataToPlotLeft;
@@ -50,32 +57,57 @@ if ~isempty(trialdata)
         whichBinUpdateOccurredL(isnan(whereUpdateOccurredAdjustedL)) = [];
         trialPosDataRight(isnan(whereUpdateOccurredAdjustedR),:) = [];
         trialPosDataLeft(isnan(whereUpdateOccurredAdjustedL),:) = [];
-        trialPosDataUpdateRight = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredR(x)-binWindowToPlot:whichBinUpdateOccurredR(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredR), 'UniformOutput',0)'),trialPosDataRight);
-        trialPosDataUpdateLeft = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredL(x)-binWindowToPlot:whichBinUpdateOccurredL(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredL), 'UniformOutput',0)'),trialPosDataLeft);
-
+        
         %get averages for when update occurred
-        meanPosDataRight = varfun(@(x) nanmean(x,1), trialPosDataUpdateRight); %makes meanxMetrics table
-        semPosDataRight = varfun(@(x) nanstd(x,[],1)/sqrt(size(trialPosDataUpdateRight,1)), trialPosDataUpdateRight); %makes semxMetrics table
-        meanPosDataLeft = varfun(@(x) nanmean(x,1), trialPosDataUpdateLeft);
-        semPosDataLeft = varfun(@(x) nanstd(x,[],1)/sqrt(size(trialPosDataUpdateLeft,1)), trialPosDataUpdateLeft);
+        if ~isempty(whichBinUpdateOccurredR)
+            trialPosDataUpdateRight = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredR(x)-binWindowToPlot:whichBinUpdateOccurredR(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredR), 'UniformOutput',0)'),trialPosDataRight);
+            meanPosDataRight = varfun(@(x) nanmean(x,1), trialPosDataUpdateRight); %makes meanxMetrics table
+            semPosDataRight = varfun(@(x) nanstd(x,[],1)/sqrt(size(trialPosDataUpdateRight,1)), trialPosDataUpdateRight); %makes semxMetrics table
+            
+            %replace the variable names so we can use them for plotting
+            trialPosDataUpdateRight.Properties.VariableNames = regexprep(trialPosDataUpdateRight.Properties.VariableNames, 'Fun_Fun_mean', 'update'); %indicates hist/mean for individual trials
+            meanPosDataRight.Properties.VariableNames = regexprep(meanPosDataRight.Properties.VariableNames, 'Fun_Fun_Fun_', '');
+            semPosDataRight.Properties.VariableNames = regexprep(semPosDataRight.Properties.VariableNames, 'Fun_Fun_Fun_mean', 'sem');
+            varNames = regexprep(meanPosDataRight.Properties.VariableNames, 'mean', '');
+        else
+            trialPosDataUpdateRight = [];
+            meanPosDataRight = [];
+            semPosDataRight = [];
+        end
+        if ~isempty(whichBinUpdateOccurredL)
+            trialPosDataUpdateLeft = varfun(@(y) cell2mat(arrayfun(@(x) y(x,whichBinUpdateOccurredL(x)-binWindowToPlot:whichBinUpdateOccurredL(x)+binWindowToPlot), 1:numel(whichBinUpdateOccurredL), 'UniformOutput',0)'),trialPosDataLeft);
+            meanPosDataLeft = varfun(@(x) nanmean(x,1), trialPosDataUpdateLeft);
+            semPosDataLeft = varfun(@(x) nanstd(x,[],1)/sqrt(size(trialPosDataUpdateLeft,1)), trialPosDataUpdateLeft);
+            
+            %replace the variable names so we can use them for plotting
+            trialPosDataUpdateLeft.Properties.VariableNames = regexprep(trialPosDataUpdateLeft.Properties.VariableNames, 'Fun_Fun_mean', 'update'); %indicates hist/mean for individual trials
+            meanPosDataLeft.Properties.VariableNames = regexprep(meanPosDataLeft.Properties.VariableNames, 'Fun_Fun_Fun_', '');
+            semPosDataLeft.Properties.VariableNames = regexprep(semPosDataLeft.Properties.VariableNames, 'Fun_Fun_Fun_mean', 'sem');
+            varNames = regexprep(meanPosDataLeft.Properties.VariableNames, 'mean', '');
+        else
+            trialPosDataUpdateLeft = [];
+            meanPosDataLeft = [];
+            semPosDataLeft = [];
+        end
 
-        %replace the variable names so we can use them for plotting
-        trialPosDataUpdateRight.Properties.VariableNames = regexprep(trialPosDataUpdateRight.Properties.VariableNames, 'Fun_Fun_mean', 'update'); %indicates hist/mean for individual trials
-        trialPosDataUpdateLeft.Properties.VariableNames = regexprep(trialPosDataUpdateLeft.Properties.VariableNames, 'Fun_Fun_mean', 'update'); %indicates hist/mean for individual trials
-        meanPosDataRight.Properties.VariableNames = regexprep(meanPosDataRight.Properties.VariableNames, 'Fun_Fun_Fun_', '');
-        meanPosDataLeft.Properties.VariableNames = regexprep(meanPosDataLeft.Properties.VariableNames, 'Fun_Fun_Fun_', '');
-        semPosDataRight.Properties.VariableNames = regexprep(semPosDataRight.Properties.VariableNames, 'Fun_Fun_Fun_mean', 'sem');
-        semPosDataLeft.Properties.VariableNames = regexprep(semPosDataLeft.Properties.VariableNames, 'Fun_Fun_Fun_mean', 'sem');
-
-        %% make a plot for each of the variables/metrics
-        varNames = regexprep(meanPosDataLeft.Properties.VariableNames, 'mean', '');
+        %% make a plot for each of the variables/metrics 
         numTrialsTotal = size(trialPosDataUpdateRight,1) + size(trialPosDataUpdateLeft,1);
         for varIdx = [2 3 5]
             %get bins to use and clean relevant data
-            meanR = meanPosDataRight.(['mean' varNames{varIdx}]); semR = semPosDataRight.(['sem' varNames{varIdx}]);
-            meanL = meanPosDataLeft.(['mean' varNames{varIdx}]); semL = semPosDataLeft.(['sem' varNames{varIdx}]);
-            indivR = trialPosDataUpdateRight.(['update' varNames{varIdx}]);
-            indivL = trialPosDataUpdateLeft.(['update' varNames{varIdx}]);
+            if ~isempty(trialPosDataUpdateRight)
+                meanR = meanPosDataRight.(['mean' varNames{varIdx}]); semR = semPosDataRight.(['sem' varNames{varIdx}]);
+                indivR = trialPosDataUpdateRight.(['update' varNames{varIdx}]);
+            else
+                meanR = nan(size(binsToUseForUpdate)); semR = nan(size(binsToUseForUpdate));
+                indivR = nan(size(binsToUseForUpdate));
+            end
+            if ~isempty(trialPosDataUpdateLeft)
+                meanL = meanPosDataLeft.(['mean' varNames{varIdx}]); semL = semPosDataLeft.(['sem' varNames{varIdx}]);
+                indivL = trialPosDataUpdateLeft.(['update' varNames{varIdx}]);
+            else
+                meanL = nan(size(binsToUseForUpdate)); semL = nan(size(binsToUseForUpdate));
+                indivL = nan(size(binsToUseForUpdate));
+            end
 
             %plot the individual traces around the location at which the update occurred
             figure(varIdx); hold on;
@@ -106,7 +138,10 @@ if ~isempty(trialdata)
             cmap = flipud(cbrewer('div', 'RdBu',100));
             colormap(cmap); colorbar
             limVal = min([abs(min(min(indivTrialsForHeatmap))) abs(max(max(indivTrialsForHeatmap)))]);
-            caxis([-limVal*0.5 limVal*0.5]); set(gca,'YDir','normal');
+            if ~isnan(limVal)
+                caxis([-limVal*0.5 limVal*0.5]);                 
+            end
+            set(gca,'YDir','normal');
             title('Velocity towards initial side')
 
             ax3(outIdx) = subplot(4,3,outIdx+9); hold on;
@@ -117,7 +152,10 @@ if ~isempty(trialdata)
             cmap = flipud(cbrewer('div', 'RdBu',100));
             colormap(cmap); colorbar
             limVal = min([abs(min(min(indivTrialsForHeatmap))) abs(max(max(indivTrialsForHeatmap)))]);
-            caxis([-limVal*0.5 limVal*0.5]); set(gca,'YDir','normal');
+            if ~isnan(limVal)
+                caxis([-limVal*0.5 limVal*0.5]);
+            end
+            set(gca,'YDir','normal');
             title('Velocity towards update side')
 
             sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories around update']);
@@ -136,7 +174,10 @@ if ~isempty(trialdata)
             cmap = flipud(cbrewer('div', 'RdBu',100));
             colormap(cmap); colorbar
             limVal = min([abs(min(min(indivTrialsForHeatmapAdjusted))) abs(max(max(indivTrialsForHeatmapAdjusted)))]);
-            caxis([-limVal limVal]); set(gca,'YDir','normal');
+            if ~isnan(limVal)
+                caxis([-limVal limVal]);
+            end
+            set(gca,'YDir','normal');
             title('Velocity towards update side')
 
             ax12(outIdx) = subplot(3,3,outIdx+3); hold on;
@@ -149,7 +190,10 @@ if ~isempty(trialdata)
             cmap = flipud(cbrewer('div', 'RdBu',100));
             colormap(cmap); colorbar
             limVal = min([abs(min(min(indivTrialsForHeatmapAdjusted))) abs(max(max(indivTrialsForHeatmapAdjusted)))]);
-            caxis([-limVal limVal]); set(gca,'YDir','normal');
+            if ~isnan(limVal)
+                caxis([-limVal limVal]);
+            end
+            set(gca,'YDir','normal');
             title('Velocity towards initial side')
 
             ax10(outIdx) = subplot(3,3,outIdx+6); hold on;
@@ -170,5 +214,4 @@ if ~isempty(trialdata)
     end
 end
 
->>>>>>> fdf33cd1d08204338cbc10b04f5902a9e92828cc:src/matlabarchive/update-task-behavior/plotPositionAroundUpdate.m
 end

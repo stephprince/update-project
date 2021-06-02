@@ -1,4 +1,4 @@
-function behaviorDataTable = getUpdateTaskBehaviorMetrics(dirs,indices,params,makenewfiles);
+function behaviorDataTable = getUpdateTaskBehaviorMetrics(dirs,indices,params,makenewfiles)
 % this function gets behavior metrics for diamond maze tracks
 
 filename = [dirs.savedatadir 'updateTaskBehaviorData.mat'];

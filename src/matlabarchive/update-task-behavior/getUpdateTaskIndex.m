@@ -10,7 +10,7 @@ function out = getUpdateTaskIndex(animal, spreadsheetfilename, animalID)
 %Outputs:   out - a four column vector of indices
 %               [animal# date session# genotype]
 
-data = readtable(spreadsheetfilename);
+data = readtable(spreadsheetfilename,'Delimiter',',');
 
 %Column 1 is the Animal ID Number
 %Column 2 is the date

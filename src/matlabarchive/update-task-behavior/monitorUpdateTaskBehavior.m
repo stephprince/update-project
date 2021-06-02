@@ -11,8 +11,8 @@ dirs = getDefaultUpdateTaskDirectories;
 indices = getdefaultindiceshpcpfcinteractions(indices,dirs);
 
 %set flags for what to look at
-makenewfiles = 1
+makenewfiles = 0;
 
 %% perform behavioral analyses
-getUpdateTaskBehavior(dirs, indices, debugmode, specificdataset, makenewfiles); %note, behavior uses different indices then the rest of the analyses  because there are more dates outside of ephys days
+getUpdateTaskBehavior(dirs, indices, 0, 0, makenewfiles); %note, behavior uses different indices then the rest of the analyses  because there are more dates outside of ephys days
 

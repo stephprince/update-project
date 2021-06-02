@@ -17,9 +17,11 @@ if ~isempty(trialsFromDelayTypeTemp1)
 end
 
 %subselect position data trials if necessary
-if params.plotCategories(paramIdx,1) == 4 && params.plotCategories(paramIdx,3) ~= 2
+if params.plotCategories(paramIdx,1) == 4 && params.plotCategories(paramIdx,3) ~= 2 && params.plotCategories(paramIdx,3) ~= 3
     trialTypeInds = intersect(trialsFromDelayType,trialsFromUpdateType);
 elseif params.plotCategories(paramIdx,1) == 4 && params.plotCategories(paramIdx,3) == 2  %on update trials, want any delay length not just nan trials
+    trialTypeInds = trialsFromUpdateType;
+elseif params.plotCategories(paramIdx,1) == 4 && params.plotCategories(paramIdx,3) == 3 %on stay trials, want any delay length not just nan trials
     trialTypeInds = trialsFromUpdateType;
 else
     trialTypeInds = 1:size(trialdata,1); %all of them if there aren't any of these caveats
