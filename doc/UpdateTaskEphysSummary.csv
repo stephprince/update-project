@@ -1,0 +1,2 @@
+﻿ID,Animal,Date,Recording,Include,DepthProbe1,DepthProbe2,Stimulation,Hemisphere,Probe1,Probe2,Region1,Region2,DOB,Notes
+Letter,#,YYMMDD,#,0 to exlcude,,in mm, v = vr; n = none,, -,-,,,YYMMDD,

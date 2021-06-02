@@ -12,4 +12,4 @@ This repository contains research code, files, and documentation for the update 
 **src/** - contains relevant matlab and python code.<br/>
 **data/** - contains relevant data files.<br/>
 **results/** - contains relevant output figures and intermediary data structures, not stored on github.<br/>
-**requirements.txt** - contains the software requirements for the project.<br/>
+**enviornment.yml** - contains the conda environment requirements for the project.<br/>
