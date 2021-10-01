@@ -541,8 +541,8 @@ S17,210410,2,Steph,0,0,ymazeSurprise,ymazeSurprise,50,57.5,28,1.963508843,1547.7
 S20,210412,1,Steph,0,0,ymazeSurprise,ymazeSurprise,19,42.10526316,9,1.872431566,612.4000472,Started off a bit biased so doing a little pause,
 S20,210412,2,Steph,0,0,ymazeSurprise,ymazeSurprise,94,92.5,71,2.120774338,2662.432846,Great job in second session after a bit of a rough start,
 S17,210412,1,Steph,0,0,ymazeSurprise,ymazeSurprise,55,52.5,31,1.92434973,1720.074625,Decent job just fell off after about 30 min ,
-S17,210412,3,Steph,0,0,ymazeSurprise,ymazeSurprise,8,87.5,7,1.767936266,293.5012156,got stuck in that weird update task loop,
-S17,210412,4,Steph,0,0,ymazeSurprise,ymazeSurprise,8,25,2,1.693683267,288.4613582,only a few minutes to see if he would keep going but didn't,
+S17,210412,1,Steph,0,0,ymazeSurprise,ymazeSurprise,8,87.5,7,1.767936266,293.5012156,got stuck in that weird update task loop,
+S17,210412,3,Steph,0,0,ymazeSurprise,ymazeSurprise,8,25,2,1.693683267,288.4613582,only a few minutes to see if he would keep going but didn't,
 S20,210413,1,Navya,0,0,ymazeSurprise,ymazeSurprise,28,25,7,0.653607994,2735.86391,not doing well. will retsart again.,
 S20,210413,2,Navya,0,0,ymazeSurprise,ymazeSurprise,1,100,1,0.063328281,956.6896563,did mot do very well on second round. will keep on middle delay. ,
 S17,210413,2,Steph,0,0,ymazeSurprise,ymazeSurprise,47,47.5,24,2.128703529,1327.44324,did ok but not great. started to drop off after 20 min so doing a pause,
@@ -587,14 +587,14 @@ S20,210506,1,Steph,0,0,ymazeLong,ymazeSurprise,122,57.5,95,2.60191639,2846.38848
 S20,210507,1,Steph,0,0,ymazeLong,ymazeSurprise,67,82.5,55,2.690680207,1532.647799,Did decent at first but them got biased so doing a brief pause,
 S20,210507,2,Steph,0,0,ymazeSurprise,ymazeSurprise,70,87.5,63,2.62741558,1599.278139,Awesome second session! Did very well on update too,
 S20,210509,1,Steph,0,0,ymazeLong,ymazeSurprise,77,72.5,58,1.692792587,2770.47015,Good job overall! Above chance on update pausing at 45 min for a brief bit,
-S20,210509,4,Steph,0,0,ymazeLong,ymazeSurprise,76,92.5,67,1.605056774,2854.599448,Great job! Did really really well ,
+S20,210509,2,Steph,0,0,ymazeLong,ymazeSurprise,76,92.5,67,1.605056774,2854.599448,Great job! Did really really well ,
 S20,210510,1,Steph,0,0,ymazeLong,ymazeSurprise,88,70,70,2.063489024,2568.544225,Great job! started falling off at end so did a pause but 100 percent on the update!,
-S20,210510,3,Steph,0,0,ymazeLong,ymazeSurprise,27,40.74074074,12,1.805444418,907.3959852,Not so great session so stopped after 15 min to pull back up,
+S20,210510,2,Steph,0,0,ymazeLong,ymazeSurprise,27,40.74074074,12,1.805444418,907.3959852,Not so great session so stopped after 15 min to pull back up,
 S20,210511,1,Steph,0,0,ymazeLong,ymazeSurprise,135,80,112,41.58601888,3804.951056,Great job,
 S20,210511,2,Steph,0,0,ymazeSurprise,ymazeSurprise,67,65,51,1.866482433,2189.632774,good job didn't last as long but did ok,
 S20,210511,5,Steph,0,0,ymazeLong,ymazeSurprise,99,77.5,80,2.13226122,2794.55889,Great job yet again!,
 S20,210512,1,Steph,0,0,ymazeLong,ymazeSurprise,81,72.5,66,2.005816869,2517.487188,Good job overall above chance on update just got pretty biased around 35 or 40 min ibn,
-S20,210512,3,Steph,0,0,ymazeLong,ymazeSurprise,54,57.5,36,1.750799613,1878.500144,Did not last very long but ok overall,
+S20,210512,2,Steph,0,0,ymazeLong,ymazeSurprise,54,57.5,36,1.750799613,1878.500144,Did not last very long but ok overall,
 S20,210513,1,Steph,0,0,ymazeLong,ymazeSurprise,124,90,114,90.30660549,3690.236333,Great job,
 S20,210513,2,Steph,0,0,ymazeSurprise,ymazeSurprise,3,66.66666667,2,1.514463123,152.5031563,dont use only a few trials,
 S20,210513,4,Steph,0,0,ymazeLong,ymazeSurprise,32,62.5,20,1.917807946,1044.363045,Not great behavior took off pretty quick,
@@ -635,508 +635,189 @@ S25,210531,1,Steph,0,0,ymazeShort,ymazeShort,205,87.5,118,192.3257341,3677.37421
 S23,210601,1,Navya,0,0,ymazeLong,ymazeLong,30,53.33333333,16,20.05727466,3697.659007,only did ymazelong. not very motivated.,
 S25,210601,1,Steph,0,0,ymazeShort,ymazeShort,127,55,77,2.991873647,2566.279837,not great so paused after 42 min,
 S24,210601,1,Steph,0,0,ymazeShort,ymazeShort,76,52.5,37,3.006941683,1517.253088,actually his first session need to rename. Doing a pause bc he was donig bad,
-S24,210601,2,Steph,0,0,ymazeShort,ymazeShort,86,62.5,64,3.060111623,1702.92417,better in second session but falling off at the end,
-S23,210602,1,Navya,0,0,ymazeLong,ymazeSurprise,23,65.2173913,17,0.415983409,3977.483963,didnt do great, still not motivated on the ball.
-S24,210602,1,Steph,0,0,ymazeShort,ymazeLong,136,32.5,88,2.435855797,3368.130185,did well on the short ymaze so transitioned to long and didn't do so well in that,
-S25,210602,1,Steph,0,0,ymazeShort,ymazeShort,66,52.5,34,2.953594995,1368.152929,not great first session maybe a tiny bit above chance so stopped after 20 min,
-S25,210602,2,Steph,0,0,ymazeShort,ymazeShort,138,65,69,3.238178595,2558.09738,got up to 65 percent in the second session so seemed to be donig better,
-S23,210603,1,Navya,0,0,ymazeLong,ymazeSurprise,45,80,38,143.3349259,3629.517795,did better on delay and had high accuracy. did not complete many trials though. ,
-S24,210603,1,Steph,0,0,ymazeLong,ymazeLong,70,27.5,26,2.285016656,1851.251507,not well in first session so did a pause,
-S24,210603,2,Steph,0,0,ymazeLong,ymazeLong,63,42.5,29,2.527548946,1510.362065,Closer to 50 percent in second session but really not great overall,
-S25,210603,1,Steph,0,0,ymazeShort,ymazeShort,227,85,144,69.46144431,3800.914637,Good job some low bouts but ended at 85 percent correct,
-S23,210604,1,Navya,0,0,ymazeLong,ymazeSurprise,40,25,12,0.698582373,3450.47435,very slow today. did not do well.,
-S24,210604,1,Steph,0,0,ymazeLong,ymazeLong,54,37.5,27,2.739619463,1187.50125,did well at first and then completely dropped off,
-S24,210604,2,Steph,0,0,ymazeLong,ymazeLong,94,97.5,90,2.786931662,2025.401233,awesome job in the second session pretty much at 100 percent!,
-S25,210604,1,Steph,0,0,ymazeShort,ymazeShort,224,77.5,177,68.57667679,3798.642004,Slow start but ended up doing really well! Will switch to ymaze long on monday if he does well on short at the beginning,
-S23,210607,1,Navya,0,0,ymazeLong,ymazeLong,45,35,17,54.02160864,3727.607061,not do well. very demotivated.,
-S24,210607,1,Steph,0,0,ymazeLong,ymazeLong,127,87.5,101,65.1309885,3722.383826,great job got up to around 90 on the long ymaze looking good,
-S25,210607,1,Steph,0,0,ymazeShort,ymazeLong,202,75,175,22.95680635,4130.02301,transitioned to the ymaze and he did really well,
-S23,210608,1,Navya,0,0,ymazeLong,ymazeLong,35,45.71428571,17,12.78204184,3798.852154,did slightly better than yesterday but still not great.,
-S24,210608,1,Steph,0,0,ymazeLong,ymazeSurprise,97,52.5,71,2.028479574,2920.025987,switched to delay today. Did ok at first but then kinda fell off so did a 10 min break at the end,
-S25,210608,1,Steph,0,0,ymazeLong,ymazeLong,174,97.5,168,63.8286165,3765.914938,amazing job on ymazeLong like close to 100 percent the whole time,
-S23,210609,1,Navya,0,0,ymazeLong,ymazeSurprise,31,67.74193548,22,0.517868697,3688.727798,did much better today. still slow and staying on ball sometimes.,
-S24,210609,1,Steph,0,0,ymazeLong,ymazeSurprise,119,62.5,89,253.2992763,3641.411888,Decent job. Transitioned to delay again and he lasted decently long,
-S25,210609,1,Steph,0,0,ymazeLong,ymazeSurprise,98,65,81,2.351630324,2548.232146,switched to laatest delay bc he was doing super well and he lasted like 20 min but then started spinning so taking a pause,
-S23,210610,1,Navya,0,0,ymazeLong,ymazeSurprise,11,81.81818182,9,0.232732648,4246.593073,stll stuck on ball. accuracy still good.,
-S24,210610,1,Steph,0,0,ymazeSurprise,ymazeSurprise,40,12.5,7,1.293897494,1854.898634,so so bad today.,
-S25,210610,1,Steph,0,0,ymazeLong,ymazeSurprise,136,80,108,76.97169215,3709.552326,good job on the latest delay little buddy!,
-S23,210611,1,Navya,0,0,ymazeLong,ymazeSurprise,24,54.16666667,15,4.057035153,3974.102851,knows the task but wont move.,
-S24,210611,1,Steph,0,0,ymazeLong,ymazeLong,72,77.5,41,1.7750852,2462.852949,Finallyyyy climbed up a bit after I moved the lick detector a little but then started falling off again at 41 min so did a pause,
-S25,210611,1,Steph,0,0,ymazeLong,ymazeSurprise,151,95,143,2.518751633,3601.377847,Amazing job and I even moved him to the later delay,
-S23,210613,1,Steph,0,0,ymazeLong,ymazeLong,15,46.66666667,7,1.587357579,833.3866648,did a puase after 10 min bc he wasn't really trying,
-S23,210613,2,Steph,0,0,ymazeLong,ymazeSurprise,43,55,23,1.184432698,2180.656635,slightly better in the second session and stayed above chance for 40 trials,
-S23,210614,1,Navya,0,0,ymazeLong,ymazeSurprise,5,60,3,0.456121146,1250.277741,going to restart,
-S23,210614,1,Navya,0,0,ymazeLong,ymazeSurprise,10,50,6,0.201581542,3100.561961,did not do well but that was expected.,
-S24,210614,1,Steph,0,0,ymazeLong,ymazeLong,54,60,28,1.726783424,1884.298855,bad at first. Changed bias correction and started doing ok. Then did bad again so took a pause,
-S24,210614,2,Steph,0,0,ymazeLong,ymazeLong,40,7.5,4,1.940745796,1253.433074,so bad in the second session ,
-S25,210614,1,Steph,0,0,ymazeSurprise,ymazeSurprise,134,90,110,97.01006298,3683.757149,slow start but awesome job on later delay,
-S23,210615,1,Navya,0,0,ymazeSurprise,ymazeSurprise,6,33.33333333,2,0.115258164,3632.650914,very slow only 6 trials. not good.,
-S24,210615,2,Steph,0,0,ymazeLong,ymazeSurprise,36,63.88888889,23,1.757442076,1255.667788,did much much better on ymaze long but hated the transition to delay,
-S25,210615,1,Steph,0,0,ymazeSurprise,ymazeSurprise,140,72.5,90,30.2227851,3884.988683,slow start bc went on delay to start but got a lot better eventually,
-S23,210616,1,Navya,0,0,ymazeSurprise,ymazeSurprise,1,0,1,0.161764309,1546.180342,horrible.,
-S23,210616,2,Navya,0,0,ymazeSurprise,ymazeSurprise,5,20,1,0.180865405,1991.530625,struggling to run and keep running back.,
-S27,210616,1,Tyler,0,0,linear,linear,41,100,41,1.340210173,1905.05417,No licks recorded. A little awkward but did well. Good amount of trials.,
-S24,210616,1,Steph,0,0,ymazeLong,ymazeLong,38,71.05263158,28,1.648065691,1404.056286,slow start but ended up doing ok then started freaking out. .think the reward moved so did a pause,
-S24,210616,2,Steph,0,0,ymazeLong,ymazeLong,71,40,34,2.419372701,1791.585316,ok in second session for a bit but then fell off again,
-S25,210616,1,Steph,0,0,ymazeSurprise,ymazeSurprise,155,90,108,41.14407061,3827.114224,really good job. Slowish start on the delay but got there eventually and ended up doing well on later too,
-S23,210617,1,Navya,0,0,ymazeSurprise,ymazeSurprise,55,15,12,0.919645808,3593.770319,did better today but accuracy is not high.,
-S26,210617,1,Teema,0,0,linear,linear,18,100,19,0.622071082,1854.76932,first day. a little awkward but licking for reward. no licks recorded. ok amount of trials. ,
-S27,210617,1,Tyler,0,0,linear,linear,39,100,48,2.002617095,1171.091119,Started on short maze. Advanced to medium. Performing well. Noticed no reward delivered. Not sure how long.,
-S27,210617,2,Tyler,0,0,linear,linear,26,100,47,1.126647451,1411.469979,Rewards fixed. Repairing in his face for the first few minutes. Licking well. Progressed but slightly lower motivation near the end.,
-S24,210617,1,Steph,0,0,ymazeLong,ymazeLong,59,42.5,28,1.593426082,2241.181893,seemed to do ok for a bit and then just totally bad agian,
-S25,210617,1,Steph,0,0,ymazeSurprise,ymazeSurprise,95,47.5,58,2.32253869,2470.928854,good job for a bit but fell off after about 40 min total so pausing,
-S23,210618,1,Navya,0,0,ymazeSurprise,ymazeSurprise,24,12.5,3,0.404533699,3564.275278,heavy side bias but moving better overall.,
-S26,210618,1,Teema,0,0,linear,linear,72,100,73,1.597751904,2709.354334,good job overall. switched to middle halfway through. no licks recorded,
-S27,210618,1,Tyler,0,0,linear,linear,91,100,107,1.519395247,3601.9783,Paused for a long ti,e early  on. Around 30 mins. Moved well afterward though. Did not progress to long yet.
-S24,210618,1,Steph,0,0,ymazeLong,ymazeLong,27,62.96296296,18,1.029120946,1632.882429,did really well for a min and then started to fall so doing a 10 min pause,
-S24,210618,2,Steph,0,0,ymazeLong,ymazeLong,69,57.5,41,1.740494755,2405.50498,did ok not great in second session,
-S25,210618,1,Steph,0,0,ymazeLong,ymazeSurprise,120,45,80,2.562333204,2810.978916,did decent but started falling off around 40 min so doing a pause,
-S23,210620,1,Steph,0,0,ymazeSurprise,ymazeSurprise,122,60,74,15.74257873,4075.137115,overall decent session on latest delay arond 60 perceny,
-S24,210620,1,Steph,0,0,ymazeLong,ymazeLong,140,55,62,12.79610024,4293.748848,did really good for parts of it and really bad for others,
-S25,210620,1,Steph,0,0,ymazeSurprise,ymazeSurprise,121,62.5,74,2.55457591,2852.959907,ok job but really slow start again,
-S23,210621,1,Navya,0,0,ymazeSurprise,ymazeSurprise,19,57.89473684,13,0.32345353,3610.342804,better than last week but still not doing enough. ,
-S26,210621,1,Teema,0,0,linear,linear,125,100,125,1591.343094,3610.102562,he did good today and stayed straight most of the time. switched to long and kept him there longer to get him adjusted to turning. 89 body weight but still motivated. ,
-S27,210621,1,Tyler,0,0,linear,linear,17,100,17,2.935547465,349.0424155,Ended after 6 mins. Track wouldn't switch to long.,
-S27,210621,2,Tyler,0,0,linear,ymazeShort,163,12.5,87,201.404477,3656.080851,Started on ymaze short. Ran well. Chose right side most every time.,
-S24,210621,1,Steph,0,0,ymazeLong,ymazeLong,53,40,24,1.734000033,1834.755429,ugh s till bad,
-S24,210621,2,Steph,0,0,ymazeLong,ymazeLong,49,27.5,20,1.863096619,1580.399774,still pretty bad tried only left trials,
-S25,210621,1,Steph,0,0,ymazeSurprise,ymazeSurprise,143,75,98,2.641801302,3262.584564,Started on later delay right off the bat and he actually ended up doing well! Good job buddy,
-S23,210622,1,Navya,0,0,ymazeSurprise,ymazeSurprise,45,50,21,8.888449953,3907.470673,better than usual. more trials and higher accuracy.,
-S26,210622,1,Teema,0,0,linear,ymazeShort,142,42.5,72,2.440169311,3498.499399,did well for first time on ymaze. he ranged from 40 to 50 correct. was at 86 body weight,
-S27,210622,1,Tyler,0,0,ymazeShort,ymazeShort,159,10,28,303.9571784,3643.99665,Perfomred well at first but fell off. Complete bias to R. Continued to show intention of choosing other side so could still be lack of ball control.,
-S24,210622,1,Steph,0,0,ymazeLong,ymazeLong,122,57.5,63,17.39560262,4043.807604,always like just above or at chance on this not great,
-S25,210622,1,Steph,0,0,ymazeSurprise,ymazeSurprise,54,75,40,2.317006542,1419.98044,did really well at first but then got super biased so did a pause,
-S25,210622,2,Steph,0,0,ymazeSurprise,ymazeSurprise,50,5,8,2.404796125,1271.368229,horrible second session not sure what happened there,
-S23,210623,1,Navya,0,0,ymazeSurprise,ymazeSurprise,83,42.5,40,1.400596069,3561.015923,more trials. finally seeing more motivation. ,
-S26,210623,1,Teema,0,0,ymazeShort,ymazeShort,170,35,71,2.862952164,3567.522314,he did ok. startd off real good but then half way through only went right the whole time,
-S27,210623,1,Tyler,0,0,ymazeShort,ymazeShort,93,5,10,2.948607047,1898.670422,Choosing R every time. Pausing halfway through to correct.,
-S27,210623,2,Tyler,0,0,ymazeShort,ymazeShort,59,5,14,2.862938054,1242.08888,Did better at restart but regressed quickly. No improvement on bias.,
-S24,210623,1,Steph,0,0,ymazeLong,ymazeLong,150,70,98,35.30173175,3870.076716,actually stayed above chance the whole time today! good job. Will try switching to delay maybe tomorrow,
-S25,210623,1,Steph,0,0,ymazeSurprise,ymazeSurprise,155,55,101,32.48976398,3895.072369,good again and much better on later and middle delay,
-S26,210624,1,Teema,0,0,ymazeShort,ymazeShort,160,75,72,2.718565594,3538.217622,he had a rough start but ended really well. he seems to be learning. was a few issues in beginning but all is good.,
-S27,210624,1,Tyler,0,0,ymazeShort,ymazeShort,186,22.5,58,847.9598815,3629.603866,Did well at exhibiting ball control. Working on accuracy. Showed lack of motivation later in the session.,
-S24,210624,1,Steph,0,0,ymazeLong,ymazeSurprise,105,32.5,64,2.15806859,2928.31628,did so well on the ymaze long and just absolutely hated the delay,
-S25,210624,1,Steph,0,0,ymazeSurprise,ymazeSurprise,157,82.5,116,26.12211395,3965.857228,did well overall. good job,
-S23,210625,1,Navya,0,0,ymazeSurprise,ymazeSurprise,39,23.07692308,9,28.28512372,3685.364009,heavy side bias. maybe since skipped yesterday. ,
-S26,210625,1,Teema,0,0,ymazeShort,ymazeShort,190,90,147,581.8701511,3628.164077,he did good today. slightly underweight. had a moment of weakness but ended really good.,
-S27,210625,1,Tyler,0,0,ymazeShort,ymazeShort,110,25,44,3.054869624,2167.571886,Did really well for around 20 mins. Then fell off. Doing a VR break to reinforce motivation.,
-S27,210625,2,Tyler,0,0,ymazeShort,ymazeShort,65,12.5,9,3.215693906,1219.195885,Minimum correct after VR break. No improvement. ,
-S24,210625,1,Steph,0,0,ymazeLong,ymazeSurprise,88,42.5,57,2.013131873,2640.300523,lasted longer today than previously on the latest delay,
-S25,210625,1,Steph,0,0,ymazeSurprise,ymazeSurprise,137,62.5,92,2.315594061,3571.284686,decent job switched a little earlier and did well on middle delay,
-S23,210626,1,Steph,0,0,ymazeSurprise,ymazeSurprise,81,65,47,1.518763289,3236.947602,got better on latest delay eventually just a bit slower overall and biased,
-S24,210626,1,Steph,0,0,ymazeLong,ymazeSurprise,80,47.5,46,1.920374089,2502.388347,did ok on latest delay for a bit hovering around 60 but eventually fell aruond 40 again,
-S25,210626,1,Steph,0,0,ymazeSurprise,ymazeSurprise,139,67.5,88,2.500221093,3342.314599,pretty good job considering it was on the middle delay the whole time,
-S23,210628,1,Navya,0,0,ymazeSurprise,ymazeSurprise,33,36.36363636,13,4.820908132,4134.746005,did alright but not good enough to advance.,
-S26,210628,1,Teema,0,0,ymazeShort,ymazeShort,173,87.5,151,3.157792904,3299.440803,he did well. was underweight. stayed above 75 most of time.,
-S27,210628,1,Tyler,0,0,ymazeShort,ymazeShort,98,25,34,3.164366223,1864.502153,Performed decently but began declining. Performing VR break to motivate.,
-S27,210628,2,Tyler,0,0,ymazeShort,ymazeShort,65,32.5,31,3.284218823,1191.511738,Was off and on over the final 20 mins. Overall exhibiting control and choice, but lacking consistency.
-S24,210628,1,Steph,0,0,ymazeLong,ymazeSurprise,63,45,34,2.171956933,1764.020259,wasn't doig great at latest delay so donig a brief pause,
-S24,210628,2,Steph,0,0,ymazeSurprise,ymazeSurprise,41,40,19,2.026713067,1214.320982,did better in second session but then fell off again,
-S25,210628,1,Steph,0,0,ymazeSurprise,ymazeSurprise,157,70,109,48.08944023,3800.082618,really good job overall! just struggled with bias a bit but overall really good,
-S23,210629,1,Navya,0,0,ymazeLong,ymazeSurprise,29,24.13793103,7,0.508695328,3476.347154,not good. not sure where to go.,
-S26,210629,1,Teema,0,0,ymazeShort,ymazeLong,155,97.5,138,276.8021906,3638.513797,he did good. underweight. switched tracks and still did well.,
-S27,210629,1,Tyler,0,0,ymazeShort,ymazeShort,109,72.5,72,3.18588468,2059.759325,Performed well. Began to show distress on the ball so giving a short break.,
-S24,210629,1,Steph,0,0,ymazeLong,ymazeSurprise,48,50,27,2.168281208,1334.77362,did really well on visual guided then developed bias on delay so did a pause,
-S24,210629,2,Steph,0,0,ymazeSurprise,ymazeSurprise,64,40,40,1.944100036,1977.193697,Bad session maybe slightly better for a bit but overall not good,
-S25,210629,1,Steph,0,0,ymazeSurprise,ymazeSurprise,46,35,19,2.220241524,1247.214793,doing a 10 min break because he is just struggling with bias today too,
-S25,210629,2,Steph,0,0,ymazeSurprise,ymazeSurprise,46,12.5,14,2.408572423,1169.009582,horrible horrible not sure what happened,
-S23,210630,1,Navya,0,0,ymazeSurprise,ymazeSurprise,38,31.57894737,12,23.36017705,3700.42401,no improvement ,
-S26,210630,1,Teema,0,0,ymazeLong,ymazeLong,172,100,157,2.894541097,3572.578519,he did great. had a moment in the middle of session but got better,
-S27,210630,1,Tyler,0,0,ymazeShort,ymazeShort,208,75,171,3.480398773,3591.591829,Performed very well today. Showed great control and decision-making. ,
-S24,210630,1,Steph,0,0,ymazeLong,ymazeSurprise,118,32.5,46,50.92755771,3773.131632,ugh fine on warmup but bad again on the rest,
-S25,210630,1,Steph,0,0,ymazeSurprise,ymazeSurprise,108,35,60,2.204498538,2946.939216,much better than yesterday but fell off eventually so last 10 min with no vr,
-S23,210701,1,Navya,0,0,ymazeSurprise,ymazeSurprise,20,50,10,4.468541468,3873.708694,higher accuracy but not enough trials.,
-S26,210701,1,Teema,0,0,ymazeLong,ymazeSurprise,92,97.5,75,2.573452968,2152.553626,had to stop because he moved lick detector. something scared him,
-S27,210701,1,Tyler,0,0,ymazeShort,ymazeLong,177,90,162,406.2117503,3630.671893,Did very well today. Advanced to YMaze long and showed no decline in performance.,
-S24,210701,1,Steph,0,0,ymazeSurprise,ymazeSurprise,47,22.5,13,1.799411554,1585.629711,tried starting on latest delay but he hated it,
-S24,210701,2,Steph,0,0,ymazeSurprise,ymazeSurprise,53,37.5,31,1.81558664,1783.146009,maybe slightly better but not great,
-S25,210701,1,Steph,0,0,ymazeSurprise,ymazeSurprise,138,55,76,131.8219449,3668.185922,Ok job not great but just above chance most of the session,
-S23,210702,1,Navya,0,0,ymazeSurprise,ymazeSurprise,42,27.5,13,20.87717263,3730.950899,fixed side bias faster but accuracy tapered off.,
-S26,210702,1,Teema,0,0,ymazeLong,ymazeLong,43,77.5,32,2.523548226,1042.174264,he started on long and did well until 15 min in. putting him in a 5 minute pause and starting delay,
-S26,210702,1,Teema,0,0,ymazeSurprise,ymazeSurprise,50,87.5,43,1.578403235,1907.240296,he did better after pause w no VR. slowly did trials but understands what to do,
-S27,210702,1,Tyler,0,0,ymazeLong,ymazeLong,159,72.5,128,131.4266821,3677.885622,Performed well. Very accurate and in control. Showed lack of motivation towards the end so stats declined over final 10 mins.,
-S24,210702,1,Steph,0,0,ymazeSurprise,ymazeSurprise,37,29.72972973,13,1.522187946,1481.91193,did ok for a bit and then bad,
-S24,210702,2,Steph,0,0,ymazeSurprise,ymazeSurprise,12,58.33333333,10,1.772185548,432.7232639,did decent at first and then started freaking out idk what happened,
-S25,210702,1,Steph,0,0,ymazeSurprise,ymazeSurprise,152,60,89,23.69175776,3990.664951,decent job. Got up to 60,
-S23,210703,1,Steph,0,0,ymazeSurprise,ymazeSurprise,15,33.33333333,5,1.738881783,539.8069076,paused after 8 min bc doing bad,
-S23,210703,2,Steph,0,0,ymazeSurprise,ymazeSurprise,12,25,4,0.851884499,935.7274466,not good just staying still so stopped,
-S26,210703,1,Steph,0,0,ymazeLong,ymazeSurprise,127,87.5,100,2.587858123,2945.182126,awesome job overall,
-S27,210703,1,Steph,0,0,ymazeLong,ymazeSurprise,116,75,94,2.718230775,2568.65468,Really great job overall just started dropping off at the end,
-S25,210704,1,Steph,0,0,ymazeLong,ymazeSurprise,113,62.5,73,2.483095358,2732.857623,decent job overall,
-S24,210704,1,Steph,0,0,ymazeLong,ymazeSurprise,41,42.5,18,2.079930196,1218.887228,did fine on ymazelong but hated delay,
-S23,210706,1,Navya,0,0,ymazeLong,ymazeSurprise,32,28.125,9,0.539634465,3699.660254,low accuracy.,
-S26,210706,1,Teema,0,0,ymazeLong,ymazeSurprise,136,100,131,2.293206068,3566.468191,he did great. ended with 100 percent,
-S27,210706,1,Tyler,0,0,ymazeLong,ymazeSurprise,119,60,97,1086.592604,3615.08297,Performed very well for around 35 minutes then declined. Still got some right and changed direction sometimes.,
-S24,210706,1,Steph,0,0,ymazeLong,ymazeSurprise,103,42.5,53,115.5226559,3678.969736,just hovered around chance the whole time not the worst not the best,
-S25,210706,1,Steph,0,0,ymazeLong,ymazeSurprise,43,55,25,2.207237343,1173.163269,did a pause at 20 min bc being annoying,
-S25,210706,2,Steph,0,0,ymazeSurprise,ymazeSurprise,108,90,91,2.447565258,2650.831941,awesome job got to doing really really well on the delay,
-S23,210707,1,Navya,0,0,ymazeShort,ymazeShort,81,37.5,30,14.6460537,3943.318945,did more trials which is good but low accuracy.,
-S26,210707,1,Teema,0,0,ymazeLong,ymazeSurprise,103,77.5,94,1.747885356,3542.39535,he did good. his performance dropeed 40 min in but he picked up slightly at end,
-S27,210707,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,87,77.5,71,2.097876804,2492.313562,Did well for 40 mins then began to develop side bias. Instituting VR break,
-S27,210707,2,Tyler,0,0,ymazeSurprise,ymazeSurprise,23,13.04347826,3,1.863834718,745.2914535,No improvement. Still complete side bias.,
-S24,210707,1,Steph,0,0,ymazeLong,ymazeSurprise,39,43.58974359,20,1.869339556,1286.094077,ugh fine on ymazeLong but bad on delay,
-S25,210707,1,Steph,0,0,ymazeSurprise,ymazeSurprise,157,52.5,100,43.91567445,3817.485407,first day trying out the update didn't really get it but good effort overall,
-S23,210708,1,Navya,0,0,ymazeShort,ymazeShort,144,45,66,2.419291159,3592.0181,less side bias on ymazeshort.,
-S26,210708,1,Teema,0,0,ymazeLong,ymazeSurprise,98,87.5,87,1.660732185,3545.616159,he did good. slight right bias but overall good,
-S27,210708,1,Tyler,0,0,ymazeLong,ymazeSurprise,107,60,73,1328.367474,3606.376679,He never quite got comfortable during the session today. consistently had bad stretches. Stayed motivated though since reward delivery was more spread out.,
-S24,210708,1,Steph,0,0,ymazeSurprise,ymazeSurprise,78,32.5,37,1.629582068,2905.489834,really not great,
-S25,210708,1,Steph,0,0,ymazeSurprise,ymazeSurprise,117,57.5,78,2.180986458,3222.385319,ok overall but doesn't like update trials still,
-S23,210709,1,Navya,0,0,ymazeShort,ymazeShort,91,60,37,1.526946836,3586.191779,did better. accuracy getting higher.,
-S27,210709,1,Tyler,0,0,ymazeLong,ymazeSurprise,94,32.5,55,1.867993781,3025.73791,Still underperformed. Began to develop side bias again so spending the last few mins off VR.,
-S24,210709,1,Steph,0,0,ymazeLong,ymazeSurprise,81,20,35,1.547086829,3154.096203,so annoying did very mediocre for the tinest bit and then gave up,
-S25,210709,1,Steph,0,0,ymazeSurprise,ymazeSurprise,91,62.5,60,2.042178084,2681.810314,did ok not great still doesn't get update,
-S25,210709,2,Steph,0,0,ymazeSurprise,ymazeSurprise,30,60,20,2.095762368,868.3634393,decent second session tried to squeeze some out of him but he didn't like update trials still,
-S23,210711,1,Steph,0,0,ymazeShort,ymazeShort,52,30,15,2.524412771,1236.653886,not good first session just biased and also stopping a lot,
-S1,210711,1,Steph,0,0,ymazeShort,ymazeShort,16,25,4,2.162069641,530.3045918,,
-S23,210711,2,Steph,0,0,ymazeShort,ymazeShort,34,38.23529412,13,1.615830065,21.04181667,not great still,
-S26,210711,1,Steph,0,0,ymazeLong,ymazeSurprise,79,50,48,2.54565394,1870.076396,he was doing ok not great on later delay so did a pause at 30 min,
-S26,210711,2,Steph,0,0,ymazeSurprise,ymazeSurprise,24,25,8,1.889924994,765.2756574,very biased in the second sessiom,
-S27,210711,1,Steph,0,0,ymazeLong,ymazeSurprise,57,47.5,33,2.402031191,1437.780462,good on ymazeLong and then struggled with bias on latest delay so pausing,
-S27,210711,2,Steph,0,0,ymazeLong,ymazeSurprise,70,90,55,2.323764587,1809.14803,much much better in second session. Was doing awesome,
-S25,210711,1,Steph,0,0,ymazeSurprise,ymazeSurprise,54,42.5,28,2.492549278,1304.990809,not great did a pause,
-S25,210711,2,Steph,0,0,ymazeSurprise,ymazeSurprise,18,16.66666667,8,2.0771228,526.7051148,ugh really bad the whole time really,
-S23,210712,1,Navya,0,0,ymazeShort,ymazeShort,46,20,11,192.2005571,3732.584096,accuracy dipped by end. not well enough to keep going.,
-S26,210712,1,Teema,0,0,ymazeLong,ymazeSurprise,105,40,65,205.6672761,3643.549846,he did ok today. changing bias cap helped for half the session. ended poorly,
-S27,210712,1,Tyler,0,0,ymazeLong,ymazeSurprise,51,55,31,1.741067923,1763.282004,Did decent but began to decline. Giving break to motivate.,
-S27,210712,2,Tyler,0,0,ymazeLong,ymazeSurprise,28,21.42857143,7,1.587664602,1062.454317,Did vrey poorly after the break with bad side bias. Showed more effort near the end.,
-S24,210712,1,Steph,0,0,ymazeLong,ymazeLong,106,70,52,1.800439919,3558.899518,he is the worst,
-S25,210712,1,Steph,0,0,ymazeLong,ymazeSurprise,66,47.5,35,2.514060646,1577.985861,not great fell off kinda quick,
-S25,210712,2,Steph,0,0,ymazeSurprise,ymazeSurprise,104,55,58,2.350610952,2657.467575,careful used the Tmaze for this. not the best really but ok,
-S23,210713,1,Navya,0,0,ymazeShort,ymazeShort,36,52.77777778,19,0.725491974,2981.518909,better accuracy than before.,
-S26,210713,1,Teema,0,0,ymazeLong,ymazeSurprise,89,52.5,47,1.843920742,2903.32154,he did ok. had to pause,
-S26,210713,1,Teema,0,0,ymazeSurprise,ymazeSurprise,11,9.090909091,1,1.597753462,425.9982341,second session of the day bc of pause. he went right every single time so i did pause,
-S27,210713,1,Tyler,0,0,ymazeLong,ymazeSurprise,86,40,45,1.918841198,2693.900833,Performed decently but began to decline due to side bias towards the end so giving a break,
-S24,210713,1,Steph,0,0,ymazeLong,ymazeLong,55,30,18,2.26942785,1474.764532,ugh just bad,
-S25,210713,1,Steph,0,0,ymazeLong,ymazeSurprise,174,72.5,116,13.23625059,4400.147449,better session! he stayed at 70 but still doesn't get the update,
-S23,210714,1,Navya,0,0,ymazeShort,ymazeShort,57,40,19,37.26748684,3778.650158,lower than yesterday.,
-S26,210714,1,Teema,0,0,ymazeLong,ymazeSurprise,113,85,69,1.888916656,3595.556012,he did ok but ended well,
-S27,210714,1,Tyler,0,0,ymazeLong,ymazeSurprise,38,60.52631579,23,1.778935993,1287.708905,Doing alright but began to develop bias. Showed pretty good decision-making when necessary however.,
-S27,210714,2,Tyler,0,0,ymazeLong,ymazeSurprise,63,67.5,36,1.991533349,1903.296662,Slowly improved over time but still not considered proficient,
-S24,210714,1,Steph,0,0,ymazeLong,ymazeLong,91,17.5,28,1.565947468,3506.552983,horrible horrible idk what to do,
-S25,210714,1,Steph,2,0,ymazeLong,ymazeSurprise,130,65,108,2.321542576,3301.673382,great job overall!! did above chance on update,
-S23,210715,1,Navya,0,0,ymazeShort,ymazeShort,121,85,74,48.51319746,3819.886383,sooo much better today yay.,
-S26,210715,1,Teema,0,0,ymazeLong,ymazeLong,12,66.66666667,8,2.445328234,303.9512238,ymazelong first. did a pause to fix lick detector and restart with delay,
-S26,210715,1,Teema,0,0,ymazeSurprise,ymazeSurprise,103,75,76,1.888234253,3287.67774,he did good. went back and forth between good and bad performace,
-S27,210715,1,Tyler,0,0,ymazeLong,ymazeSurprise,44,67.5,29,1.809839356,1463.162538,Doing very well but began to decline quickly,
-S27,210715,2,Tyler,1,0,ymazeLong,ymazeSurprise,58,5,4,1.765535827,1975.648353,Didn't improve after break. File got overwritten,
-S24,210715,1,Steph,0,0,ymazeLong,ymazeLong,133,37.5,77,2.253092921,3555.26225,did good for a bit and then gave up. all on visual guided,
-S25,210715,1,Steph,0,0,ymazeLong,ymazeSurprise,177,92.5,146,21.72285564,4097.984455,good job overall today and even transitioned to earlier delay just not the best at updates,
-S23,210716,1,Navya,0,0,ymazeLong,ymazeLong,106,85,83,1.778233085,3645.645837,did so great on long maze,
-S26,210716,1,Teema,0,0,ymazeLong,ymazeSurprise,109,42.5,58,1.828798714,3583.56373,he did not do too well,
-S27,210716,1,Tyler,0,0,ymazeLong,ymazeSurprise,106,47.5,72,1.77949883,3587.297858,Very up and down sesion. Did a better job of correcting his bias. Seemed to do well with the delay.,
-S24,210716,1,Steph,0,0,ymazeLong,ymazeSurprise,65,77.5,47,1.817809782,2168.866296,so good on ymaze long and then he just crashed,
-S24,210716,2,Steph,0,0,ymazeSurprise,ymazeSurprise,35,54.28571429,21,1.870875721,1161.240975,maybe slightly better but not great. was on delay,
-S25,210716,1,Steph,0,0,ymazeLong,ymazeSurprise,136,62.5,106,2.359298629,3464.91674,Good job overall but not the best at the update part but above chance the whole time,
-S23,210719,1,Navya,0,0,ymazeLong,ymazeLong,39,43.58974359,17,36.63921335,3669.727026,did ok. high side bias.,
-S26,210719,1,Teema,0,0,ymazeLong,ymazeLong,18,33.33333333,6,2.078082007,530.3807825,warmup only. didnt do well. doing pause,
-S26,210719,1,Teema,0,0,ymazeSurprise,ymazeSurprise,67,75,48,1.687634759,2389.538817,he did a little better,
-S27,210719,1,Tyler,0,0,ymazeLong,ymazeSurprise,85,20,42,558.0479265,3616.150296,Biased throughout the session. No extended stretches without bias.,
-S23,210720,1,Navya,0,0,ymazeLong,ymazeLong,30,30,9,0.553086978,3323.681263,not good. very high bias.,
-S26,210720,1,Teema,0,0,ymazeSurprise,ymazeSurprise,104,65,70,1.792080726,3486.669245,he started off ok then did well but then dropped off at the end a lot,
-S27,210720,1,Tyler,0,0,ymazeLong,ymazeSurprise,97,50,52,186.8138923,3636.95846,Slow bias decline over the session. Began to improve near the end though.,
-S24,210720,1,Steph,0,0,ymazeLong,ymazeSurprise,95,80,73,2.474944444,2334.534238,did ok for a few min and then got discouraged,
-S24,210720,1,Steph,0,0,ymazeSurprise,ymazeSurprise,43,52.5,24,1.752603091,1479.337201,just above chance on delay but pretty biased and not great,
-S25,210720,1,Steph,0,0,ymazeLong,ymazeSurprise,128,52.5,85,2.190231908,3515.136362,good job overall and was above chance on task and update most of the time,
-S23,210721,1,Navya,0,0,ymazeLong,ymazeLong,38,44.73684211,17,10.42543073,3823.730854,not good. will use auditory cue tmr.,
-S26,210721,1,Teema,0,0,ymazeSurprise,ymazeSurprise,16,50,10,1.839644335,529.2264155,had to pause to fix lick detector,
-S26,210721,1,Teema,0,0,ymazeSurprise,ymazeSurprise,19,15.78947368,4,1.811081915,633.8998847,stopping to do a brief pause bc he went left everytime,
-S26,210721,1,Teema,0,0,ymazeSurprise,ymazeSurprise,58,52.5,35,1.990746461,1754.658693,he did a little better,
-S27,210721,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,21,42.85714286,9,1.564984102,816.0534296,Doing poorly to bias. Giving VR break.,
-S27,210721,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,50,57.5,28,1.45183747,2114.730112,Better preformance today. Pretty consistent. Still need to bring up the accuracy though.,
-S24,210721,1,Steph,0,0,ymazeLong,ymazeSurprise,107,52.5,64,2.073129816,3123.496377,did maybe ok for a bit but fell to chance at 40 min,
-S25,210721,1,Steph,0,0,ymazeLong,ymazeSurprise,79,57.5,62,2.259922562,2121.600297,doing pretty well on update but struggling with bias a bit so pausing,
-S25,210721,2,Steph,0,0,ymazeSurprise,ymazeSurprise,34,58.82352941,22,2.062798044,991.1055243,seemed to be a bit random and struggling so stopped,
-S23,210722,1,Navya,0,0,ymazeLong,ymazeLong,120,77.5,82,10.78204251,4319.316444,did well. high accuracy.,
-S26,210722,1,Teema,0,0,ymazeSurprise,ymazeSurprise,118,37.5,61,2.014652327,3521.699595,he didnt do too well today,
-S27,210722,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,120,22.5,60,502.5476373,3617.250355,Improved session. Performed well for longer but bias developed later in the session.,
-S24,210722,1,Steph,0,0,ymazeLong,ymazeSurprise,111,47.5,68,2.075326887,3243.339411,did actually ok on delay for a tiny bit but didn't last very long,
-S25,210722,1,Steph,0,0,ymazeLong,ymazeSurprise,39,56.41025641,22,2.494677488,942.909695,did fine on warmup and middle delay but biased pretty quick on update so paused,
-S25,210722,2,Steph,0,0,ymazeSurprise,ymazeSurprise,122,57.5,77,2.279539421,3216.569917,much better second session! like took a while but we got there finally,
-S26,210723,1,Teema,0,0,ymazeSurprise,ymazeSurprise,46,40,19,1.957578702,1418.287491,he is not doing well. doing a pause,
-S26,210723,1,Teema,0,0,ymazeSurprise,ymazeSurprise,55,60,33,2.012639375,1645.482917,he did okay. better than before but not great,
-S27,210723,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,118,30,53,7436.97479,3608.564795,No real improvement. Hovered around random percent then dropped below to finish off the session.,
-S24,210723,1,Steph,0,0,ymazeLong,ymazeLong,159,37.5,67,28.12964405,3943.480494,horrible horrible,
-S25,210723,1,Steph,0,0,ymazeLong,ymazeSurprise,121,55,83,2.397848674,3033.764847,did prett good today just fell off at very end and not amazing at update but overall above chance,
-S23,210725,1,Steph,0,0,ymazeLong,ymazeLong,106,80,86,2.247276767,2836.800576,good job overall on ymazeLong,
-S26,210725,1,Steph,0,0,ymazeSurprise,ymazeSurprise,44,35,16,2.099478709,1258.480075,not doing great on later delay below chance so pausing,
-S26,210725,2,Steph,0,0,ymazeSurprise,ymazeSurprise,46,47.5,23,2.15599566,1280.669077,bad stayed at 50 the whole time,
-S27,210725,1,Steph,0,0,ymazeSurprise,ymazeSurprise,28,39.28571429,11,1.987295504,865.4885913,doing bad,
-S27,210725,2,Steph,0,0,ymazeLong,ymazeSurprise,90,62.5,51,2.246633794,2436.273649,did slightly better but didn't last,
-S25,210725,1,Steph,0,0,ymazeLong,ymazeSurprise,127,77.5,90,2.194378762,3479.300026,great job overall,
-S23,210726,1,Steph,0,0,ymazeLong,ymazeSurprise,84,65,63,1.624049335,3106.270058,on the delay again ok overall,
-S26,210726,1,Teema,0,0,ymazeSurprise,ymazeSurprise,110,57.5,62,1.893838854,3491.213464,he did not do too well. no disturbances,
-S27,210726,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,52,30,13,1.732910696,1804.936613,Poor performance overall so instituting a VR break.,
-S27,210726,2,Tyler,0,0,ymazeSurprise,ymazeSurprise,39,30.76923077,13,1.94174435,1213.418244,Poor session. Biased throughout.,
-S24,210726,1,Steph,0,0,ymazeLong,ymazeLong,45,45,20,2.616598538,1034.841379,stopped bc being annoying,
-S24,210726,2,Steph,0,0,ymazeLong,ymazeLong,46,27.5,16,2.401896454,1157.336221,just so bad,
-S25,210726,1,Steph,0,0,ymazeLong,ymazeSurprise,99,55,62,2.184181671,2724.347651,did not do super great today,
-S26,210727,1,Teema,0,0,ymazeLong,ymazeLong,166,87.5,132,3.023979612,3305.391639,ymazelong to remind him. he did well,
-S27,210727,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,108,32.5,62,1228.901953,3610.358881,First day with punishment. Performed better but declined in the end.,
-S23,210727,1,Steph,0,0,ymazeLong,ymazeSurprise,105,65,78,1.776208449,3552.922564,did better on delay I think. good job overall,
-S24,210727,1,Steph,0,0,ymazeLong,ymazeLong,90,55,54,2.614231002,2075.550534,did well at first and then totally fell off,
-S25,210727,1,Steph,0,0,ymazeLong,ymazeSurprise,55,57.5,36,2.533583416,1310.65347,paused bc he was being so annoying and not trying,
-S25,210727,2,Steph,0,0,ymazeSurprise,ymazeSurprise,88,57.5,60,2.413313814,2193.707908,really just not great on the update still,
-S23,210728,1,Navya,0,0,ymazeLong,ymazeSurprise,96,67.5,59,134.6801347,3659.379633,did pretty well. stable accuracy.,
-S26,210728,1,Teema,0,0,ymazeLong,ymazeSurprise,130,82.5,110,2.248091932,3476.258068,did a gradual transition. it worked and he did well,
-S27,210728,1,Tyler,0,0,ymazeLong,ymazeSurprise,112,25,47,1.874602484,3587.235097,Did well for a while but fell off. Punisment less effective today.,
-S24,210728,1,Steph,0,0,ymazeLong,ymazeLong,43,27.5,14,2.214886959,1169.541704,did it for 20 min but not good so stopped,
-S24,210728,2,Steph,0,0,ymazeLong,ymazeLong,127,55,79,2.738836814,2786.834746,better second session above chance for a decent bit but dropping at the end. has a hard time changing sides,
-S25,210728,1,Steph,0,0,ymazeLong,ymazeSurprise,112,57.5,71,2.248245816,2992.876175,pretty good job overall but just didn't last that long on the update part. Computer was downloading software updates so super slow,
-S23,210729,1,Navya,0,0,ymazeLong,ymazeLong,130,62.5,84,2.172554894,3604.121502,did ok. not as well as yesterday.,
-S26,210729,1,Teema,0,0,ymazeLong,ymazeSurprise,45,87.5,40,2.623718022,1034.428753,he did good but something is wrong restart,
-S26,210729,1,Teema,0,0,ymazeSurprise,ymazeSurprise,84,65,65,2.194275206,2300.868864,he did good but dropped off at end,
-S27,210729,1,Tyler,0,0,ymazeLong,ymazeSurprise,39,53.84615385,21,2.256289407,1042.15309,Declining early to side bias so VR break.,
-S27,210729,2,Tyler,0,0,ymazeLong,ymazeSurprise,75,60,46,2.118272074,2128.393227,Very positive response to extra reward delivery this session.,
-S24,210729,1,Steph,0,0,ymazeLong,ymazeSurprise,130,55,86,2.196155545,3560.302882,decent job today on delay! Good job bud,
-S25,210729,1,Steph,0,0,ymazeLong,ymazeSurprise,32,62.5,20,3.028653905,654.7093056,fine on warmup but then just kept running to the same side very biased,
-S25,210729,2,Steph,0,0,ymazeSurprise,ymazeSurprise,122,50,64,2.592788718,2831.033294,not really great but slightly better than first session,
-S23,210730,1,Navya,0,0,ymazeLong,ymazeSurprise,126,67.5,77,281.9633,3632.812827,did well. not progressing too much though.,
-S26,210730,1,Teema,0,0,ymazeLong,ymazeSurprise,40,57.5,23,2.414312042,1002.098142,he wasnt ding too well so i did a pause,
-S26,210730,1,Teema,0,0,ymazeSurprise,ymazeSurprise,68,52.5,42,2.035241605,2010.854669,didnt do too well after pause,
-S27,210730,1,Tyler,0,0,ymazeLong,ymazeSurprise,91,75,66,1.98974661,2748.29411,Very good session today. Began to decline towards the end so ended the session early.,
-S24,210730,1,Steph,0,0,ymazeLong,ymazeSurprise,52,47.5,30,2.328523291,1342.335116,fine at warmup bad at delay,
-S24,210730,2,Steph,0,0,ymazeSurprise,ymazeSurprise,116,55,66,2.185002532,3187.840801,better in second session but not amazing amazing,
-S25,210730,1,Steph,0,0,ymazeLong,ymazeSurprise,42,65,29,2.594621309,974.0239967,good but bias being weird restart,
-S25,210730,2,Steph,0,0,ymazeSurprise,ymazeSurprise,142,65,83,2.523314747,3385.180114,not the best not the worst worst but not good on update,
-S23,210801,1,Steph,0,0,ymazeLong,ymazeSurprise,133,77.5,103,307.3249634,3630.911955,good job overall,
-S26,210801,1,Steph,0,0,ymazeLong,ymazeSurprise,145,57.5,103,2.762780958,3162.73217,did pretty well on later delay just dropped at the end,
-S27,210801,1,Steph,0,0,ymazeLong,ymazeSurprise,110,72.5,86,2.347645791,2813.019149,did pretty well just dropped off at the end,
-S24,210801,1,Steph,0,0,ymazeLong,ymazeSurprise,120,55,77,2.313462617,3116.021378,did ok on latest delay,
-S25,210801,1,Steph,0,0,ymazeLong,ymazeSurprise,40,77.5,31,2.870820265,836.6488287,developed bias at 10 min so stopped briefly,
-S25,210801,2,Steph,0,0,ymazeSurprise,ymazeSurprise,84,57.5,53,2.679964395,1888.904233,slightly better than usual but not amazing,
-S23,210802,1,Navya,0,0,ymazeLong,ymazeSurprise,107,87.5,77,529.7466788,3673.604661,yay. did so well on later delay.,
-S26,210802,1,Teema,0,0,ymazeLong,ymazeSurprise,150,90,134,2.605504098,3459.855756,he did really well today,
-S27,210802,1,Tyler,0,0,ymazeLong,ymazeSurprise,88,62.5,63,2.111119241,2506.588356,Performed well and advanced. Bias slightly worse with new task but not awful.,
-S24,210802,1,Steph,0,0,ymazeLong,ymazeSurprise,55,52.5,32,1.792100097,1865.156565,paused after 30 min bc doing bad,
-S24,210802,2,Steph,0,0,ymazeSurprise,ymazeSurprise,67,82.5,60,1.989079853,2027.611638,did well on latest delay in second session,
-S25,210802,1,Steph,0,0,ymazeLong,ymazeSurprise,105,55,61,2.631228337,2402.053897,not good idk if he needs a reset or soethig,
-S25,210802,2,Steph,0,0,ymazeSurprise,ymazeSurprise,39,43.58974359,19,2.629721699,911.3601061,bad second session,
-S23,210803,1,Navya,0,0,ymazeLong,ymazeSurprise,53,62.5,32,0.89883677,3634.16566,not as well as yesterday,
-S26,210803,1,Teema,0,0,ymazeLong,ymazeSurprise,28,67.85714286,19,2.453031026,690.7073929,isnt doing well doing a pause,
-S26,210803,1,Teema,0,0,ymazeLong,ymazeSurprise,91,62.5,67,2.122363178,2579.704599,he did ok not the best. first day on middle,
-S27,210803,1,Tyler,0,0,ymazeLong,ymazeSurprise,70,32.5,34,1.952719092,2155.553635,Performed decently but declined to bias. ,
-S27,210803,2,Tyler,0,0,ymazeLong,ymazeLong,38,39.47368421,15,2.430374565,942.506863,Did better. Still looking for bias to decrease as he becomes more familiar with the task.,
-S24,210803,1,Steph,0,0,ymazeLong,ymazeSurprise,81,50,48,2.465108069,1973.43221,ok at first but dropped off to bias so pausing,
-S24,210803,2,Steph,0,0,ymazeSurprise,ymazeSurprise,49,52.5,26,2.118178511,1408.362467,not much better,
-S25,210803,1,Steph,0,0,ymazeLong,ymazeSurprise,96,55,58,2.591534949,2254.358801,not great at or below chance,
-S25,210803,2,Steph,0,0,ymazeSurprise,ymazeSurprise,42,45,23,2.457603895,1031.624923,better for a bit and then dropped off still,
-S26,210804,1,Teema,0,0,ymazeLong,ymazeLong,20,55,12,2.505522589,486.5529752,he was doing poorly so i put him on pause but i think he also needed rest,
-26,210804,1,Teema,0,0,ymazeSurprise,ymazeSurprise,94,52.5,53,2.266435576,2495.814371,did not do well. choices seemed random,
-S27,210804,1,Tyler,0,0,ymazeLong,ymazeSurprise,91,60,63,1.942754912,2816.364403,Performed very well today. Ended early due to bias decline.,
-S23,210804,1,Navya,0,0,ymazeLong,ymazeSurprise,88,52.5,49,1.483263145,3581.459642,not as well but could be due to later training.,
-S24,210804,1,Steph,0,0,ymazeLong,ymazeSurprise,111,47.5,62,1.862357258,3581.536951,not great not the worst. Percent correct was around 50 but bias was really low. Seemed to be trying just struggling with switching sides,
-S25,210804,1,Steph,0,0,ymazeLong,ymazeSurprise,190,45,111,17.95377376,4243.928809,maybe slightly better than usual at least above chance on update and normal task,
-S26,210805,1,Teema,0,0,ymazeLong,ymazeSurprise,152,62.5,112,2.63520296,3468.416978,he did okay today but not great,
-S27,210805,1,Tyler,0,0,ymazeLong,ymazeSurprise,62,40,32,1.939414161,1922.837715,Doing ok but developed bias early.,
-S27,210805,2,Tyler,0,0,ymazeLong,ymazeLong,35,40,14,2.380358641,890.1551713,Some improvement after break. Working on consistency.,
-S23,210805,1,Navya,0,0,ymazeLong,ymazeSurprise,85,57.5,50,237.3086408,3639.688351,started off well then tapered off.,
-S24,210805,1,Steph,0,0,ymazeLong,ymazeSurprise,97,47.5,61,1.72037315,3417.790436,did ok just fell off at end,
-S25,210805,1,Steph,0,0,ymazeLong,ymazeSurprise,199,40,126,11.97968871,4601.81448,good on normal task but bad on updates,
-S23,210806,1,Navya,0,0,ymazeLong,ymazeSurprise,25,36,9,0.811495977,1931.854408,started bad was slowly improving,
-S26,210806,1,Steph,0,0,ymazeLong,ymazeSurprise,122,57.5,71,2.039017093,3592.585349,fine but not really great on middle delay,
-S27,210806,1,Tyler,0,0,ymazeLong,ymazeSurprise,60,42.5,28,1.930834297,1870.379252,Performing poorly. Break due to lick detector malfunction.,
-S27,210806,2,Tyler,0,0,ymazeLong,ymazeLong,62,82.5,41,2.587469691,1443.262602,Performed better after the break. Finished on a very strong note.,
-S24,210806,1,Steph,0,0,ymazeLong,ymazeSurprise,105,50,70,85.14549067,3717.455451,ok not great,
-S25,210806,1,Steph,0,0,ymazeLong,ymazeSurprise,65,32.5,35,2.511926822,1568.627623,paused bc super low performance,
-S25,210806,2,Steph,0,0,ymazeSurprise,ymazeSurprise,51,50,27,2.510828976,1229.707893,not much better didn't even do update,
-S23,210809,1,Abby,0,0,ymazeLong,ymazeSurprise,112,70,70,107.8599746,3672.174339,ymazeLong 15 min Latest delay 5 min Later delay to end. 84% correct 77.5% correct end at 70% correct. Performance ok but side bias switched throughout. had to switch back to ymazeLong for a couple of trials to encourage nonpreferred side. significant improvement towards the end. trouble switching sides ,
-S26,210809,1,Steph,0,0,ymazeLong,ymazeSurprise,147,82.5,110,236.9439072,3641.596653,awesome job!,
-S27,210809,1,Steph,0,0,ymazeLong,ymazeSurprise,71,50,42,1.958497327,2203.221766,not great on later delay,
-S27,210809,2,Steph,0,0,ymazeLong,ymazeSurprise,60,72.5,39,2.00717901,1830.100149,better in second session,
-S25,210809,1,Steph,0,0,ymazeLong,ymazeSurprise,124,30,79,2.291133467,3248.087216,didn't get better,
-S23,210810,1,Abby,0,0,ymazeLong,ymazeSurprise,80,67.5,53,62.01870898,3684.310903,yMazeLong 10 min 75% correct. Latest Delay 5 min 68% correct. Later Delay rest of session had issues with him running to one side consistently but seemed to improve towards the end,
-S26,210810,1,Teema,0,0,ymazeLong,ymazeSurprise,70,67.5,54,2.431786929,1741.188118,he started off great but dropped 30 min in so im doing pause,
-S26,210810,1,Teema,0,0,ymazeSurprise,ymazeSurprise,56,85,47,2.285907111,1479.115625,he did good,
-S27,210810,1,Steph,0,0,ymazeLong,ymazeSurprise,82,37.5,46,2.260266987,2178.679691,paused bc doing bad,
-S27,210810,1,Steph,0,0,ymazeLong,ymazeSurprise,35,54.28571429,21,2.079422039,1027.684212,good for a ltitle then bad again,
-S25,210810,1,Steph,0,0,ymazeLong,ymazeSurprise,161,60,107,100.5516811,3699.990327,actually decent job for a bit on both task and update. NOt amazing but passable,
-S24,210810,1,Steph,0,0,ymazeLong,ymazeLong,63,47.5,37,2.508213071,1524.542956,not great but a couple days off so pausing,
-S24,210810,2,Steph,0,0,ymazeLong,ymazeLong,80,75,61,2.684793497,1790.521796,Much better second session. seemed to remember how it worked more,
-S23,210811,1,Abby,0,0,ymazeLong,ymazeSurprise,57,90,48,215.786485,3623.516685,great job today!!! yMazeLong LatestDelay then Later Delay. got most trials right ending with 90% correct. super slow though about 1 min per trial,
-S26,210811,1,Teema,0,0,ymazeLong,ymazeSurprise,28,82.14285714,23,2.535921785,671.190754,left whole time had to fix,
-S26,210811,1,Teema,0,0,ymazeSurprise,ymazeSurprise,92,55,62,2.132842883,2594.126576,he did not do well,
-S27,210811,1,Steph,0,0,ymazeLong,ymazeSurprise,82,65,58,2.252060498,2207.453464,pausing for a few min bc dropped off,
-S25,210811,1,Steph,0,0,ymazeLong,ymazeSurprise,156,62.5,104,117.6973568,3690.558148,Pretty good job today,
-S24,210811,1,Steph,0,0,ymazeLong,ymazeSurprise,55,40,26,2.018847471,1664.218517,bad so pausing,
-S24,210811,2,Steph,0,0,ymazeLong,ymazeSurprise,68,57.5,34,1.962501786,2083.60669,maybe slightly better second session at end but hard to tell,
-S23,210812,1,Abby,0,0,ymazeLong,ymazeSurprise,80,47.5,43,1.360602452,3538.14793,Did terrible. tried to switch to middle delay today but didnt spend enough time warming up with later delay and i think it hurt the transition. switched back to later after terrible performance at middle. performance didnt improve,
-S26,210812,1,Teema,0,0,ymazeLong,ymazeSurprise,41,77.5,32,2.821563628,877.7093434,bias was lagging so i restarted,
-S26,210812,2,Teema,0,0,ymazeSurprise,ymazeSurprise,34,76.47058824,26,2.449650084,834.1677569,bias,
-S26,210812,3,Teema,0,0,ymazeSurprise,ymazeSurprise,75,62.5,55,2.532329405,1785.929863,did better got a few update trials correct,
-S27,210812,1,Steph,0,0,ymazeLong,ymazeLong,37,56.75675676,25,2.521758688,888.7603619,not good paused,
-S27,210812,2,Steph,0,0,ymazeLong,ymazeSurprise,69,47.5,37,2.241307624,1878.658753,maybe slightly better but not great,
-S25,210812,1,Steph,0,0,ymazeLong,ymazeSurprise,142,52.5,90,2.496764756,3412.419038,Not as good as usual. fell close to chance on nonupdate trials and was pretty biased,
-S24,210812,1,Steph,0,0,ymazeLong,ymazeSurprise,61,42.5,31,2.309374103,1592.757463,did ok for a very tiny bit and then bad so paused,
-S24,210812,2,Steph,0,0,ymazeLong,ymazeLong,60,57.5,33,2.518454676,1441.12367,not great but a bit above chance on some parts,
-S23,210813,1,Abby,0,0,ymazeLong,ymazeSurprise,89,82.5,73,211.7535094,3631.806867,transitioned to middleDelay today and he did really well. ended with 82.5% correct but performance during middle delay was really good. feel off towards end and he seemed tired,
-S26,210813,1,Teema,0,0,ymazeLong,ymazeSurprise,37,81.08108108,31,2.533422345,886.5699249,bias restart,
-S26,210813,1,Teema,0,0,ymazeSurprise,ymazeSurprise,117,87.5,105,2.537732503,2771.99012,he did so well during update ,
-S27,210813,1,Steph,0,0,ymazeLong,ymazeSurprise,56,50,36,1.933802933,1740.107875,stopped bc he did really well at first but fell into bias,
-S27,210813,2,Steph,0,0,ymazeLong,ymazeSurprise,52,42.5,29,2.15489555,1458.130881,not good,
-S25,210813,1,Steph,0,0,ymazeLong,ymazeSurprise,79,52.5,41,2.488003519,1917.884292,pausing bc he was doing so bad,
-S25,210813,2,Steph,0,0,ymazeLong,ymazeSurprise,35,57.14285714,20,2.5785538,830.181677,just not great at all. wonder if it was too early or something,
-S24,210813,1,Steph,0,0,ymazeLong,ymazeSurprise,118,40,59,93.28923616,3682.848867,not good,
-S23,210814,1,Abby,0,0,ymazeLong,ymazeLong,22,9.090909091,2,2.161659368,623.7146924,Doing terrible. I noticed he had some fluff above his eye, going to take him off to let him remove and then try again
-S23,210814,2,Abby,0,0,ymazeLong,ymazeSurprise,55,35,19,1.809822731,1835.843481,did terrible today. from ymaze long all the way through middle delay. no interventions bc wasn't even doing easy well. tried on a couple trials but mostly running to one side. ending today w sitting on the ball in the dark,
-S26,210816,1,Teema,0,0,ymazeLong,ymazeSurprise,40,85,34,2.656968731,909.3373553,bias had to restart,
-S26,210816,1,Teema,0,0,ymazeSurprise,ymazeSurprise,14,64.28571429,9,2.421342404,359.1613024,after i restarted for bias reasons he didnt do well at all so i am doing a pause,
-S26,210816,1,Teema,0,0,ymazeSurprise,ymazeSurprise,13,61.53846154,8,2.321981424,339.2289733,,
-S26,210816,1,Teema,0,0,ymazeSurprise,ymazeSurprise,60,45,28,2.089673703,1725.838741,did not do well,
-S27,210816,1,Tyler,0,0,ymazeLong,ymazeSurprise,121,57.5,72,1172.291297,3611.892909,Had good stretches and bad stretches. Overall poor performance.,
-S25,210816,1,Steph,0,0,ymazeLong,ymazeLong,62,57.5,42,2.816508983,1321.632358,did ok at first then developed bad bias so stopped,
-S25,210816,2,Steph,0,0,ymazeSurprise,ymazeSurprise,95,50,53,2.587056728,2210.667688,maybe slightly better in second session but not amazing,
-S23,210816,1,Steph,0,0,ymazeLong,ymazeSurprise,105,67.5,79,1.955376447,3227.706459,overall good job just took a lot of coaching to start,
-S23,210817,1,Abby,0,0,ymazeLong,ymazeSurprise,83,55,47,1.532544883,3254.532064,did mediocre. had to do an easy break on the later delay. was able to transition to middle delay but he was really struggling,
-S26,210817,1,Teema,0,0,ymazeLong,ymazeSurprise,146,62.5,122,2.471869783,3549.718879,he did good until 10 minutes into update and then he started to drop,
-S27,210817,1,Tyler,0,0,ymazeLong,ymazeSurprise,93,50,70,1.827823004,3056.812386,Promising today. Stats were good but began to fell off towards the end.,
-S25,210817,1,Steph,0,0,ymazeLong,ymazeSurprise,90,47.5,56,2.626781104,2084.244287,did ok but fell into bias pretty quick. ball being weird,
-S25,210817,2,Steph,0,0,ymazeSurprise,ymazeSurprise,37,29.72972973,12,2.580972189,883.2200878,horrible second session ended early,
-S24,210817,1,Steph,0,0,ymazeLong,ymazeLong,149,50,91,63.97275076,3745.87809,not the worst but not great really,
-S23,210818,1,Abby,0,0,ymazeLong,ymazeSurprise,100,62.5,63,32.46542432,3791.202737,spent 40 min on middleDelay today. Did ok but having trouble alternating. takes a couple trials to switch to new side and then is successful. side bias was pretty bad starting so lots of the same side repeated. Did an easy break of about 10 trials to try and help but not sure if it did. overall okish and better than yesterday,
-S26,210818,1,Teema,0,0,ymazeLong,ymazeSurprise,27,88.88888889,24,2.894123322,566.3208646,had to restart,
-S26,210818,1,Teema,0,0,ymazeSurprise,ymazeSurprise,111,62.5,76,2.656833987,2512.645041,did not do too hot,
-S27,210818,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,83,32.5,54,1.864666406,2677.057147,Poor all around. While bias was low bad performance. Then bias came back. Ended early.,
-S25,210818,1,Steph,0,0,ymazeLong,ymazeSurprise,69,65,47,2.708640563,1550.246597,stopped at 25 bc doing bad,
-S25,210818,2,Steph,0,0,ymazeSurprise,ymazeSurprise,47,55,28,2.476797589,1143.466627,not good. annoying,
-S23,210819,1,Abby,0,0,ymazeLong,ymazeSurprise,82,57.5,53,1.525990692,3237.237172,middleDelay today but still having a lot of trouble alternating. gave an easy break which he got all correct but didnt help a ton. 82 trials 57.5% correct about 35 min on middle,
-S26,210819,1,Teema,0,0,ymazeLong,ymazeSurprise,50,57.5,32,2.360845844,1276.891789,not doing well. doing pause,
-S26,210819,1,Teema,0,0,ymazeSurprise,ymazeSurprise,57,57.5,33,1.880799131,1824.091337,did not do well. is underweight,
-S27,210819,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,113,22.5,66,1.889107706,3594.490447,Srtaed well and fell off dramatically,
-S25,210819,1,Steph,0,0,ymazeLong,ymazeSurprise,122,50,92,2.685423543,2753.211504,did so so well at the beginning and then fell off,
-S25,210819,2,Steph,0,0,ymazeLong,ymazeSurprise,34,64.70588235,23,2.639112948,777.5690649,slightly better but stilla  bit biased,
-S24,210819,1,Steph,0,0,ymazeLong,ymazeSurprise,104,47.5,55,1.733871315,3661.288213,not good,
-S23,210820,1,Abby,0,0,ymazeLong,ymazeSurprise,89,70,65,1.487870097,3598.720971,middle delay today with extra long warm up since he had been struggling lately. did really well for a while but stopped trying with about 10 min left,
-S26,210820,1,Teema,0,0,ymazeLong,ymazeLong,19,94.73684211,18,2.672135951,433.0838386,,
-S26,210820,1,Teema,0,0,ymazeLong,ymazeSurprise,111,55,87,2.227036694,2997.315943,got to update. did well in delay until update started,
-S27,210820,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,99,47.5,66,1.942940991,3061.804339,Middling performance. Good stretches but never broke through,
-S25,210820,1,Steph,0,0,ymazeLong,ymazeSurprise,112,52.5,85,2.618360003,2576.185667,did really well at beginning and fell off with update,
-S25,210820,2,Steph,0,0,ymazeLong,ymazeSurprise,90,62.5,59,2.512307983,2157.614336,better second session but not amazing,
-S26,210823,1,Teema,0,0,ymazeLong,ymazeLong,11,54.54545455,6,2.681161187,256.1817426,,
-S26,210823,1,Teema,0,0,ymazeLong,ymazeLong,22,45.45454545,10,2.775429876,487.1797266,was not doing well at all doing a pause,
-S26,210823,1,Teema,0,0,ymazeLong,ymazeSurprise,84,62.5,59,2.267081039,2231.397209,he got better but not too good,
-S23,210823,2,Steph,0,0,ymazeLong,ymazeSurprise,70,50,45,1.609474748,2611.333044,not great,
-S27,210823,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,120,27.5,136,2.011086674,3588.156141,Better when I constantly intervene but bad performance when I am hands off,
-S25,210823,1,Steph,0,0,ymazeLong,ymazeSurprise,140,55,102,2.622204893,3206.458192,decent session!,
-S23,210824,1,Steph,0,0,ymazeLong,ymazeSurprise,76,52.5,49,1.632485897,2796.72682,overall decent job just a bit biased and fell off at the end,
-S26,210824,1,Teema,0,0,ymazeLong,ymazeSurprise,57,70,46,2.511671561,1367.514389,he had bias and now he is doing better but bias correction is bad,
-S26,210824,1,Teema,0,0,ymazeSurprise,ymazeSurprise,67,75,46,2.231906153,1807.737112,he did okay. struggled in later a bit,
-S27,210824,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,127,35,73,2.146754021,3556.928544,Tried new interventions and task progression but no improvement,
-S25,210824,1,Steph,0,0,ymazeLong,ymazeSurprise,183,55,129,22.30827682,4094.034769,did decent overall in the task but not really good on updates,
-S23,210825,1,Steph,0,0,ymazeLong,ymazeSurprise,99,75,71,140.748288,3642.724723,great job today!,
-S26,210825,1,Teema,0,0,ymazeLong,ymazeLong,40,57.5,23,2.237326246,1077.598464,he is not doing well. very underweight,
-S26,210825,1,Teema,0,0,ymazeLong,ymazeSurprise,95,72.5,70,2.402208008,2375.306732,he did a little better but not great,
-S27,210825,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,90,25,27,2.009976182,2702.920726,Slowly progressed to target track. Bad drop off with delay tasks,
-S25,210825,1,Steph,0,0,ymazeLong,ymazeSurprise,162,45,104,17.12696863,4177.044189,fine on middle delay ones but not great overall,
-S23,210826,1,Steph,0,0,ymazeLong,ymazeSurprise,99,50,60,1.961256274,3032.400907,just not a strong day today hovered aruond chance,
-S26,210826,1,Teema,0,0,ymazeLong,ymazeSurprise,112,52.5,56,2.0880122,3228.168463,he did not do well today/ he is still underweight but not as bad as yesterday. had very strong left bias,
-S27,210826,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,115,47.5,67,2.100374141,3290.390904,Positive performance today. Extended warmup helped.,
-S25,210826,1,Steph,0,0,ymazeLong,ymazeSurprise,166,72.5,115,10.01686575,4600.85848,much better today and after a pause,
-S23,210827,1,Steph,0,0,ymazeLong,ymazeLong,109,40,62,1.872273716,3520.9744,not good really,
-S26,210827,1,Teema,0,0,ymazeLong,ymazeSurprise,136,75,104,2.267086078,3600.854316,bias kept flipping but he did ok,
-S27,210827,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,115,37.5,55,1.93510065,3569.847174,Not a great performance today.,
-S25,210827,1,Steph,0,0,ymazeLong,ymazeSurprise,158,55,90,8.604094569,4707.650226,ugh not great didn't even get to update,
-S23,210829,1,Steph,0,0,ymazeLong,ymazeSurprise,112,40,68,109.5747456,3664.25249,ok at first but then not great couldn't get to middle dela,
-S26,210829,1,Steph,0,0,ymazeLong,ymazeSurprise,145,60,97,25.48509561,3946.822235,decent job overall! Got to the update phase and got some right,
-S25,210829,1,Steph,0,0,ymazeLong,ymazeSurprise,165,75,131,30.34622281,3931.511229,good on the task but still couldn't get udpates,
-S26,210830,1,Tema,0,0,ymazeLong,ymazeSurprise,144,55,101,2.61071044,3451.252508,he did better but not on update. weight is back to normal,
-S23,210830,1,Steph,0,0,ymazeLong,ymazeLong,98,55,62,1.831934354,3459.095132,slow start overall. got to middle delay but never did amazing,
-S27,210830,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,126,52.5,70,2.124666194,3560.626154,No real improvement today. Still middling.,
-S25,210830,1,Steph,0,0,ymazeLong,ymazeSurprise,93,72.5,72,2.773241303,2040.908284,great first session,
-S25,210830,2,Steph,0,0,ymazeSurprise,ymazeSurprise,71,87.5,55,2.615186375,1630.630091,decent job this session as well! Great day mouse-y,
-S26,210831,1,Teema,0,0,ymazeLong,ymazeSurprise,121,67.5,84,2.219668957,3276.525766,he didnt do too well. very underweight,
-S27,210831,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,131,47.5,69,472.7819549,3621.264825,Pretty low bias today but performance did not improve.,
-S25,210831,1,Steph,0,0,ymazeLong,ymazeSurprise,179,92.5,142,19.88796815,4141.604317,really good job again overall,
-S23,210831,1,Steph,0,0,ymazeLong,ymazeSurprise,136,77.5,99,24.15265901,3940.60844,pretty good job overall just got kinda confused on update,
-S23,210901,1,Steph,0,0,ymazeLong,ymazeSurprise,103,65,74,1.857653261,3366.817879,ok overall but just not super consistent,
-S26,210901,1,Teema,0,0,ymazeLong,ymazeSurprise,158,62.5,120,2.755683379,3445.580359,he did well on delay and ok on update. 83 underweight but better than yesterday seemed more motivated,
-S27,210901,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,90,57.5,63,2.170443305,2492.310986,Did better today. Seems enritchment environment helped.,
-S25,210901,1,Steph,0,0,ymazeLong,ymazeSurprise,155,72.5,122,2.722248144,3419.912452,really good job overall dropped off at end but decent,
-S23,210902,1,Steph,0,0,ymazeLong,ymazeSurprise,101,75,79,2.045640743,2962.742332,pretty good job overall! Should really try update again tomorrow,
-S26,210902,1,Teema,0,0,ymazeLong,ymazeSurprise,162,85,140,2.715618579,3582.227064,he did so good,
-S27,210902,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,98,45,117,1.932256659,3046.424059,Had a positive stretch but still underperformed on the target track.,
-S25,210902,1,Steph,0,0,ymazeLong,ymazeLong,148,55,107,23.27153797,3987.639315,did a delay before starting and he didn't like that but got better at updates at the end,
-S23,210903,1,Steph,0,0,ymazeLong,ymazeSurprise,104,67.5,78,1.963082102,3180.208569,on the update he got some right but not sure he understands good job overall!,
-S26,210903,1,Teema,0,0,ymazeLong,ymazeSurprise,158,70,109,2.688798008,3529.182491,didnt do well. weight is back to normal,
-S27,210903,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,91,42.5,46,2.054129704,2662.568233,A little promising stretch but mostly another bad performance.,
-S25,210903,1,Steph,0,0,ymazeLong,ymazeSurprise,144,57.5,106,2.418413532,3578.482891,got a couple trials right but didn't peak very high at correct on the update task,
-S23,210905,1,Steph,0,0,ymazeLong,ymazeSurprise,102,57.5,74,1.945750443,3152.778927,decent warmup got to update faster but those trials still confused him,
-S25,210905,1,Steph,0,0,ymazeLong,ymazeSurprise,135,70,102,2.369688351,3426.724644,did decent on the update in one section and dropped off but good overall,
-S23,210906,1,Steph,0,0,ymazeLong,ymazeSurprise,115,57.5,88,1.957792824,3530.855086,pretty decent job I think he was starting to get better at the update but just not amazing yet,
-S26,210906,1,Steph,0,0,ymazeLong,ymazeSurprise,84,52.5,53,1.83930127,2741.345359,just bad day. ended earlier,
-S27,210906,1,Steph,0,0,ymazeLong,ymazeSurprise,64,57.5,44,2.129411667,1811.344933,ok for a bit but fell into bias,
-S25,210906,1,Steph,0,1,ymazeLong,ymazeSurprise,20,50,11,1.905076394,632.8755879,idk what happened he did really bad but the velocity seemed messed up too,
-S25,210906,3,Steph,0,1,ymazeLong,ymazeSurprise,50,57.5,37,1.998088495,1507.880072,maybe got slightly better but still really struggling with middle delay. going to try again witha  fresh session,
-S25,210906,4,Steph,0,0,ymazeSurprise,ymazeSurprise,101,57.5,67,1.978121842,3066.704815,best session of the day but just did not do well at the updates and took forever to do well at the basic task,
-S23,210907,1,Steph,0,0,ymazeLong,ymazeSurprise,110,50,78,1.976102336,3363.615025,not great got to pdate but he really didn't get it,
-S26,210907,1,Teema,0,0,ymazeLong,ymazeSurprise,158,62.5,121,2.725267194,3485.179555,he did okay. first day on earlier,
-S25,210907,1,Steph,0,1,ymazeLong,ymazeSurprise,136,80,107,44.09071015,3794.188662,naming 2 bc I'm scared I saved a file under a wrong name. will change. good on task not great at updates,
-S25,210907,3,Steph,0,0,ymazeSurprise,ymazeSurprise,128,85,107,113.7524994,3676.675371,good job overall this second session! Did well the whole time and did decent on updates as well,
-S23,210908,1,Steph,0,0,ymazeLong,ymazeSurprise,93,60,68,1.818742434,3072.54536,did ok overall but not amazing on update. only got a few,
-S26,210908,1,Teema,0,0,ymazeLong,ymazeSurprise,138,60,95,2.330876998,3563.827872,he did ok in beginning but dropped once at middle,
-S25,210908,1,Steph,0,1,ymazeLong,ymazeSurprise,135,70,113,184.1118309,3655.972393,great job! best session ever,
-S25,210908,4,Steph,0,0,ymazeSurprise,ymazeSurprise,97,85,84,2.246641907,2604.954987,pretty good job! dropped off on upates at the end but really good overall,
-S26,210909,1,Teema,0,0,ymazeLong,ymazeSurprise,110,57.5,63,2.262986456,2922.6333,did not do well at all,
-S25,210909,1,Steph,0,1,ymazeLong,ymazeSurprise,147,85,129,22.85518828,3996.801208,pretty good session overall!,
-S25,210909,3,Steph,0,0,ymazeSurprise,ymazeSurprise,55,65,34,2.05803535,1607.684634,got a few good trials at the beginning but declined pretty quickly,
-S23,210910,1,Steph,0,0,ymazeLong,ymazeSurprise,106,65,82,1.933372811,3324.626452,did well overall but still doesn't get updates,
-S26,210910,1,Teema,0,0,ymazeLong,ymazeSurprise,125,70,79,2.335557303,3214.03391,he started bad but ended ok,
-S25,210910,1,Steph,0,1,ymazeLong,ymazeSurprise,107,67.5,85,2.11982352,3038.610874,good overal but didn't do amazing at updates ,
-S25,210910,3,Steph,0,1,ymazeSurprise,ymazeSurprise,134,87.5,105,43.74986396,3798.833482,Amazing session! Started out rough but really really turned it around,
-S25,210910,4,Steph,0,0,ymazeSurprise,ymazeSurprise,131,90,106,2321.323095,3614.662078,wow he still did really good the whole time! Amazing job,
-S26,210912,1,Steph,0,0,ymazeLong,ymazeSurprise,75,50,44,2.268001125,1984.580388,slow session didn't get past warmup,
-S26,210912,2,Steph,0,0,ymazeLong,ymazeSurprise,68,67.5,50,2.187773137,1870.405453,much better second session but didn't get update still,
-S23,210912,1,Steph,0,0,ymazeLong,ymazeSurprise,77,60,59,1.732133437,2670.938829,not amazing really. got super biased when I introduced updates,
-S25,210912,1,Steph,0,0,ymazeLong,ymazeSurprise,143,97.5,134,52.11275305,3772.753934,great first session! amazing job,
-S25,210912,2,Steph,0,0,ymazeSurprise,ymazeSurprise,134,80,112,100.6408973,3688.696565,great job again! not as great at update but very good overall,
-S26,210913,1,Teema,0,0,ymazeLong,ymazeSurprise,137,62.5,96,272.9174275,3630.806561,didnt do well today. overwight at 88,
-S23,210913,1,Steph,0,0,ymazeLong,ymazeSurprise,104,52.5,66,1.948426037,3209.707084,not good idk what's up with him. at chance the whole time,
-S1,210913,2,Steph,0,0,ymazeLong,ymazeLong,0,0,0,0,83.859614,,
-S1,210913,3,Steph,0,0,ymazeLong,ymazeLong,0,0,0,0,33.5815013,,
-S25,210913,1,Steph,0,1,ymazeLong,ymazeSurprise,138,72.5,124,2.357611512,3520.126795,great job overall just started dropping off at the end so pausing,
-S25,210913,3,Steph,0,1,ymazeLong,ymazeSurprise,90,75,75,2.305485347,2347.034197,decent for a bit but started dropping off about 35 min in,
-S23,210914,1,Abby,0,0,ymazeLong,ymazeSurprise,113,75,94,1.90232968,3566.478927,Slow warm up to get to update one location middle delay. Started update around 30 min. Overall good job seemed like he was trying on update trials. performance tanked towards the end but otherwise good job,
-S26,210914,1,Teema,0,0,ymazeLong,ymazeSurprise,133,62.5,85,2.44337449,3270.463841,weight is back to normal but his performance isnt,
-S25,210914,1,Steph,0,1,ymazeLong,ymazeSurprise,75,55,54,2.110905076,2138.697287,not his best day... seemed to fall into bias a bit more quickly. But he did the update trials he doesn't usually get well!,
-S25,210914,4,Steph,0,1,ymazeLong,ymazeSurprise,116,82.5,91,2.158944872,3234.400768,best session of the deay finally picked it up at the end but was struggling at the beginning,
-S23,210915,1,Steph,0,0,ymazeLong,ymazeSurprise,111,65,83,134.5508909,3655.86532,pretty good again! dropped a bit at the end but got above chance on updates for a bit,
-S26,210915,1,Teema,0,0,ymazeLong,ymazeSurprise,109,50,63,1.958001174,3346.011537,he did not do well. weight was high again 87,
-S1,210915,1,Steph,0,0,ymazeLong,ymazeLong,0,0,0,0,41.8428604,Checking frames 2,
-S25,210915,1,Steph,0,1,ymazeLong,ymazeLong,8,12.5,1,2.399856009,210.0086453,horrible start soI paused it for a sec,
-S25,210915,3,Steph,0,0,ymazeLong,ymazeSurprise,102,62.5,68,1.907912068,3216.093971,slightly better session but not great.. will pause and try a bit longer in a sec,
-S25,210915,5,Steph,0,1,ymazeLong,ymazeSurprise,29,65.51724138,20,2.143406193,824.2238812,bad. braely got out of warmup without bias,
-S23,210916,1,Steph,0,0,ymazeLong,ymazeSurprise,117,75,89,164.6920821,3650.010571,did pretty well just couldn't tell how many he was actually getting right,
-S26,210916,1,Teema,0,0,ymazeLong,ymazeLong,129,57.5,77,2.557987663,3266.680346,did not do well at all,
-S25,210916,1,Steph,0,1,ymazeLong,ymazeSurprise,86,52.5,55,2.208961792,2345.49355,not great became pretty biased pretty quick. maybe a few ok trials,
-S25,210916,3,Steph,0,1,ymazeSurprise,ymazeSurprise,77,60,49,2.210443821,2095.070358,really bad behavior should have stopped earlier,
-S23,210917,1,Steph,0,0,ymazeLong,ymazeSurprise,102,72.5,84,1.800678432,3402.182421,pretty good overall! got some updates even on earlier delya,
-S26,210917,1,Teema,0,0,ymazeLong,ymazeLong,112,55,69,2.191367707,3070.387854,didnt do well today and weight is 85,
-S26,210920,1,Teema,0,0,ymazeLong,ymazeSurprise,109,57.5,77,2.0385841,3275.782357,started much better than last wekk especially for having 2 days off. 85 weight. dropped at end bad,
-S23,210920,1,Steph,0,0,ymazeLong,ymazeSurprise,144,72.5,100,8.821646524,4583.297925,slow start but got better at update and did well at end,
-S23,210921,1,Steph,0,0,ymazeLong,ymazeSurprise,138,62.5,94,14.10511719,4211.443937,pretrty good overall,
-S26,210921,1,Steph,0,0,ymazeLong,ymazeSurprise,147,60,107,2.526960694,3496.676649,decent on the normal task but dropped at the end and did not do well on updates,
-S28,210922,1,Teema,0,0,linear,linear,30,93.33333333,46,1.002397959,1816.83087,87 weight. didnt move a lot. is his first day,
-S29,210922,1,Tyler,0,0,linear,linear,11,100,11,0.384339225,1807.527035,First day on the ball. Learned to move forward but mostly still.,
-S26,210922,1,Steph,0,0,ymazeLong,ymazeSurprise,144,65,96,25.51344328,3946.365364,got him doing slightly better on middle delay at the end but he was just kind of biased the whole time,
-S23,210922,1,Steph,0,0,ymazeLong,ymazeSurprise,128,57.5,85,46.75998368,3766.954367,did ok on middle delay and updates for a little bit but dropped off about 30 min in,
-S26,210923,1,Steph,0,0,ymazeLong,ymazeSurprise,128,50,78,2.570190807,2994.407856,hovered around chance at the end maybe did decent for like a few min but not a ton,
-S28,210923,1,Teema,0,0,linear,linear,74,100,79,1.486761793,2995.170961,did better and was a little faster,
-S29,210923,1,Tyler,0,0,linear,linear,41,100,41,1.309045397,2094.261302,Pretty slow and still for long stretches.,
-S23,210923,1,Steph,0,0,ymazeLong,ymazeSurprise,137,57.5,101,2.342416228,3514.858376,really great job overall,
-S28,210924,1,Teema,0,0,linear,linear,107,100,107,1.887851061,3403.778882,did well he was walking fast 2 trial per min will do ymazeshort next,
-S29,210924,1,Tyler,0,0,linear,linear,96,100,96,2.030950129,2840.822584,Licks not detected. ,
-S26,210924,1,Steph,0,0,ymazeLong,ymazeSurprise,39,84.61538462,33,2.625469976,915.3600215,mouse massively freaked out idk what was happening so took off at 15 min,
-S23,210924,2,Steph,0,0,ymazeLong,ymazeSurprise,136,50,88,3162.790698,3606.067034,want to make sure I'm saving the right file. not the best day probably bc of shielding and long delay,
-S23,210926,1,Steph,0,0,ymazeLong,ymazeSurprise,150,72.5,108,16.66793219,4083.256147,struggled a bit still with the transition to update but lasted decently well overall,
-S28,210927,1,Teema,0,0,linear,ymazeShort,123,35,57,2.367467532,3121.355983,first day on short maze did not do well but is getting better at swinging body,
-S26,210927,1,Steph,0,0,ymazeLong,ymazeLong,143,65,97,2.600328587,3241.943083,first day back in a while. seemed to do ok,
-S29,210927,1,Tyler,0,0,linear,linear,118,100,118,2.30651875,3075.262559,Performde well. Nice and consistent,
-S23,210927,1,Steph,0,0,ymazeLong,ymazeSurprise,22,86.36363636,19,1.923424395,696.3154001,slow warmup it seems like weird veloctiy going to try to fix,
-S23,210927,2,Steph,0,0,ymazeSurprise,ymazeSurprise,84,77.5,70,1.697148555,2977.746246,really good job overall and did decently well on update,
-S28,210928,1,Teema,0,0,ymazeShort,ymazeShort,157,57.5,77,2.640005784,3570.130337,did a bit better,
-S29,210928,1,Tyler,0,0,ymazeShort,ymazeShort,117,22.5,21,2.380979838,2960.274129,Showed improvement today. Good session.,
-S23,210928,1,Steph,0,0,ymazeLong,ymazeLong,89,32.5,56,1.882689411,2837.310659,great start and totally crashed. not sure the reason,
-S1,210929,1,Steph,0,0,ymazeLong,ymazeLong,0,0,0,0,104.7259237,,
-S26,210929,1,Steph,0,0,ymazeLong,ymazeSurprise,136,60,89,47.77349742,3775.26532,decent overall sruggled with bias a bit,
-S28,210929,1,Teema,0,0,ymazeShort,ymazeShort,182,62.5,93,79.49970515,3738.377113,a little better but not really,
-S29,210929,1,Tyler,0,0,ymazeShort,ymazeShort,159,35,54,252.254158,3648.396386,Improved today. Seems promising.,
-S23,210929,1,Steph,0,0,ymazeLong,ymazeLong,110,17.5,49,1.929219283,3429.809338,actually so awfu lidk what happened,
+S24,210601,2,Steph,0,0,ymazeShort,ymazeShort,86,62.5,64,3.06011162290885,1702.9241703,better in second session but falling off at the end
+S23,210602,1,Navya,0,0,ymazeLong,ymazeSurprise,23,65.2173913043478,17,0.415983408893605,3977.4839633,didnt do great, still not motivated on the ball.
+S24,210602,1,Steph,0,0,ymazeShort,ymazeLong,136,32.5,88,2.4358557973368,3368.1301848,did well on the short ymaze so transitioned to long and didn't do so well in that
+S25,210602,1,Steph,0,0,ymazeShort,ymazeShort,66,52.5,34,2.95359499499903,1368.1529288,not great first session maybe a tiny bit above chance so stopped after 20 min
+S25,210602,2,Steph,0,0,ymazeShort,ymazeShort,138,65,69,3.23817859493554,2558.0973802,got up to 65 percent in the second session so seemed to be donig better
+S23,210603,1,Navya,0,0,ymazeLong,ymazeSurprise,45,80,38,143.334925943622,3629.5177948,did better on delay and had high accuracy. did not complete many trials though. 
+S24,210603,1,Steph,0,0,ymazeLong,ymazeLong,70,27.5,26,2.28501665613927,1851.2515071,not well in first session so did a pause
+S24,210603,2,Steph,0,0,ymazeLong,ymazeLong,63,42.5,29,2.52754894618594,1510.362065,Closer to 50 percent in second session but really not great overall
+S25,210603,1,Steph,0,0,ymazeShort,ymazeShort,227,85,144,69.4614443084455,3800.9146371,Good job some low bouts but ended at 85 percent correct
+S23,210604,1,Navya,0,0,ymazeLong,ymazeSurprise,40,25,12,0.698582372612777,3450.4743502,very slow today. did not do well.
+S24,210604,1,Steph,0,0,ymazeLong,ymazeLong,54,37.5,27,2.73961946347428,1187.5012498,did well at first and then completely dropped off
+S24,210604,2,Steph,0,0,ymazeLong,ymazeLong,94,97.5,90,2.78693166236026,2025.4012327,awesome job in the second session pretty much at 100 percent!
+S25,210604,1,Steph,0,0,ymazeShort,ymazeShort,224,77.5,177,68.5766767864888,3798.6420037,Slow start but ended up doing really well! Will switch to ymaze long on monday if he does well on short at the beginning
+S23,210607,1,Navya,0,0,ymazeLong,ymazeLong,45,35,17,54.0216086434574,3727.6070612,not do well. very demotivated.
+S24,210607,1,Steph,0,0,ymazeLong,ymazeLong,127,87.5,101,65.1309885037822,3722.3838261,great job got up to around 90 on the long ymaze looking good
+S25,210607,1,Steph,0,0,ymazeShort,ymazeLong,202,75,175,22.9568063521407,4130.0230103,transitioned to the ymaze and he did really well
+S23,210608,1,Navya,0,0,ymazeLong,ymazeLong,35,45.7142857142857,17,12.7820418398836,3798.8521538,did slightly better than yesterday but still not great.
+S24,210608,1,Steph,0,0,ymazeLong,ymazeSurprise,97,52.5,71,2.02847957439571,2920.0259867,switched to delay today. Did ok at first but then kinda fell off so did a 10 min break at the end
+S25,210608,1,Steph,0,0,ymazeLong,ymazeLong,174,97.5,168,63.8286164963959,3765.9149375,amazing job on ymazeLong like close to 100 percent the whole time
+S23,210609,1,Navya,0,0,ymazeLong,ymazeSurprise,31,67.741935483871,22,0.517868697454425,3688.7277975,did much better today. still slow and staying on ball sometimes.
+S24,210609,1,Steph,0,0,ymazeLong,ymazeSurprise,119,62.5,89,253.299276287782,3641.4118881,Decent job. Transitioned to delay again and he lasted decently long
+S25,210609,1,Steph,0,0,ymazeLong,ymazeSurprise,98,65,81,2.35163032371311,2548.2321456,switched to laatest delay bc he was doing super well and he lasted like 20 min but then started spinning so taking a pause
+S23,210610,1,Navya,0,0,ymazeLong,ymazeSurprise,11,81.8181818181818,9,0.232732648017964,4246.5930726,stll stuck on ball. accuracy still good.
+S24,210610,1,Steph,0,0,ymazeSurprise,ymazeSurprise,40,12.5,7,1.29389749420577,1854.8986339,so so bad today.
+S25,210610,1,Steph,0,0,ymazeLong,ymazeSurprise,136,80,108,76.9716921509626,3709.552326,good job on the latest delay little buddy!
+S23,210611,1,Navya,0,0,ymazeLong,ymazeSurprise,24,54.1666666666667,15,4.05703515251917,3974.1028508,knows the task but wont move.
+S24,210611,1,Steph,0,0,ymazeLong,ymazeLong,72,77.5,41,1.77508519998061,2462.8529492,Finallyyyy climbed up a bit after I moved the lick detector a little but then started falling off again at 41 min so did a pause
+S25,210611,1,Steph,0,0,ymazeLong,ymazeSurprise,151,95,143,2.51875163329645,3601.3778467,Amazing job and I even moved him to the later delay
+S23,210613,1,Steph,0,0,ymazeLong,ymazeLong,15,46.6666666666667,7,1.58735757875057,833.3866648,did a puase after 10 min bc he wasn't really trying
+S23,210613,2,Steph,0,0,ymazeLong,ymazeSurprise,43,55,23,1.18443269805505,2180.6566354,slightly better in the second session and stayed above chance for 40 trials
+S23,210614,1,Navya,0,0,ymazeLong,ymazeSurprise,5,60,3,0.456121145776318,1250.2777407,going to restart
+S23,210614,1,Navya,0,0,ymazeLong,ymazeSurprise,10,50,6,0.2015815415814,3100.5619611,did not do well but that was expected.
+S24,210614,1,Steph,0,0,ymazeLong,ymazeLong,54,60,28,1.72678342351868,1884.298855,bad at first. Changed bias correction and started doing ok. Then did bad again so took a pause
+S24,210614,2,Steph,0,0,ymazeLong,ymazeLong,40,7.5,4,1.94074579626374,1253.433074,so bad in the second session 
+S25,210614,1,Steph,0,0,ymazeSurprise,ymazeSurprise,134,90,110,97.0100629841454,3683.7571492,slow start but awesome job on later delay
+S23,210615,1,Navya,0,0,ymazeSurprise,ymazeSurprise,6,33.3333333333333,2,0.11525816387982,3632.6509137,very slow only 6 trials. not good.
+S24,210615,2,Steph,0,0,ymazeLong,ymazeSurprise,36,63.8888888888889,23,1.75744207560418,1255.6677878,did much much better on ymaze long but hated the transition to delay
+S25,210615,1,Steph,0,0,ymazeSurprise,ymazeSurprise,140,72.5,90,30.2227851016061,3884.9886831,slow start bc went on delay to start but got a lot better eventually
+S23,210616,1,Navya,0,0,ymazeSurprise,ymazeSurprise,1,0,1,0.161764309401202,1546.1803419,horrible.
+S23,210616,2,Navya,0,0,ymazeSurprise,ymazeSurprise,5,20,1,0.180865404788834,1991.5306253,struggling to run and keep running back.
+S27,210616,1,Tyler,0,0,linear,linear,41,100,41,1.34021017328482,1905.0541704,No licks recorded. A little awkward but did well. Good amount of trials.
+S24,210616,1,Steph,0,0,ymazeLong,ymazeLong,38,71.0526315789474,28,1.64806569132019,1404.0562857,slow start but ended up doing ok then started freaking out. .think the reward moved so did a pause
+S24,210616,2,Steph,0,0,ymazeLong,ymazeLong,71,40,34,2.41937270095702,1791.5853157,ok in second session for a bit but then fell off again
+S25,210616,1,Steph,0,0,ymazeSurprise,ymazeSurprise,155,90,108,41.1440706085341,3827.1142236,really good job. Slowish start on the delay but got there eventually and ended up doing well on later too
+S23,210617,1,Navya,0,0,ymazeSurprise,ymazeSurprise,55,15,12,0.919645808170802,3593.7703191,did better today but accuracy is not high.
+S26,210617,1,Teema,0,0,linear,linear,18,100,19,0.622071081988969,1854.7693197,first day. a little awkward but licking for reward. no licks recorded. ok amount of trials. 
+S27,210617,1,Tyler,0,0,linear,linear,39,100,48,2.00261709533228,1171.0911189,Started on short maze. Advanced to medium. Performing well. Noticed no reward delivered. Not sure how long.
+S27,210617,2,Tyler,0,0,linear,linear,26,100,47,1.12664745106847,1411.4699787,Rewards fixed. Repairing in his face for the first few minutes. Licking well. Progressed but slightly lower motivation near the end.
+S24,210617,1,Steph,0,0,ymazeLong,ymazeLong,59,42.5,28,1.59342608213436,2241.1818929,seemed to do ok for a bit and then just totally bad agian
+S25,210617,1,Steph,0,0,ymazeSurprise,ymazeSurprise,95,47.5,58,2.32253868962367,2470.9288535,good job for a bit but fell off after about 40 min total so pausing
+S23,210618,1,Navya,0,0,ymazeSurprise,ymazeSurprise,24,12.5,3,0.404533699061763,3564.2752779,heavy side bias but moving better overall.
+S26,210618,1,Teema,0,0,linear,linear,72,100,73,1.59775190389522,2709.3543336,good job overall. switched to middle halfway through. no licks recorded
+S27,210618,1,Tyler,0,0,linear,linear,91,100,107,1.51939524729827,3601.9783002,Paused for a long ti,e early  on. Around 30 mins. Moved well afterward though. Did not progress to long yet.
+S24,210618,1,Steph,0,0,ymazeLong,ymazeLong,27,62.962962962963,18,1.02912094648635,1632.8824294,did really well for a min and then started to fall so doing a 10 min pause
+S24,210618,2,Steph,0,0,ymazeLong,ymazeLong,69,57.5,41,1.7404947545524,2405.5049801,did ok not great in second session
+S25,210618,1,Steph,0,0,ymazeLong,ymazeSurprise,120,45,80,2.56233320367453,2810.9789162,did decent but started falling off around 40 min so doing a pause
+S23,210620,1,Steph,0,0,ymazeSurprise,ymazeSurprise,122,60,74,15.7425787290233,4075.1371151,overall decent session on latest delay arond 60 perceny
+S24,210620,1,Steph,0,0,ymazeLong,ymazeLong,140,55,62,12.7961002361185,4293.7488475,did really good for parts of it and really bad for others
+S25,210620,1,Steph,0,0,ymazeSurprise,ymazeSurprise,121,62.5,74,2.55457591048991,2852.9599074,ok job but really slow start again
+S23,210621,1,Navya,0,0,ymazeSurprise,ymazeSurprise,19,57.8947368421053,13,0.323453530367605,3610.3428044,better than last week but still not doing enough. 
+S26,210621,1,Teema,0,0,linear,linear,125,100,125,1591.34309357097,3610.1025624,he did good today and stayed straight most of the time. switched to long and kept him there longer to get him adjusted to turning. 89 body weight but still motivated. 
+S27,210621,1,Tyler,0,0,linear,linear,17,100,17,2.93554746521232,349.0424155,Ended after 6 mins. Track wouldn't switch to long.
+S27,210621,2,Tyler,0,0,linear,ymazeShort,163,12.5,87,201.404477027945,3656.0808506,Started on ymaze short. Ran well. Chose right side most every time.
+S24,210621,1,Steph,0,0,ymazeLong,ymazeLong,53,40,24,1.73400003271698,1834.7554294,ugh s till bad
+S24,210621,2,Steph,0,0,ymazeLong,ymazeLong,49,27.5,20,1.86309661866975,1580.3997743,still pretty bad tried only left trials
+S25,210621,1,Steph,0,0,ymazeSurprise,ymazeSurprise,143,75,98,2.64180130205703,3262.5845641,Started on later delay right off the bat and he actually ended up doing well! Good job buddy
+S23,210622,1,Navya,0,0,ymazeSurprise,ymazeSurprise,45,50,21,8.88844995308874,3907.4706727,better than usual. more trials and higher accuracy.
+S26,210622,1,Teema,0,0,linear,ymazeShort,142,42.5,72,2.44016931109037,3498.4993994,did well for first time on ymaze. he ranged from 40 to 50 correct. was at 86 body weight
+S27,210622,1,Tyler,0,0,ymazeShort,ymazeShort,159,10,28,303.957178359778,3643.9966498,Perfomred well at first but fell off. Complete bias to R. Continued to show intention of choosing other side so could still be lack of ball control.
+S24,210622,1,Steph,0,0,ymazeLong,ymazeLong,122,57.5,63,17.3956026197968,4043.807604,always like just above or at chance on this not great
+S25,210622,1,Steph,0,0,ymazeSurprise,ymazeSurprise,54,75,40,2.31700654196785,1419.9804399,did really well at first but then got super biased so did a pause
+S25,210622,2,Steph,0,0,ymazeSurprise,ymazeSurprise,50,5,8,2.40479612539248,1271.3682292,horrible second session not sure what happened there
+S23,210623,1,Navya,0,0,ymazeSurprise,ymazeSurprise,83,42.5,40,1.40059606893745,3561.0159233,more trials. finally seeing more motivation. 
+S26,210623,1,Teema,0,0,ymazeShort,ymazeShort,170,35,71,2.86295216399888,3567.5223144,he did ok. startd off real good but then half way through only went right the whole time
+S27,210623,1,Tyler,0,0,ymazeShort,ymazeShort,93,5,10,2.94860704738221,1898.6704215,Choosing R every time. Pausing halfway through to correct.
+S27,210623,2,Tyler,0,0,ymazeShort,ymazeShort,59,5,14,2.86293805378442,1242.0888801,Did better at restart but regressed quickly. No improvement on bias.
+S24,210623,1,Steph,0,0,ymazeLong,ymazeLong,150,70,98,35.3017317460629,3870.0767161,actually stayed above chance the whole time today! good job. Will try switching to delay maybe tomorrow
+S25,210623,1,Steph,0,0,ymazeSurprise,ymazeSurprise,155,55,101,32.4897639775856,3895.0723686,good again and much better on later and middle delay
+S26,210624,1,Teema,0,0,ymazeShort,ymazeShort,160,75,72,2.71856559417366,3538.2176218,he had a rough start but ended really well. he seems to be learning. was a few issues in beginning but all is good.
+S27,210624,1,Tyler,0,0,ymazeShort,ymazeShort,186,22.5,58,847.959881467974,3629.6038659,Did well at exhibiting ball control. Working on accuracy. Showed lack of motivation later in the session.
+S24,210624,1,Steph,0,0,ymazeLong,ymazeSurprise,105,32.5,64,2.15806859027081,2928.3162803,did so well on the ymaze long and just absolutely hated the delay
+S25,210624,1,Steph,0,0,ymazeSurprise,ymazeSurprise,157,82.5,116,26.1221139500962,3965.8572278,did well overall. good job
+S23,210625,1,Navya,0,0,ymazeSurprise,ymazeSurprise,39,23.0769230769231,9,28.2851237171971,3685.3640089,heavy side bias. maybe since skipped yesterday. 
+S26,210625,1,Teema,0,0,ymazeShort,ymazeShort,190,90,147,581.870151082074,3628.1640767,he did good today. slightly underweight. had a moment of weakness but ended really good.
+S27,210625,1,Tyler,0,0,ymazeShort,ymazeShort,110,25,44,3.05486962418161,2167.5718864,Did really well for around 20 mins. Then fell off. Doing a VR break to reinforce motivation.
+S27,210625,2,Tyler,0,0,ymazeShort,ymazeShort,65,12.5,9,3.21569390551797,1219.1958852,Minimum correct after VR break. No improvement. 
+S24,210625,1,Steph,0,0,ymazeLong,ymazeSurprise,88,42.5,57,2.01313187271974,2640.3005233,lasted longer today than previously on the latest delay
+S25,210625,1,Steph,0,0,ymazeSurprise,ymazeSurprise,137,62.5,92,2.31559406114915,3571.2846859,decent job switched a little earlier and did well on middle delay
+S23,210626,1,Steph,0,0,ymazeSurprise,ymazeSurprise,81,65,47,1.51876328917878,3236.9476015,got better on latest delay eventually just a bit slower overall and biased
+S24,210626,1,Steph,0,0,ymazeLong,ymazeSurprise,80,47.5,46,1.92037408887251,2502.3883474,did ok on latest delay for a bit hovering around 60 but eventually fell aruond 40 again
+S25,210626,1,Steph,0,0,ymazeSurprise,ymazeSurprise,139,67.5,88,2.50022109269255,3342.3145985,pretty good job considering it was on the middle delay the whole time
+S23,210628,1,Navya,0,0,ymazeSurprise,ymazeSurprise,33,36.3636363636364,13,4.82090813248245,4134.7460046,did alright but not good enough to advance.
+S26,210628,1,Teema,0,0,ymazeShort,ymazeShort,173,87.5,151,3.15779290354494,3299.4408029,he did well. was underweight. stayed above 75 most of time.
+S27,210628,1,Tyler,0,0,ymazeShort,ymazeShort,98,25,34,3.16436622265083,1864.5021531,Performed decently but began declining. Performing VR break to motivate.
+S27,210628,2,Tyler,0,0,ymazeShort,ymazeShort,65,32.5,31,3.28421882328966,1191.5117378,Was off and on over the final 20 mins. Overall exhibiting control and choice, but lacking consistency.
+S24,210628,1,Steph,0,0,ymazeLong,ymazeSurprise,63,45,34,2.17195693319681,1764.0202588,wasn't doig great at latest delay so donig a brief pause
+S24,210628,2,Steph,0,0,ymazeSurprise,ymazeSurprise,41,40,19,2.02671306686176,1214.3209822,did better in second session but then fell off again
+S25,210628,1,Steph,0,0,ymazeSurprise,ymazeSurprise,157,70,109,48.0894402327896,3800.0826179,really good job overall! just struggled with bias a bit but overall really good
+S23,210629,1,Navya,0,0,ymazeLong,ymazeSurprise,29,24.1379310344828,7,0.508695328042707,3476.347154,not good. not sure where to go.
+S26,210629,1,Teema,0,0,ymazeShort,ymazeLong,155,97.5,138,276.802190606584,3638.5137969,he did good. underweight. switched tracks and still did well.
+S27,210629,1,Tyler,0,0,ymazeShort,ymazeShort,109,72.5,72,3.18588467974308,2059.7593245,Performed well. Began to show distress on the ball so giving a short break.
+S24,210629,1,Steph,0,0,ymazeLong,ymazeSurprise,48,50,27,2.16828120800367,1334.7736198,did really well on visual guided then developed bias on delay so did a pause
+S24,210629,2,Steph,0,0,ymazeSurprise,ymazeSurprise,64,40,40,1.94410003609748,1977.1936966,Bad session maybe slightly better for a bit but overall not good
+S25,210629,1,Steph,0,0,ymazeSurprise,ymazeSurprise,46,35,19,2.22024152366488,1247.2147933,doing a 10 min break because he is just struggling with bias today too
+S25,210629,2,Steph,0,0,ymazeSurprise,ymazeSurprise,46,12.5,14,2.40857242341656,1169.0095821,horrible horrible not sure what happened
+S23,210630,1,Navya,0,0,ymazeSurprise,ymazeSurprise,38,31.5789473684211,12,23.3601770455523,3700.4240098,no improvement 
+S26,210630,1,Teema,0,0,ymazeLong,ymazeLong,172,100,157,2.89454109743497,3572.5785189,he did great. had a moment in the middle of session but got better
+S27,210630,1,Tyler,0,0,ymazeShort,ymazeShort,208,75,171,3.48039877338254,3591.5918285,Performed very well today. Showed great control and decision-making. 
+S24,210630,1,Steph,0,0,ymazeLong,ymazeSurprise,118,32.5,46,50.927557707109,3773.1316321,ugh fine on warmup but bad again on the rest
+S25,210630,1,Steph,0,0,ymazeSurprise,ymazeSurprise,108,35,60,2.20449853781872,2946.9392161,much better than yesterday but fell off eventually so last 10 min with no vr
+S23,210701,1,Navya,0,0,ymazeSurprise,ymazeSurprise,20,50,10,4.46854146806482,3873.7086944,higher accuracy but not enough trials.
+S26,210701,1,Teema,0,0,ymazeLong,ymazeSurprise,92,97.5,75,2.57345296781599,2152.553626,had to stop because he moved lick detector. something scared him
+S27,210701,1,Tyler,0,0,ymazeShort,ymazeLong,177,90,162,406.211750305998,3630.6718928,Did very well today. Advanced to YMaze long and showed no decline in performance.
+S24,210701,1,Steph,0,0,ymazeSurprise,ymazeSurprise,47,22.5,13,1.79941155413645,1585.6297106,tried starting on latest delay but he hated it
+S24,210701,2,Steph,0,0,ymazeSurprise,ymazeSurprise,53,37.5,31,1.81558664002284,1783.1460094,maybe slightly better but not great
+S25,210701,1,Steph,0,0,ymazeSurprise,ymazeSurprise,138,55,76,131.821944851302,3668.1859216,Ok job not great but just above chance most of the session
+S23,210702,1,Navya,0,0,ymazeSurprise,ymazeSurprise,42,27.5,13,20.8771726343347,3730.9508985,fixed side bias faster but accuracy tapered off.
+S26,210702,1,Teema,0,0,ymazeLong,ymazeLong,43,77.5,32,2.52354822618035,1042.174264,he started on long and did well until 15 min in. putting him in a 5 minute pause and starting delay
+S26,210702,1,Teema,0,0,ymazeSurprise,ymazeSurprise,50,87.5,43,1.57840323467436,1907.2402961,he did better after pause w no VR. slowly did trials but understands what to do
+S27,210702,1,Tyler,0,0,ymazeLong,ymazeLong,159,72.5,128,131.426682096214,3677.8856222,Performed well. Very accurate and in control. Showed lack of motivation towards the end so stats declined over final 10 mins.
+S24,210702,1,Steph,0,0,ymazeSurprise,ymazeSurprise,37,29.7297297297297,13,1.52218794632848,1481.9119296,did ok for a bit and then bad
+S24,210702,2,Steph,0,0,ymazeSurprise,ymazeSurprise,12,58.3333333333333,10,1.77218554782686,432.7232639,did decent at first and then started freaking out idk what happened
+S25,210702,1,Steph,0,0,ymazeSurprise,ymazeSurprise,152,60,89,23.691757762168,3990.664951,decent job. Got up to 60
+S23,210703,1,Steph,0,0,ymazeSurprise,ymazeSurprise,15,33.3333333333333,5,1.73888178308802,539.8069076,paused after 8 min bc doing bad
+S23,210703,2,Steph,0,0,ymazeSurprise,ymazeSurprise,12,25,4,0.851884498660057,935.7274466,not good just staying still so stopped
+S26,210703,1,Steph,0,0,ymazeLong,ymazeSurprise,127,87.5,100,2.5878581228859,2945.1821263,awesome job overall
+S27,210703,1,Steph,0,0,ymazeLong,ymazeSurprise,116,75,94,2.71823077544953,2568.6546797,Really great job overall just started dropping off at the end
+S25,210704,1,Steph,0,0,ymazeLong,ymazeSurprise,113,62.5,73,2.48309535782027,2732.857623,decent job overall
+S24,210704,1,Steph,0,0,ymazeLong,ymazeSurprise,41,42.5,18,2.07993019551344,1218.8872284,did fine on ymazelong but hated delay
+S23,210706,1,Navya,0,0,ymazeLong,ymazeSurprise,32,28.125,9,0.5396344651042,3699.6602535,low accuracy.
+S26,210706,1,Teema,0,0,ymazeLong,ymazeSurprise,136,100,131,2.2932060678907,3566.4681908,he did great. ended with 100 percent
+S27,210706,1,Tyler,0,0,ymazeLong,ymazeSurprise,119,60,97,1086.59260386547,3615.0829696,Performed very well for around 35 minutes then declined. Still got some right and changed direction sometimes.
+S24,210706,1,Steph,0,0,ymazeLong,ymazeSurprise,103,42.5,53,115.522655899507,3678.9697361,just hovered around chance the whole time not the worst not the best
+S25,210706,1,Steph,0,0,ymazeLong,ymazeSurprise,43,55,25,2.20723734303377,1173.163269,did a pause at 20 min bc being annoying
+S25,210706,2,Steph,0,0,ymazeSurprise,ymazeSurprise,108,90,91,2.44756525801984,2650.8319408,awesome job got to doing really really well on the delay
+S23,210707,1,Navya,0,0,ymazeShort,ymazeShort,81,37.5,30,14.6460537021969,3943.3189449,did more trials which is good but low accuracy.
+S26,210707,1,Teema,0,0,ymazeLong,ymazeSurprise,103,77.5,94,1.74788535569043,3542.3953497,he did good. his performance dropeed 40 min in but he picked up slightly at end
+S27,210707,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,87,77.5,71,2.0978768039932,2492.313562,Did well for 40 mins then began to develop side bias. Instituting VR break
+S27,210707,2,Tyler,0,0,ymazeSurprise,ymazeSurprise,23,13.0434782608696,3,1.86383471837863,745.2914535,No improvement. Still complete side bias.
+S24,210707,1,Steph,0,0,ymazeLong,ymazeSurprise,39,43.5897435897436,20,1.86933955594398,1286.0940774,ugh fine on ymazeLong but bad on delay
+S25,210707,1,Steph,0,0,ymazeSurprise,ymazeSurprise,157,52.5,100,43.9156744459259,3817.4854074,first day trying out the update didn't really get it but good effort overall
+S23,210708,1,Navya,0,0,ymazeShort,ymazeShort,144,45,66,2.41929115889087,3592.0181004,less side bias on ymazeshort.
+S26,210708,1,Teema,0,0,ymazeLong,ymazeSurprise,98,87.5,87,1.66073218518746,3545.6161586,he did good. slight right bias but overall good
+S27,210708,1,Tyler,0,0,ymazeLong,ymazeSurprise,107,60,73,1328.36747361887,3606.3766794,He never quite got comfortable during the session today. consistently had bad stretches. Stayed motivated though since reward delivery was more spread out.
+S24,210708,1,Steph,0,0,ymazeSurprise,ymazeSurprise,78,32.5,37,1.62958206791179,2905.4898343,really not great
+S25,210708,1,Steph,0,0,ymazeSurprise,ymazeSurprise,117,57.5,78,2.180986458311,3222.3853188,ok overall but doesn't like update trials still
+S23,210709,1,Navya,0,0,ymazeShort,ymazeShort,91,60,37,1.52694683624166,3586.191779,did better. accuracy getting higher.
+S27,210709,1,Tyler,0,0,ymazeLong,ymazeSurprise,94,32.5,55,1.86799378130297,3025.7379097,Still underperformed. Began to develop side bias again so spending the last few mins off VR.
+S24,210709,1,Steph,0,0,ymazeLong,ymazeSurprise,81,20,35,1.54708682913413,3154.096203,so annoying did very mediocre for the tinest bit and then gave up
+S25,210709,1,Steph,0,0,ymazeSurprise,ymazeSurprise,91,62.5,60,2.04217808391332,2681.8103135,did ok not great still doesn't get update
+S25,210709,2,Steph,0,0,ymazeSurprise,ymazeSurprise,30,60,20,2.09576236849091,868.3634393,decent second session tried to squeeze some out of him but he didn't like update trials still
+S23,210711,1,Steph,0,0,ymazeShort,ymazeShort,52,30,15,2.52441277061584,1236.653886,not good first session just biased and also stopping a lot
+S1,210711,1,Steph,0,0,ymazeShort,ymazeShort,16,25,4,2.162069641164,530.3045918,
+S23,210711,2,Steph,0,0,ymazeShort,ymazeShort,34,38.2352941176471,13,1.61583006536983,21.0418166666667,not great still
+S26,210711,1,Steph,0,0,ymazeLong,ymazeSurprise,79,50,48,2.54565394036618,1870.0763955,he was doing ok not great on later delay so did a pause at 30 min
+S26,210711,2,Steph,0,0,ymazeSurprise,ymazeSurprise,24,25,8,1.88992499360182,765.2756574,very biased in the second sessiom
+S27,210711,1,Steph,0,0,ymazeLong,ymazeSurprise,57,47.5,33,2.40203119128807,1437.7804616,good on ymazeLong and then struggled with bias on latest delay so pausing
+S27,210711,2,Steph,0,0,ymazeLong,ymazeSurprise,70,90,55,2.32376458715556,1809.1480298,much much better in second session. Was doing awesome
+S25,210711,1,Steph,0,0,ymazeSurprise,ymazeSurprise,54,42.5,28,2.49254927785308,1304.990809,not great did a pause
+S25,210711,2,Steph,0,0,ymazeSurprise,ymazeSurprise,18,16.6666666666667,8,2.07712280026926,526.7051148,ugh really bad the whole time really
+S23,210712,1,Navya,0,0,ymazeShort,ymazeShort,46,20,11,192.200557103064,3732.5840962,accuracy dipped by end. not well enough to keep going.
+S26,210712,1,Teema,0,0,ymazeLong,ymazeSurprise,105,40,65,205.667276051188,3643.5498464,he did ok today. changing bias cap helped for half the session. ended poorly
+S27,210712,1,Tyler,0,0,ymazeLong,ymazeSurprise,51,55,31,1.74106792327011,1763.2820035,Did decent but began to decline. Giving break to motivate.
+S27,210712,2,Tyler,0,0,ymazeLong,ymazeSurprise,28,21.4285714285714,7,1.58766460207266,1062.4543167,Did vrey poorly after the break with bad side bias. Showed more effort near the end.
+S24,210712,1,Steph,0,0,ymazeLong,ymazeLong,106,70,52,1.80043991881035,3558.8995181,he is the worst
+S25,210712,1,Steph,0,0,ymazeLong,ymazeSurprise,66,47.5,35,2.51406064599931,1577.9858605,not great fell off kinda quick
+S25,210712,2,Steph,0,0,ymazeSurprise,ymazeSurprise,104,55,58,2.35061095166217,2657.4675753,careful used the Tmaze for this. not the best really but ok
+S23,210713,1,Navya,0,0,ymazeShort,ymazeShort,36,52.7777777777778,19,0.725491974245035,2981.5189086,better accuracy than before.
+S26,210713,1,Teema,0,0,ymazeLong,ymazeSurprise,89,52.5,47,1.84392074179481,2903.3215398,he did ok. had to pause
+S26,210713,1,Teema,0,0,ymazeSurprise,ymazeSurprise,11,9.09090909090909,1,1.59775346179917,425.9982341,second session of the day bc of pause. he went right every single time so i did pause
+S27,210713,1,Tyler,0,0,ymazeLong,ymazeSurprise,86,40,45,1.91884119841301,2693.900833,Performed decently but began to decline due to side bias towards the end so giving a break
+S24,210713,1,Steph,0,0,ymazeLong,ymazeLong,55,30,18,2.26942784973087,1474.7645324,ugh just bad
+S25,210713,1,Steph,0,0,ymazeLong,ymazeSurprise,174,72.5,116,13.2362505911304,4400.1474485,better session! he stayed at 70 but still doesn't get the update
+S23,210714,1,Navya,0,0,ymazeShort,ymazeShort,57,40,19,37.2674868419619,3778.6501581,lower than yesterday.
+S26,210714,1,Teema,0,0,ymazeLong,ymazeSurprise,113,85,69,1.88891665614947,3595.5560117,he did ok but ended well
+S27,210714,1,Tyler,0,0,ymazeLong,ymazeSurprise,38,60.5263157894737,23,1.77893599341482,1287.7089051,Doing alright but began to develop bias. Showed pretty good decision-making when necessary however.
+S27,210714,2,Tyler,0,0,ymazeLong,ymazeSurprise,63,67.5,36,1.99153334896353,1903.2966618,Slowly improved over time but still not considered proficient
+S24,210714,1,Steph,0,0,ymazeLong,ymazeLong,91,17.5,28,1.56594746848531,3506.552983,horrible horrible idk what to do
+S25,210714,1,Steph,2,0,ymazeLong,ymazeSurprise,130,65,108,2.32154257575149,3301.6733824,great job overall!! did above chance on update
+S23,210715,1,Navya,0,0,ymazeShort,ymazeShort,121,85,74,48.5131974607417,3819.8863827,sooo much better today yay.
+S26,210715,1,Teema,0,0,ymazeLong,ymazeLong,12,66.6666666666667,8,2.44532823437113,303.9512238,ymazelong first. did a pause to fix lick detector and restart with delay
+S26,210715,1,Teema,0,0,ymazeSurprise,ymazeSurprise,103,75,76,1.88823425348598,3287.6777401,he did good. went back and forth between good and bad performace
+S27,210715,1,Tyler,0,0,ymazeLong,ymazeSurprise,44,67.5,29,1.80983935619078,1463.1625375,Doing very well but began to decline quickly
+S1,210715,1,Steph,0,0,ymazeLong,ymazeSurprise,58,5,4,1.76553582744018,1975.6483529,
+S24,210715,1,Steph,0,0,ymazeLong,ymazeLong,133,37.5,77,2.25309292060134,3555.2622499,did good for a bit and then gave up. all on visual guided
+S25,210715,1,Steph,0,0,ymazeLong,ymazeSurprise,177,92.5,146,21.722855635056,4097.9844549,good job overall today and even transitioned to earlier delay just not the best at updates
