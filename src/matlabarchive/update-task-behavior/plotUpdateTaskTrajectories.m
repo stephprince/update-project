@@ -32,3 +32,20 @@ for anIdx = 1:numel(indices.animals)
         end
     end
 end
+
+%% plot data from all animals
+for paramIdx = 1:size(params.plotCategories,1)
+    %% compile all trials for each track across days for each world
+    %get trials to pick
+    trialdata = getTrialsOfInterest(trackdata, params, paramIdx, howMuchToRound);
+    
+    %get position histograms and bins for trajectories
+    [positionData, binsTable] = getPositionInfoForTrajectories(trialdata);
+    
+    %% make the plots for each track/trial type
+    plotHistByPosition(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
+    
+    if params.plotCategories(paramIdx,3) == 2 || (params.plotCategories(paramIdx,3) == 3) %if we're in the delay part of the task with update trials
+        plotPositionAroundUpdate(trialdata, positionData, binsTable, 'All', paramIdx, indices, dirs, params);
+    end
+end

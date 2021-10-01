@@ -3,7 +3,7 @@ function dirs = getdefaultdirectorieshpcpfcinteractions
 %this function sets all the default directories used for the analyses
 
 %% directory to save all the data into
-dirs.projectdir = '\\neuro-cloud\labs\singer\Steph\Code\hpc-pfc-interactions\';
+dirs.projectdir = '\\neuro-cloud\labs\singer\Steph\Code\update-project\';
 
 %% directories to get and save data to
 dirs.virmendatadir = '\\neuro-cloud\labs\singer\Virmen Logs\UpdateTask\';
@@ -11,5 +11,7 @@ dirs.processeddatadir = '\\neuro-cloud\labs\singer\ProcessedData\UpdateTask\';
 dirs.savedfiguresdir = [dirs.projectdir 'results\'];
 
 %% files to use
-dirs.ephyspreadsheetfname = [dirs.projectdir 'doc\VRUpdateTaskEphysSummary.csv'];
+dirs.ephysspreadsheetfname = [dirs.projectdir 'doc\VRUpdateTaskEphysSummary.xlsx'];
 dirs.behaviorspreadsheetfname = [dirs.projectdir 'doc\VRUpdateTaskBehaviorSummary.csv'];
+dirs.virmendatafname = 'virmenDataRaw';
+dirs.virmenephysdatafname = 'virmenDataSynced';

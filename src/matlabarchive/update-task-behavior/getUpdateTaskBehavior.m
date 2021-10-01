@@ -1,4 +1,4 @@
-function getUpdateTaskBehavior(dirs, indices, debugmode, specificdataset, makenewfiles)
+function getUpdateTaskBehavior(dirs, indices, debugmode, specificdataset, ephys, makenewfiles)
 %SP 190813
 %this function generates and plots the behavioral data for the Update Task
 
@@ -27,9 +27,9 @@ dirs.savedatadir = [dirs.behaviorfigdir 'data\'];
 if ~exist(dirs.savedatadir); mkdir(dirs.savedatadir); end;
 
 %% generate the data structures
-behaviordata = getUpdateTaskBehaviorMetrics(dirs,indices,params,makenewfiles);
+behaviordata = getUpdateTaskBehaviorMetrics(dirs,indices,params,ephys,makenewfiles);
 
 %% plot the data
-plotUpdateTaskBehaviorMetrics(dirs,indices,params, behaviordata);
+plotUpdateTaskBehaviorMetrics(dirs,indices,params,behaviordata);
 
 end

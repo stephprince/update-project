@@ -7,7 +7,7 @@ updateTypeKeySet = params.updateTypeMap.keys; updateTypeValueSet = params.update
 trackTypeKeySet = params.trackTypeMap.keys; trackTypeValueSet = params.trackTypeMap.values;
 
 %get different parameters to calculate percent correct by like delay length
-allDelayLocations = []; 
+allDelayLocations = []; allDelayLocationsActual = [];
 howMuchToRound = 0;
 for anIdx = 1:numel(indices.animals)
     %get all the world 4 trials where the interesting stuff happens
@@ -15,9 +15,12 @@ for anIdx = 1:numel(indices.animals)
     trialRows = cellfun(@(x) find(x.trialWorld == 4), animaldata.trialTable,'UniformOutput',0);
     
     %get delay locations
-    delayLocations = cell2mat(cellfun(@(x) round(x.trialDelayLocation/20)*20, animaldata.trialTable,'UniformOutput',0));
+    delayLocations = cell2mat(cellfun(@(x) round(x.trialDelayLocation/25)*25, animaldata.trialTable,'UniformOutput',0));
+    delayLocationsActual = cell2mat(cellfun(@(x) x.trialDelayLocation, animaldata.trialTable,'UniformOutput',0));
     delayLocations(isnan(delayLocations)) = [];
+    delayLocationsActual(isnan(delayLocationsActual)) = [];
     allDelayLocations = [allDelayLocations; delayLocations];
+    allDelayLocationsActual = [allDelayLocationsActual; delayLocationsActual];
 end
 params.delayLocations = sort(unique(allDelayLocations), 'descend');
 params.plotCategories = [2 nan 1; 3 nan 1; [repmat(4,numel(params.delayLocations),1) params.delayLocations ones(numel(params.delayLocations),1)]; 4 nan 2];
@@ -117,6 +120,94 @@ sgtitle(['All animals performance']);
 filename = [savedfiguresdir 'sessPerformanceMovingAvgAll_AllAnimals'];
 saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 
+%% plot correct performance across different tracks for animals - all combined
+anIdx = 'All';
+figure('units','normalized','outerposition',[0 0 0.9 0.9]); hold on;
+for paramIdx = 1:size(params.plotCategories,1)
+    %compile all trials for each track across days
+    trialsFromWorldType = cellfun(@(x) find(x.trialWorld == params.plotCategories(paramIdx,1)), trackdata.trialTable,'UniformOutput',0);
+    trialsFromDelayTypeTemp1 = cellfun(@(x) find(round(x.trialDelayLocation) <= params.plotCategories(paramIdx,2)), trackdata.trialTable,'UniformOutput',0);
+    trialsFromDelayTypeTemp2 = cellfun(@(x) find(round(x.trialDelayLocation) >= params.plotCategories(paramIdx,2)-20), trackdata.trialTable,'UniformOutput',0);
+    trialsFromUpdateType = cellfun(@(x) find(round(x.trialTypesUpdate) == params.plotCategories(paramIdx,3)), trackdata.trialTable,'UniformOutput',0);
+    trialdata = [];
+    for trialIdx = 1:numel(trialsFromWorldType)
+        if ~isempty(trialsFromDelayTypeTemp1{trialIdx})
+            trialsFromDelayType{trialIdx} = intersect(trialsFromDelayTypeTemp1{trialIdx},trialsFromDelayTypeTemp2{trialIdx});
+        else
+            trialsFromDelayType{trialIdx} = [];
+        end
+        if params.plotCategories(paramIdx,1) ~= 4
+            trialRows = trialsFromWorldType{trialIdx};
+        elseif params.plotCategories(paramIdx,1) == 4 && params.plotCategories(paramIdx,3) ~= 2
+            trialRowsTemp = intersect(trialsFromWorldType{trialIdx},trialsFromDelayType{trialIdx});
+            trialRows = intersect(trialRowsTemp,trialsFromUpdateType{trialIdx});
+        else  %on update trials, want any delay length not just nan trials
+            trialRows = intersect(trialsFromWorldType{trialIdx},trialsFromUpdateType{trialIdx});
+        end
+        trialdata = [trialdata; trackdata.trialTable{trialIdx,:}(trialRows,:)];
+    end
+    
+    %loop through bins to calc percent correct
+    numTrialsAllCombined{paramIdx} = size(trialdata,1);
+    rightTrialOutcomes = trialdata.trialOutcomes; leftTrialOutcomes = trialdata.trialOutcomes;
+    rightTrialOutcomes(trialdata.trialTypesLeftRight == params.trialTypeMap('left')) = nan; %replace with nans so lengths of vectors are equal
+    leftTrialOutcomes(trialdata.trialTypesLeftRight == params.trialTypeMap('right')) = nan;
+    perCorrectAllCombined{paramIdx} = movmean(trialdata.trialOutcomes,params.trialBlockSize,'omitnan');
+    perCorrectRightCombined{paramIdx} = movmean(rightTrialOutcomes,params.trialBlockSize,'omitnan');
+    perCorrectLeftCombined{paramIdx} = movmean(leftTrialOutcomes,params.trialBlockSize,'omitnan');
+    
+    %plot the result for individual animals
+    if numTrialsAllCombined{paramIdx}
+        subplot(size(params.plotCategories,1),1,paramIdx); hold on;
+        plot([1:numTrialsAllCombined{paramIdx}],repmat(0.5,1,numTrialsAllCombined{paramIdx}),'k--');
+        plot([1:numTrialsAllCombined{paramIdx}],perCorrectRightCombined{paramIdx}, 'r');
+        plot([1:numTrialsAllCombined{paramIdx}],perCorrectLeftCombined{paramIdx}, 'b');
+        plot([1:numTrialsAllCombined{paramIdx}],perCorrectAllCombined{paramIdx}, 'k','LineWidth',2);
+        ylim([0 1.01]); ylabel('Percent Correct');
+        trackName = trackTypeKeySet{trackTypeValueSet{params.plotCategories(paramIdx,1)}};
+        updateType = updateTypeKeySet{updateTypeValueSet{params.plotCategories(paramIdx,3)}};
+        title([trackName ' - delay loc: ' num2str(params.plotCategories(paramIdx,2)) ' - trial type:' updateType]);
+    end
+    
+end
+xlabel(['Trial Window (' num2str(params.trialBlockSize) ' trial moving average)']);
+sgtitle(['S' anIdx ' performance']);
+filename = [savedfiguresdir 'sessPerformanceMovingAvgAll_' trackName  '_AllAnimalsCombined'];
+saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+
+%% plot performance for all animals combined
+figure('units','normalized','outerposition',[0 0 1 1]); hold on;
+cmap = cbrewer('qual','Set2',numel(indices.animals));
+for paramIdx = 1:size(params.plotCategories,1)
+    %plot the performance over time
+    if numTrialsAllCombined{paramIdx}
+        subplot(size(params.plotCategories,1),3,(paramIdx)*3-2:(paramIdx)*3-1); hold on;
+        plot([1:numTrialsAllCombined{paramIdx}],repmat(0.5,1,numTrialsAllCombined{paramIdx}),'k--');
+        plot([1:numTrialsAllCombined{paramIdx}],perCorrectAllCombined{paramIdx}, 'Color',cmap(1,:),'LineWidth',2);
+        xlabel(['Trial Window (' num2str(params.trialBlockSize) ' trial moving average)']);
+        ylim([0 1.01]); ylabel('Percent Correct');
+        trackName = trackTypeKeySet{trackTypeValueSet{params.plotCategories(paramIdx,1)}};
+        updateType = updateTypeKeySet{updateTypeValueSet{params.plotCategories(paramIdx,3)}};
+        title([trackName ' - delay location: ' num2str(params.plotCategories(paramIdx,2)) 'ypos - ' updateType]);
+        
+        %plot the performance distribution for each type of track
+        subplot(size(params.plotCategories,1),3,(paramIdx)*3); hold on;
+        edges = 0:0.025:1;
+        perCorrectHist = histcounts(perCorrectAllCombined{paramIdx},edges);
+        perCorrectHistNorm = perCorrectHist/nansum(perCorrectHist);
+        plot([0.5 0.5],[0 1], 'k--'); ylim([0 0.33]);
+        ylabel(['Proportion of trial windows']);
+        if sum(~isnan(perCorrectHistNorm))
+            h(1) = histogram('BinCounts', perCorrectHistNorm, 'BinEdges', edges);
+            h(1).FaceAlpha = 0.2; xlim([0 1]);
+            h(1).FaceColor = cmap(1,:);
+        end
+    end
+end
+sgtitle(['All animals performance']);
+filename = [savedfiguresdir 'sessPerformanceMovingAvgAll_AllAnimalsCombined'];
+saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+
 %% plot performance as a function of delay length (in terms of position)
 figure(200); clf;
 for anIdx = 1:numel(indices.animals)
@@ -168,6 +259,52 @@ saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 figure(200)
 set(gcf,'units','normalized','outerposition',[0 0 0.9 0.9]);
 filename = [savedfiguresdir 'sessPerformanceVsDelayLength_AllAnimals_violinplot'];
+saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+
+%% plot performance as a function of delay length (in terms of position) - all animals combined
+%concat data for relevant tracks
+delayLocations = []; performanceVals = [];
+for paramIdx = 2:size(params.plotCategories,1)-1 %skip the short maze and update so that comparing tracks of equal length
+    %plot the performance over time
+    if numTrialsAllCombined{paramIdx}
+        delayLength = params.plotCategories(paramIdx,2);
+        if isnan(delayLength) && params.plotCategories(paramIdx,3) ~= 2 % if it is a ymazeLong but not an update trial
+            delayLength = 250; %counts as a 0 delay length for ymaze long
+        end
+        delayLocations = [delayLocations; repmat(delayLength,numTrialsAllCombined{paramIdx},1)];
+        performanceVals = [performanceVals; perCorrectAllCombined{paramIdx}];
+        
+    end
+end
+
+paramIdx = size(params.plotCategories,1);
+delayLocationsWithUpdate = [delayLocations; repmat(0,numTrialsAllCombined{paramIdx},1)];
+performanceValsWithUpdate = [performanceVals; perCorrectAllCombined{paramIdx}];
+
+%plot the data as a scatter plot
+figure; hold on;
+plot([0 300], [0.5 0.5], 'k--');
+h1 = scatter(delayLocations,performanceVals,[],cmap(1,:));
+h2 = lsline;
+xlabel(['Delay Location (smaller is longer)']); xlim([115 260])
+ylabel('Percent Correct'); ylim([0 1.01])
+title('Performance as a function of delay location')
+set(gcf,'units','normalized','outerposition',[0 0 0.9 0.9]);
+h2(1).Color = cmap(1,:);
+filename = [savedfiguresdir 'sessPerformanceVsDelayLength_AllAnimalsCombined_scatter'];
+saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
+
+%plot the data for the violin plot
+figure; hold on;
+ax1(1) = subplot(1,1,1);
+violinplot(performanceValsWithUpdate, delayLocationsWithUpdate, 'ViolinColor', cmap(1,:))
+xlabel(['Delay Location (smaller is longer)']);
+ylabel('Percent Correct'); ylim([0 1.01])
+linkaxes(ax1, 'y'); linkaxes(ax1, 'x');
+title(['SAll'])
+sgtitle('Performance as a function of delay location')
+set(gcf,'units','normalized','outerposition',[0 0 0.9 0.9]);
+filename = [savedfiguresdir 'sessPerformanceVsDelayLength_AllAnimalsCombined_violinplot'];
 saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 
 %% plot heatmaps of performance and time spent on sessions for all tracks

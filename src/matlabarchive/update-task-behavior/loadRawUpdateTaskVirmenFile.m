@@ -1,4 +1,4 @@
-function behaviorDataTableRaw = loadRawUpdateTaskVirmenFile(dirs, index, animalID, makenewfiles)
+function behaviorDataTableRaw = loadRawUpdateTaskVirmenFile(dirs, index, animalID, ephys, makenewfiles)
 %this function converts raw virmen data from the Update track to a table
 %200930
 
@@ -10,6 +10,8 @@ function behaviorDataTableRaw = loadRawUpdateTaskVirmenFile(dirs, index, animalI
 %       behaviorTable - contains all the info from the virmen file organized into
 %       a table
 
+behaviorDataTableRaw = [];
+
 %% check if file already exists or if makenewfile flag is set
 savedatadir = [dirs.behaviorfigdir 'data\'];
 if ~exist(savedatadir); mkdir(savedatadir); end;
@@ -17,8 +19,10 @@ filename = [savedatadir 'updateTaskBehaviorDataRaw_' animalID num2str(index.Anim
 
 if ~exist(filename) || makenewfiles
     %% load mat file
+    virmendatafname = [dirs.virmendatadir, animalID, num2str(index.Animal) '_' num2str(index.Date) '_' num2str(index.Session),'\' dirs.virmendatafname '.mat'];
+    
     try
-        sessionfile = load([dirs.virmendatadir, animalID, num2str(index.Animal) '_' num2str(index.Date) '_' num2str(index.Session),'\virmenDataRaw.mat']);
+        sessionfile = load(virmendatafname);
     catch ME
         if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
             fprintf(['File could not be found for ' animalID, num2str(index.Animal) '_' num2str(index.Date) '_' num2str(index.Session) ' . Skipping analysis... \n']);

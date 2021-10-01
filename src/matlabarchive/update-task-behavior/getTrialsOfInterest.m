@@ -7,6 +7,7 @@ for trialIdx = 1:numel(trialRows)
     trialdata = [trialdata; animaldata.trialTable{trialIdx,:}(trialRows{trialIdx},:)];
 end
 
+
 %% get different types of delay/update trials
 trialsFromDelayTypeTemp1 = find(round(trialdata.trialDelayLocation) <= params.plotCategories(paramIdx,2));
 trialsFromDelayTypeTemp2 = find(round(trialdata.trialDelayLocation) >= params.plotCategories(paramIdx,2)-howMuchToRound);

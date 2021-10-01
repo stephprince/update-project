@@ -157,9 +157,14 @@ if ~isempty(trialdata)
             end
             set(gca,'YDir','normal');
             title('Velocity towards update side')
-
-            sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories around update']);
-            filename = [savedfiguresdir varNames{varIdx} 'trajectoriesaroundupdate_S' num2str(indices.animals(anIdx))];
+            
+            if isnumeric(anIdx)
+                anID = num2str(indices.animals(anIdx));
+            else
+                anID = anIdx;
+            end
+            sgtitle(['S' anID ' trajectories around update']);
+            filename = [savedfiguresdir varNames{varIdx} 'trajectoriesaroundupdate_S' anID];
             saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 
             %plot just as difference after the update cue occurs
@@ -207,8 +212,8 @@ if ~isempty(trialdata)
             alpha(0.5); xlim([min(binsToUseForUpdate) max(binsToUseForUpdate)])
             title([trialOutcome{outIdx} 'trials n=' num2str(numTrialsTotal)]);
 
-            sgtitle(['S' num2str(indices.animals(anIdx)) ' velocity change after update']);
-            filename = [savedfiguresdir varNames{varIdx} 'trajectoriesaroundupdatedifffrombaseline_S' num2str(indices.animals(anIdx))];
+            sgtitle(['S' anID ' velocity change after update']);
+            filename = [savedfiguresdir varNames{varIdx} 'trajectoriesaroundupdatedifffrombaseline_S' anID];
             saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
         end
     end
