@@ -4,6 +4,9 @@
 _pycache_/
 *.pyc
 
+# distribution/packaging
+*.egg-info/
+
 # matlab
 *.m~
 *.asv
