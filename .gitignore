@@ -1,29 +1,14 @@
-# Windows default autosave extension
-*.asv
+#python
+.idea/
+.ipynb_checkpoints/
+_pycache_/
+*.pyc
 
-# OSX / *nix default autosave extension
+# matlab
 *.m~
-
-# Compiled MEX binaries (all platforms)
+*.asv
 *.mex*
 
-# Simulink Code Generation
-slprj/
-
-# Session info
-octave-workspace
-
-# Simulink autosave extension
-.autosave
-
-#R autosave
-.Rhistory
-
-#ipynb temp files
-.ipynb_checkpoints/
-
-#results
+#folders
 results/*
-
-#DS_Store
 *.DS_Store
