@@ -11,7 +11,7 @@ dirs.processeddatadir = '\\neuro-cloud\labs\singer\ProcessedData\UpdateTask\';
 dirs.savedfiguresdir = [dirs.projectdir 'results\'];
 
 %% files to use
-dirs.ephysspreadsheetfname = [dirs.projectdir 'doc\VRUpdateTaskEphysSummary.xlsx'];
-dirs.behaviorspreadsheetfname = [dirs.projectdir 'doc\VRUpdateTaskBehaviorSummary.csv'];
+dirs.ephysspreadsheetfname = [dirs.projectdir 'docs\metadata-summaries\VRUpdateTaskEphysSummary.xlsx'];
+dirs.behaviorspreadsheetfname = [dirs.projectdir 'docs\metadata-summaries\VRUpdateTaskBehaviorSummary.csv'];
 dirs.virmendatafname = 'virmenDataRaw';
 dirs.virmenephysdatafname = 'virmenDataSynced';

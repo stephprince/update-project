@@ -15,7 +15,7 @@ params.choiceMap = containers.Map({'incorrect','correct','terminated'},[0 1 2]);
 if makenewfiles
     dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' num2str(yyyymmdd(datetime('now'))) '\'];
 elseif specificdataset
-    dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' num2str(specificdataset) '\']; %uses the date to load specific dataset of interest
+    dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\' specificdataset '\']; %uses the date to load specific dataset of interest
 elseif debugmode
     dirs.behaviorfigdir = [dirs.savedfiguresdir 'behavior\20210112\']; %just to debug the code I have to write
 else
