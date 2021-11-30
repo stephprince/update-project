@@ -20,7 +20,7 @@ The channels on Trodes are given nTrodeIDs 1-64. I have ordered these IDs so tha
 				
 		    left shank					    right shank
 
-These nTrodeIDs had to be mapped from the probe channels to the Neuronexus adapter channels to the SpikeGadgets headstage channels. These calculations can be found in this folder under SpikeGadgets_A2x32Poly5_Mapping_210327_RigC.csv. The "Final Only" version is what was input into SpikeGadgets to set up the Trodes, where the first column is the first hardware channel and it's corresponding nTrodeID. 
+These nTrodeIDs had to be mapped from the probe channels to the Neuronexus adapter channels to the SpikeGadgets headstage channels. These calculations can be found in this folder under SpikeGadgets_A2x32Poly5_Mapping_210327_RigC.csv.
 
 ## getting the correct channels from the singer lab preprocessed data structures
 
