@@ -92,7 +92,9 @@ if ~isempty(trialdata)
                 
                 plot(binsToUse, indivR,'Color', [0 1 0 0.2], 'LineWidth', 1);
                 plot(binsToUse, indivL, 'Color', [1 0 1 0.2], 'LineWidth', 1);
-                xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
+                if binsToUse(min(allFullBins)) ~= binsToUse(max(allFullBins))
+                    xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
+                end
                 xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
                 
                 %plot the averages
@@ -107,7 +109,10 @@ if ~isempty(trialdata)
                 end
                 xlabel('Y Position'); ylabel(varNames{varIdx}); set(gca,'tickdir','out');
                 title([trialOutcome{outIdx} 'trials - delay loc: ' num2str(params.plotCategories(paramIdx,2)) ' - trial type:' updateType '  n=' num2str(numTrialsTotal) 'right = red, left = blue']);
-                alpha(0.5); xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
+                if binsToUse(min(allFullBins)) ~= binsToUse(max(allFullBins))
+                    xlim([binsToUse(min(allFullBins)) binsToUse(max(allFullBins))])
+                end
+                alpha(0.5)
                 %linkaxes(ax,'y')
                 
                 sgtitle(['S' num2str(indices.animals(anIdx)) ' trajectories on' trackName]);

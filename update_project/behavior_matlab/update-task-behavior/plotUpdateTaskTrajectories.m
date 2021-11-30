@@ -21,14 +21,16 @@ for anIdx = 1:numel(indices.animals)
         %get trials to pick
         trialdata = getTrialsOfInterest(animaldata, params, paramIdx, howMuchToRound);
         
-        %get position histograms and bins for trajectories
-        [positionData, binsTable] = getPositionInfoForTrajectories(trialdata);
-        
-        %% make the plots for each track/trial type
-        plotHistByPosition(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
-        
-        if params.plotCategories(paramIdx,3) == 2 || (params.plotCategories(paramIdx,3) == 3) %if we're in the delay part of the task with update trials
-            plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
+        if ~isempty(trialdata)
+            %get position histograms and bins for trajectories
+            [positionData, binsTable] = getPositionInfoForTrajectories(trialdata);
+
+            %% make the plots for each track/trial type
+            plotHistByPosition(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
+
+            if params.plotCategories(paramIdx,3) == 2 || (params.plotCategories(paramIdx,3) == 3) %if we're in the delay part of the task with update trials
+                plotPositionAroundUpdate(trialdata, positionData, binsTable, anIdx, paramIdx, indices, dirs, params);
+            end
         end
     end
 end

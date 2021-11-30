@@ -212,38 +212,50 @@ saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
 figure(200); clf;
 for anIdx = 1:numel(indices.animals)
     %concat data for relevant tracks
-    delayLocations = []; performanceVals = [];
+    delayLocations = []; performanceVals = []; allDelayLengths = [];
     for paramIdx = 2:size(params.plotCategories,1)-1 %skip the short and update maze so that comparing tracks of equal length
         %plot the performance over time
         if numTrialsAll{anIdx}{paramIdx}
             delayLength = params.plotCategories(paramIdx,2);
-            if isnan(delayLength)
+            if isnan(delayLength) || delayLength == 275
                 delayLength = 250; %counts as a 0 delay length for ymaze long
             end
+            
             delayLocations = [delayLocations; repmat(delayLength,numTrialsAll{anIdx}{paramIdx},1)];
+            allDelayLengths = [allDelayLengths; delayLength];
             performanceVals = [performanceVals; perCorrect{anIdx}{paramIdx}];
-   
         end
     end
+    
+    % add the data from the update task
+    paramIdx = size(params.plotCategories,1);
+    delayLocationsWithUpdate = [delayLocations; repmat(0,numTrialsAll{anIdx}{paramIdx},1)];
+    performanceValsWithUpdate = [performanceVals; perCorrect{anIdx}{paramIdx}];
 
     %plot the data as a scatter plot
     figure(100); hold on;
     plot([0 300], [0.5 0.5], 'k--');
-    h1 = scatter(delayLocations,performanceVals,[],cmap(anIdx,:));
+    h1 = scatter(delayLocationsWithUpdate,performanceValsWithUpdate,[],cmap(anIdx,:));
     h2 = lsline;
-    xlabel(['Delay Location (smaller is longer)']); xlim([115 260])
+    xlabel(['Delay Location (smaller is longer), 0 = update trials, 250 = ymazeLong trials']); xlim([115 260])
     ylabel('Percent Correct'); ylim([0 1.01])    
     title('Performance as a function of delay location')
 
     %plot the data for the violin plot
     figure(200); hold on;
     ax1(anIdx) = subplot(numel(indices.animals),1,anIdx);   
-    violinplot(performanceVals, delayLocations, 'ViolinColor', cmap(anIdx,:))
-    xlabel(['Delay Location (smaller is longer)']);
+    violinplot(performanceValsWithUpdate, delayLocationsWithUpdate, 'ViolinColor', cmap(anIdx,:))
+    xlabel(['Trial types']);
+    if numel(unique(allDelayLengths))+1 == 6
+        xticklabels({'Update','Delay 4','Delay 3','Delay 2','Delay 1','Visual guided'})
+    elseif numel(unique(allDelayLengths)) == 2
+        xticklabels({'Delay 1','Visual guided'})
+    end
+    
     ylabel('Percent Correct'); ylim([0 1.01])    
     linkaxes(ax1, 'y'); linkaxes(ax1, 'x');
     title(['S' num2str(indices.animals(anIdx))])
-    sgtitle('Performance as a function of delay location')
+    sgtitle('Performance across different delay lengths and trial types')
 end
 
 figure(100);
@@ -340,20 +352,34 @@ for anIdx = 1:numel(indices.animals)
             end
 
             %loop through bins to calc percent correct
-            if ~isempty(trialdata)
+            if ~isempty(trialdata) && params.plotCategories(paramIdx,2) ~= 275
                 perCorrectHeatMap{anIdx}(paramIdx,sessIdx) = nanmean(trialdata.trialOutcomes);
                 timeHeatMap{anIdx}(paramIdx,sessIdx) = nansum(trialdata.trialDur)/60; %convert from seconds to minutes
             end
         end
     end
     
+    %remove empty rows)
+    if ismember(indices.animals(anIdx),[27 29])
+        ymazeLongWarmupCat = find(params.plotCategories(:,2) == 250);
+        perCorrectHeatMap{anIdx}(ymazeLongWarmupCat,:) = [];
+    end
+    anySess = nansum(perCorrectHeatMap{anIdx},2);
+    perCorrectHeatMap{anIdx}(anySess == 0,:) = [];
+    
     %plot the heatmap for each animal
     figure(300); hold on;
     subplot(numel(indices.animals),1,anIdx)
     cmap = cbrewer('div','PRGn',100);
-    imagesc(perCorrectHeatMap{anIdx},[0 1])
+    imAlpha = ones(size(perCorrectHeatMap{anIdx}));
+    imAlpha(isnan(perCorrectHeatMap{anIdx})) = 0;
+    imagesc(perCorrectHeatMap{anIdx}, 'AlphaData', imAlpha)
+    colorbar
+    set(gca,'color',[0.1 0.1 0.1 0.1])
     colormap(cmap);
     ylabel('Training level');
+    yticks([1:7])
+    yticklabels({'Visual cue short','Visual cue long','Delay 1','Delay 2', 'Delay 3', 'Delay 4', 'Update'})
     title(['S' num2str(indices.animals(anIdx))])
     
     figure(400); hold on;
@@ -365,7 +391,6 @@ for anIdx = 1:numel(indices.animals)
     title(['S' num2str(indices.animals(anIdx))])
 end
 figure(300)
-colorbar
 xlabel('Session'); sgtitle('Performance over sessions');
 filename = [savedfiguresdir 'sessPerformanceHeatmapAll'];
 saveas(gcf,filename,'png'); saveas(gcf,filename,'fig');
