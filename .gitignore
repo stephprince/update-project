@@ -15,3 +15,4 @@ _pycache_/
 #folders
 results/*
 *.DS_Store
+*.png
