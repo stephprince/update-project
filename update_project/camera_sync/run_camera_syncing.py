@@ -53,7 +53,7 @@ if save_new_video_images:
         print(f"Saving frames for trial {i}")
         # create folder
         Path(f"{output_dir}/temp/trial{i}/").mkdir(parents=True, exist_ok=True)
-        img_dir = Path(f"{video_dir}/temp/{trial_type}/trial{i}/")
+        img_dir = Path(f"{output_dir}/temp/trial{i}/")
 
         camera_frames = np.where(np.logical_and(camera_trig > interval[0], camera_trig < interval[1]))[0]
         frame_no = camera_frames[0]
@@ -78,19 +78,19 @@ for i, interval in enumerate(trial_intervals):
 
     # make plot for each camera frame
     print(f"Making gif for trial {i}")
-    Path(f"{video_dir}/results/camera/{trial_type}/trial{i}/").mkdir(parents=True, exist_ok=True)
-    out_dir = Path(f"{video_dir}/results/camera/{trial_type}/trial{i}/")
+    Path(f"{output_dir}/results/camera/trial{i}/").mkdir(parents=True, exist_ok=True)
+    out_dir = Path(f"{output_dir}/results/camera/trial{i}/")
     plot_filenames_all = []
     plot_filenames_simple = []
     plot_filenames_angle_veloc = []
     for ind, frame_no in enumerate(camera_frames):
-        filename, fps = plot_update_cam_all(camera_inds_in_df, video_dir, frame_no, ind, interval, virmen_df, i)
+        filename, fps = plot_update_cam_all(camera_inds_in_df, output_dir, frame_no, ind, interval, virmen_df, i)
         plot_filenames_all.append(filename)
 
-        filename = plot_update_cam_simple(camera_inds_in_df, video_dir, frame_no, ind, interval, virmen_df, i)
+        filename = plot_update_cam_simple(camera_inds_in_df, output_dir, frame_no, ind, interval, virmen_df, i)
         plot_filenames_simple.append(filename)
 
-        filename = plot_update_cam_angle_and_veloc(camera_inds_in_df, video_dir, frame_no, ind, interval, virmen_df, i)
+        filename = plot_update_cam_angle_and_veloc(camera_inds_in_df, output_dir, frame_no, ind, interval, virmen_df, i)
         plot_filenames_angle_veloc.append(filename)
 
     # make videos for each plot type

@@ -49,9 +49,9 @@ def extract_virmen_data(camera_inds_in_df, ind, interval, virmen_df):
             "rot_veloc": rot_veloc, "trans_veloc": trans_veloc,
             }
 
-def plot_update_cam_all(camera_inds_in_df, video_dir, frame_no, ind, interval, virmen_df, itrial):
+def plot_update_cam_all(camera_inds_in_df, output_dir, frame_no, ind, interval, virmen_df, itrial):
     # read in the image
-    frame_filename = Path(f"{video_dir}/temp/trial{itrial}/frame{frame_no}.png")
+    frame_filename = Path(f"{output_dir}/temp/trial{itrial}/frame{frame_no}.png")
     img = mpimg.imread(frame_filename)
 
     # extract relevant data
@@ -115,15 +115,19 @@ def plot_update_cam_all(camera_inds_in_df, video_dir, frame_no, ind, interval, v
     ax_dict["G"].set_xlim(0, vr_data["trial_duration"])
 
     # save the entire plot for each camera frame
-    plot_filename = Path(f"{video_dir}/results/camera/trial{itrial}/trial{itrial}_frame{frame_no}_all.png")
+    plot_filename = Path(f"{output_dir}/results/camera/trial{itrial}/trial{itrial}_frame{frame_no}_all.png")
     plt.savefig(plot_filename)
     plt.close()
 
     return plot_filename, fps
 
-def plot_update_cam_simple(camera_inds_in_df, video_dir, frame_no, ind, interval, virmen_df, itrial):
+def plot_update_cam_simple(camera_inds_in_df, output_dir, frame_no, ind, interval, virmen_df, itrial):
+    # font sizes
+    axes_size = 18
+    title_size = 22
+
     # read in the image
-    frame_filename = Path(f"{video_dir}/temp/trial{itrial}/frame{frame_no}.png")
+    frame_filename = Path(f"{output_dir}/temp/trial{itrial}/frame{frame_no}.png")
     img = mpimg.imread(frame_filename)
 
     # extract relevant data
@@ -148,26 +152,30 @@ def plot_update_cam_simple(camera_inds_in_df, video_dir, frame_no, ind, interval
 
     ax_dict["B"].plot(vr_data["x_pos"], vr_data["y_pos"], color="steelblue", linewidth=lwidth)
     ax_dict["B"].plot(track_bounds_xs, track_bounds_ys, color='black')
-    ax_dict["B"].set_title('Track Position', fontsize=20)
+    ax_dict["B"].set_title('Track Position', fontsize=title_size)
     ax_dict["B"].set_ylim(0, 300)
     ax_dict["B"].set_xlim(10.1, -10.1)
     ax_dict["B"].axis('off')
 
     ax_dict["C"].eventplot(vr_data["lick_events"], color="hotpink", linewidths=lwidth)
-    ax_dict["C"].set_ylabel('Lick events', fontsize=14)
-    ax_dict["C"].set_xlabel('Time elapsed (s)', fontsize=14)
+    ax_dict["C"].set_ylabel('Lick events', fontsize=axes_size)
+    ax_dict["C"].set_xlabel('Time elapsed (s)', fontsize=axes_size)
     ax_dict["C"].set_xlim(0, vr_data["trial_duration"])
 
     # save the entire plot for each camera frame
-    plot_filename = Path(f"{video_dir}/results/camera/trial{itrial}/trial{itrial}_frame{frame_no}_simple.png")
+    plot_filename = Path(f"{output_dir}/results/camera/trial{itrial}/trial{itrial}_frame{frame_no}_simple.png")
     plt.savefig(plot_filename)
     plt.close()
 
     return plot_filename
 
-def plot_update_cam_angle_and_veloc(camera_inds_in_df, video_dir, frame_no, ind, interval, virmen_df, itrial):
+def plot_update_cam_angle_and_veloc(camera_inds_in_df, output_dir, frame_no, ind, interval, virmen_df, itrial):
+    # font sizes
+    axes_size = 18
+    title_size = 22
+
     # read in the image
-    frame_filename = Path(f"{video_dir}/temp/trial{itrial}/frame{frame_no}.png")
+    frame_filename = Path(f"{output_dir}/temp/trial{itrial}/frame{frame_no}.png")
     img = mpimg.imread(frame_filename)
 
     # extract relevant data
@@ -187,21 +195,21 @@ def plot_update_cam_angle_and_veloc(camera_inds_in_df, video_dir, frame_no, ind,
     ax_dict["A"].set_yticks([])
 
     ax_dict["B"].plot(vr_data["time_elapsed"], vr_data["rot_veloc"], color='slateblue', linewidth=lwidth)
-    ax_dict["B"].set_xlabel('Time (s)', fontsize=14)
-    ax_dict["B"].set_ylabel('Speed (au)', fontsize=14)
-    ax_dict["B"].set_title('Rotational velocity', fontsize=20)
+    ax_dict["B"].set_xlabel('Time (s)', fontsize=axes_size)
+    ax_dict["B"].set_ylabel('Speed (au)', fontsize=axes_size)
+    ax_dict["B"].set_title('Rotational velocity', fontsize=title_size)
     ax_dict["B"].set_xlim(0, vr_data["trial_duration"])
     ax_dict["B"].set_ylim(-2.75, 2.75)
 
     ax_dict["C"].plot(vr_data["time_elapsed"], vr_data["view_angle"], color='darkviolet', linewidth=lwidth)
-    ax_dict["C"].set_title('View Angle', fontsize=20)
-    ax_dict["C"].set_xlabel('Time (s)', fontsize=14)
-    ax_dict["C"].set_ylabel('View Angle', fontsize=14)
+    ax_dict["C"].set_title('View Angle', fontsize=title_size)
+    ax_dict["C"].set_xlabel('Time (s)', fontsize=axes_size)
+    ax_dict["C"].set_ylabel('View Angle', fontsize=axes_size)
     ax_dict["C"].set_ylim(-1.5, 1.5)
     ax_dict["C"].set_xlim(0, vr_data["trial_duration"])
 
     # save the entire plot for each camera frame
-    plot_filename = Path(f"{video_dir}/results/camera/trial{itrial}/trial{itrial}_frame{frame_no}_angle_veloc.png")
+    plot_filename = Path(f"{output_dir}/results/camera/trial{itrial}/trial{itrial}_frame{frame_no}_angle_veloc.png")
     plt.savefig(plot_filename)
     plt.close()
 
