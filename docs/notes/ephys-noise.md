@@ -22,8 +22,14 @@ These occurred when the animal made contact with the reward.
 In most cases, these were controlled for by grounding the reward needle, but in a few recordings they may have persisted.
 
 ### Luigs and Neumann manipulator noise
-Sometimes the manipulators or manipulator controller would emit a short burst of high frequency square wave activity.
-The reasons/timing of why this would occurr were unclear, sometimes it would happen only once or twice in a recording, sometimes never.
+Sometimes the manipulators or manipulator controller was turned off during a recording to try to control noise. This seemed to cause a high frequency signal that looked
+like a 60 Hz wave but was much higher frequency and really only visible in phy when looking at the waveforms (very tiny triangle wave)
+This was controlled for by not turning off the manipulators or control box during a recording. I realized it after I used this as a denoising technique, so it is present
+in some recordings but should be noted in the recording logs.
+
+### texting noise
+When texts were received/sent on my phone or the phone was held high enough above the shielding, this could cause a short burst of high frequency square wave activity.
 These were observed in the spike sorting output and could contaminate the single unit activity. 
-They were controlled for during the recording by grounding the manipulators or turning the manipulator control box off during the recording.
 They were removed with manual curation through phy.
+This was discovered later in the recording process so it was present in several recordings but controlled for by putting the phone on the rig rack so that the faraday
+cage was blocking the electrodes from the phone.
