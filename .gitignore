@@ -14,5 +14,6 @@ _pycache_/
 
 #folders
 results/*
+data/*
 *.DS_Store
 *.png
