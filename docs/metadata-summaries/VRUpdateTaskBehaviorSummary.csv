@@ -1304,3 +1304,84 @@ S28,211123,1,Steph,0,0,ymazeLong,ymazeSurprise,59,52.5,39,2.17870689437641,1631.
 S28,211123,3,Steph,0,0,ymazeLong,ymazeSurprise,147,55,83,17.8209899741777,4099.0290887,hmmm tried to ride it out not sure much better
 S29,211123,1,Steph,0,0,ymazeLong,ymazeSurprise,27,66.6666666666667,18,2.2604609107704,732.4762381,not good got biased fast
 S29,211123,3,Steph,0,0,ymazeSurprise,ymazeSurprise,79,57.5,52,2.24224898519311,2119.3740333,maybe ok for a bit but not great overall
+S30,220119,1,Grace,0,0,linear,linear,28,100,29,1.00409227368926,1683.6753333,Mouse looked more comfortable by end of training session. Licking occasionally but not consistently for reward.
+S32,220125,1,Teema,0,0,linear,linear,2,50,4,0.0746720961577473,1757.9479784,90% weight. only 1 trial
+S33,220125,1,Grace,0,0,linear,linear,18,94.4444444444444,18,0.586204650556894,1933.157276,First day. No licking recorded. Awkward on ball, but maybe better at end? 
+S34,220125,1,Tyler,0,0,linear,linear,15,100,15,0.608719706894698,1478.805568,first day. Did well
+S32,220126,1,Teema,0,0,linear,linear,76,100,83,1.7062752012357,2676.4437661,85% weight. did better today
+S34,220126,1,Tyler,0,0,linear,linear,109,100,109,2.39871305743487,2730.923179,Did very well. Seems comfortable
+S32,220127,1,Teema,0,0,linear,linear,99,100,101,37.6468798722288,3768.2186339,82 weight, did good
+S33,220127,1,Grace,0,0,linear,linear,29,100,35,0.627842203769435,2793.5450241,Not recording licks. Licking well. Better movement on ball. Seems more comfortable overall.
+S34,220127,1,Tyler,0,0,linear,ymazeShort,132,22.5,73,795.580110497238,3614.7486455,First day on ymaze. Didn't do great
+S32,220128,1,Teema,0,0,ymazeShort,ymazeShort,77,32.5,24,1.79461870761816,2585.0215384,very low weight today. low performance but is first day
+S33,220128,1,gRACE,0,0,linear,linear,63,97.5,65,93.1906710714462,3676.4314916,Mouse did well. Completed short linear track and started medium. Slowed down towards end.
+S34,220128,1,Tyler,0,0,ymazeShort,ymazeShort,151,72.5,91,2.52957664212382,3588.2508028,Did well. Lagged a bit in the middle
+S32,220131,1,Teema,0,0,ymazeShort,ymazeShort,89,40,36,1.49808993533245,3575.5102062,weight is high. did not do well but is second day
+S33,220131,1,Grace,0,0,linear,linear,117,100,118,1.9659861983288,3574.4655871,Mouse did well today. Licking and running. Very motivated. Completed medium and long linear. 
+S34,220131,1,Tyler,0,0,ymazeShort,ymazeShort,147,80,119,2.47459472198686,3570.284279,Very good today
+S32,220201,1,Teema,0,0,ymazeShort,ymazeShort,102,32.5,39,85.2581427098716,3679.7566813,lower weight but still not doing well
+S34,220201,1,Tyler,0,0,ymazeShort,ymazeShort,144,72.5,119,2.44902887784873,3533.7935511,Another great performance
+S32,220202,1,Teema,0,0,ymazeShort,ymazeShort,120,67.5,69,2.01864329227263,3577.6894315,weight is better and he seemed to start getting it
+S133,220202,1,Grace,0,0,linear,ymazeShort,133,20,54,2.22576075414799,3619.2271149,Switched to y-maze. Mouse seemed very confused. Lots of fast running. Biased
+S34,220202,1,Tyler,0,0,ymazeLong,ymazeLong,111,80,88,1.89861725928612,3512.1478735,Good promotion. Slightly more bias today.
+S32,220203,1,Teema,0,0,ymazeShort,ymazeShort,115,67.5,86,2.03263348878561,3402.6396139,did well today and weight looks good
+S33,220203,1,Grace,0,0,ymazeShort,ymazeShort,125,40,67,113.665641149993,3666.7727472,Mouse seemed frustrated (rapid running). Improved in the last 30 min (more deliberate).
+S34,220203,1,Tyler,0,0,ymazeLong,ymazeLong,91,82.5,69,1.5360136114437,3559.4479097,Struggled a bit today but rebounded well.
+S32,220204,1,Teema,0,0,ymazeShort,ymazeShort,109,80,83,1.91459781296721,3419.2715731,bias correction was weird but he still did well. weight is high but ok
+S33,220204,1,Grace,0,0,ymazeShort,ymazeShort,146,62.5,135,2.43713187415163,3623.8282289,Mouse did better today. Reached 90% correct around 30 min but dropped down to 62% by end of trial.
+S34,220204,1,Tyler,0,0,ymazeLong,ymazeLong,110,90,86,1.90453215167694,3471.0812346,Showed some troublesome behaviors but ended up well.
+S32,220207,1,Teema,0,0,ymazeShort,ymazeLong,48,50,29,49.813200498132,3665.8813533,weight is normal but first day on ymazelong went super slow and did not do well
+S33,220207,1,Grace,0,0,ymazeShort,ymazeShort,148,82.5,125,2.47861081679158,3617.422429,Mouse did well today. Ended with 82.5% correct. Passed y maze short.
+S34,220207,1,Tyler,0,0,ymazeLong,ymazeSurprise,77,35,40,1.29061455042196,3588.6190649,Poor performance today when promoted to delay.
+S32,220208,1,Teema,0,0,ymazeLong,ymazeLong,45,40,20,0.774135169161437,3497.4115951,weight is normal but he is not doing well. very slow
+S33,220208,1,Grace,0,0,ymazeShort,ymazeLong,126,67.5,100,135.883241066935,3668.1047738,Mouse started Y-maze LONG after 14 min warmup with SHORT. Did reasonably well until 59 min and fell below 75% correct
+S34,220208,1,Tyler,0,0,ymazeLong,ymazeSurprise,77,55,50,1.29547917026522,3570.8345954,Improvement but still low performance
+S32,220209,1,Teema,0,0,ymazeLong,ymazeLong,38,50,20,23.3190827827439,3702.5377542,weight is good. no warmup and was very slow
+S33,220209,1,Steph,0,0,ymazeLong,ymazeLong,117,62.5,87,2.09687941330389,3351.7565647,good job overall. will count as second good ymazeLong session
+S34,220209,1,Tyler,0,0,ymazeLong,ymazeSurprise,78,60,44,1.31009721033275,3578.9909737,Similar performance
+S32,220210,1,Teema,0,0,ymazeLong,ymazeLong,37,45.945945945946,18,0.631504747806303,3521.1523258,weight was ok did timeout did not help
+S33,220210,1,Grace,0,0,ymazeLong,ymazeSurprise,93,5,34,46.7685293057639,3723.5244037,Started on ymazeSurprise - latest delay today after warmup on ymazeLong. Performance dropped sharply and mouse did very poorly. Prominant right side bias.
+S34,220210,1,Tyler,0,0,ymazeLong,ymazeSurprise,109,72.5,80,87.2919475180523,3681.3628407,Did great today. Longer warmup helped
+S32,220211,1,Teema,0,0,ymazeShort,ymazeLong,66,72.5,42,1.13484022538615,3501.7548425,weight is ok. did ymazeshort warmup it helped but did not do well on long
+S33,220211,1,Grace,0,0,ymazeLong,ymazeSurprise,100,42.5,84,266.394352439728,3660.6268379,Mouse did 30 min warmup on ymazeLong before reaching 75. Confused when delay started but performance improved during last 10 min of training session.
+S34,220211,1,Tyler,0,0,ymazeLong,ymazeSurprise,84,57.5,49,107.313957202172,3654.5579033,Declined again today
+S32,220214,1,Teema,0,0,ymazeShort,ymazeShort,59,50,37,0.994583174125104,3577.3121861,weight at 90 percent, did ok but still paused a lot
+S33,220214,1,Grace,0,0,ymazeLong,ymazeSurprise,110,67.5,80,1.84424511694191,3589.3360341,15 min warmup on ymazeLong. Performance dropped sharply when switching to delay. Performance improved in last 20 min.
+S34,220214,1,Tyler,0,0,ymazeLong,ymazeSurprise,83,62.5,51,1.39611319842806,3573.8596675,Good in the middle of the session but did not finish strong.
+S32,220215,1,Teema,0,0,ymazeShort,ymazeLong,32,31.25,12,0.593802556938552,3567.423847,weight was better performance was not
+S33,220215,1,Grace,0,0,ymazeLong,ymazeSurprise,88,55,78,1.47439742382559,3622.213154,Mouse initially performed well after switch to delay (after 10 min warmup on ymazeLong), but performance started to decrease over time. Double rewards on side opposite of bias.
+S34,220215,1,Tyler,0,0,ymazeLong,ymazeSurprise,97,87.5,74,1.6262520673939,3584.0909172,Very good today. Showed some resiliency too
+S32,220216,1,Teema,0,0,ymazeLong,ymazeLong,29,48.2758620689655,14,0.534227560677044,3525.0889379,weight is slightly high but he did so bad. lots of pausing
+S33,220216,1,Grace,0,0,ymazeLong,ymazeSurprise,110,52.5,123,287.018917155903,3624.8054633,Mouse did great for the first 45 min but then performance decreased significanly for the last 15 min.
+S34,220216,1,Tyler,0,0,ymazeLong,ymazeSurprise,96,40,53,38.9215487532941,3754.233699,First day on later delay. Did not do too well but showed promise.
+S33,220217,1,Grace,0,0,ymazeLong,ymazeSurprise,104,97.5,109,1.74283468710252,3606.5983178,Mouse did really well today! Started off a little rocky (optic mouse was misaligned) but ended strong. Can move on to next delay phase tomorrow.
+S34,220217,1,Tyler,0,0,ymazeLong,ymazeSurprise,99,32.5,56,98.876404494382,3665.9623638,Did well for a while but fell off. Promising
+S33,220218,1,Grace,0,0,ymazeLong,ymazeSurprise,116,72.5,115,1.94312723435203,3591.8601468,Switched to later delay today after 15 min warmup (ymaze long and latest delay). Mouse did surprisingly well for first day on later delay track. Good motivation and effort.
+S34,220218,1,Tyler,0,0,ymazeLong,ymazeSurprise,89,62.5,55,89.8505855431417,3667.7676268,Started poorly but improved throughout the session
+S33,220221,1,Grace,0,0,ymazeLong,ymazeSurprise,110,45,85,1.83491696861708,3600.7117013,Mouse started off strong today with percent correct hovering around upper 60s and low 70s for first 49 min. Dropped below 60 percent at 49 min and exhibited strong right bias thereafter.
+S34,220221,1,Tyler,0,0,ymazeLong,ymazeSurprise,69,65,42,1.2070688752334,3435.914251,Lick detector malfunction.
+S33,220222,1,Grace,0,0,ymazeLong,ymazeSurprise,102,30,68,301.581826245503,3622.5315585,Mouse did well initially in later delay training (70-80 percent correct) but performance dropped dramatically after 39 min. Seemed less motivated during latter half of training session.
+S34,220222,1,Tyler,0,0,ymazeLong,ymazeSurprise,57,62.5,37,0.977285820097111,3505.7004242,Same as usual. Not much improvement.
+S35,220223,1,Teema,0,0,linear,linear,5,100,5,0.170164588862501,1768.2832241,weight is high but behavior looked normal for first day
+S33,220223,1,Grace,0,0,ymazeLong,ymazeSurprise,82,5,35,279.863481228669,3618.0956999,VERY BAD performance today. Repeatedly going to right (STRONG BIAS). Failed training session. Disappointed in mouse.
+S34,220223,1,Tyler,0,0,ymazeSurprise,ymazeSurprise,64,52.5,34,1.0884452466689,3534.3023248,Tried no warmup. Did not work
+S35,220224,1,Teema,0,0,linear,linear,45,100,48,1.08778199237344,2492.9249921,was slower today but behavior is better
+S33,220224,1,Grace,0,0,ymazeLong,ymazeSurprise,103,60,90,1.71814809213277,3597.9993674,Mouse did a lot better than yesterday overall. Maintained high performance (above 75 perecent correct) until 49 min into training session. Performance decreased slowly after.
+S34,220224,1,Tyler,0,0,ymazeLong,ymazeSurprise,65,52.5,36,1.11511822969548,3502.8133457,Did not do well. Trouble with his eye though
+S35,220225,1,Teema,0,0,linear,linear,43,97.5,42,25.3819591330782,3720.019944,weight it high but paused
+S33,220225,1,Steph,0,0,ymazeLong,ymazeSurprise,73,37.5,39,1.51338934947062,2950.8121487,not good. really biased. 
+S34,220225,1,Tyler,0,0,ymazeLong,ymazeSurprise,78,55,44,1291.39072847682,3608.8838503,Showed progress today
+S35,220228,1,Teema,0,0,linear,linear,78,100,80,1.32657949414236,3533.4027508,weight is lower and better. linear still but was better
+S33,220228,1,Grace,0,0,ymazeLong,ymazeSurprise,96,70,86,1.60290615791464,3619.9520387,Mouse started badly but performance improved over training session. Overall good day. Note: stopped licking for reward last 10 min
+S34,220228,1,Tyler,0,0,ymazeLong,ymazeSurprise,94,17.5,32,209.610881926636,3633.8751011,Really poor job today
+S33,220301,1,Grace,0,0,ymazeLong,ymazeSurprise,76,82.5,89,113.599561545552,3640.7329869,Mouse did very well today. Some pauses and hesitations in latter half of training, but overall GOOD! Count day as pass.
+S34,220301,1,Tyler,0,0,ymazeLong,ymazeSurprise,57,7.5,15,1.42088830446894,2410.5650796,Really bad again today. Ended early
+S33,220302,1,Grace,0,0,ymazeLong,ymazeSurprise,109,52.5,104,658.212560386473,3619.5715528,Decent performance today for first middle delay training session. Bell curve shaped percent correct
+S34,220302,1,Tyler,0,0,ymazeLong,ymazeSurprise,108,20,41,1.84823376734502,3512.016406,Poor again today
+S33,220303,1,Grace,0,0,ymazeLong,ymazeSurprise,97,37.5,64,109.097043882505,3672.0249714,Mouse performance dropped today after switching to middle delay. Not great today. Strong right side bias.
+S34,220303,1,Tyler,0,0,ymazeLong,ymazeSurprise,93,45,42,1.5653820528106,3567.957975,A lot better today. Low bias
+S35,220304,1,Teema,0,0,ymazeShort,ymazeShort,136,20,38,2.37045506636838,3453.3992571,weight was high but ran faster. just left the whole time
+S33,220304,1,Grace,0,0,ymazeLong,ymazeSurprise,95,57.5,74,1.59628630991255,3578.732129,Better performance than yesterday. Improved over the duration of training session.
+S34,220304,1,Tyler,0,0,ymazeLong,ymazeSurprise,86,7.5,17,1.45489692647385,3553.4139096,Really bad bias today
+S35,220307,1,Teema,0,0,ymazeShort,ymazeShort,141,15,27,2.5479824857828,3443.4328042,weight it high and lft side bias is 100 the whole time
+S33,220307,1,Steph,0,0,ymazeLong,ymazeSurprise,116,65,93,125.312831961974,3661.3526874,great job!!
