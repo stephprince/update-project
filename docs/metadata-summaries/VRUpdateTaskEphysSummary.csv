@@ -15,7 +15,7 @@ S,17,210408,3,1,1.85,2.15,1,R,R405,W189,CA1,PFC,201117,"FIX CA1 CHANNEL MAPPING.
 S,17,210409,1,1,1.9,2.45,1,R,R405,W189,CA1,PFC,201117,"Movement noise, proceed with caution. One shank is through the layer and CA1 probe started above I think Great behavior"
 S,17,210410,1,1,2.04,2.04,1,R,R405,W189,CA1,PFC,201117,some movement noise
 S,17,210410,2,1,2.04,2.04,1,R,R405,W189,CA1,PFC,201117,some movement noise
-S,17,210412,1,1,2,1.92,1,L,R404,W198,PFC,CA1,201117,"movement noise, proceed with caution. Behavior file overwritten for the first session"
+S,17,210412,1,1,2,1.92,0,L,R404,W198,PFC,CA1,201117,"movement noise, proceed with caution. Behavior file overwritten for the first session so marked as 0 even though there was behaivor"
 S,17,210412,2,1,2,1.92,0,L,R404,W198,PFC,CA1,201117,"movement noise, proceed with caution."
 S,17,210412,3,1,2,1.92,1,L,R404,W198,PFC,CA1,201117,"movement noise, proceed with caution."
 S,17,210412,4,1,2,1.92,1,L,R404,W198,PFC,CA1,201117,"movement noise, proceed with caution."
@@ -77,7 +77,7 @@ S,25,210906,2,1,2.25,1.675,0,L,W189,Y777,PFC,CA1,210302,
 S,25,210906,3,1,2.25,1.675,1,L,W189,Y777,PFC,CA1,210302,
 S,25,210906,4,1,2.25,1.675,1,L,W189,Y777,PFC,CA1,210302,
 S,25,210907,1,1,2.3,1.6,1,L,W189,Y777,PFC,CA1,210302,
-S,25,210907,2,1,2.3,1.6,1,L,W189,Y777,PFC,CA1,210302,
+S,25,210907,2,0,2.3,1.6,1,L,W189,Y777,PFC,CA1,210302,
 S,25,210907,3,1,2.3,1.6,1,L,W189,Y777,PFC,CA1,210302,
 S,25,210908,1,1,2.4,1.575,1,L,W189,Y777,PFC,CA1,210302,
 S,25,210908,2,1,2.4,1.575,0,L,W189,Y777,PFC,CA1,210302,
