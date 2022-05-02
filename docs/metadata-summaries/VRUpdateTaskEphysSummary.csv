@@ -1,5 +1,5 @@
 ID,Animal,Date,Recording,Include,TravelPFC,TravelCA1,Behavior,hemisphere,ProbeAB,ProbeCD,RegAB,RegCD,DOB,Notes
-Letter,#,YYMMDD,#,0 to exlcude,in mm,in mm,"1 = vr behavior, 0 = none (baseline with screen off)",, -,-,,,YYMMDD,
+Letter,#,YYMMDD,#,0 to exlcude,in mm,in mm,"1 = vr behavior, 0 = none (baseline with screen off)",,,,,,YYMMDD,
 S,17,210406,1,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain"
 S,17,210406,2,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain"
 S,17,210406,3,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. try to salvage, will have to stitch together with behavior"
@@ -124,7 +124,7 @@ S,29,211106,3,1,2.35,1.85,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211107,1,1,2.4,1.875,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211107,2,1,2.4,1.875,0,R,W190,Y457,CA1,PFC,210713,
 S,29,211107,3,1,2.4,1.875,1,R,W190,Y457,CA1,PFC,210713,
-S,23,211107,1,1,2.6,1.7,1,R,W189,Y777,CA1,PFC,210302,don’t use HPC location was weird
+S,23,211107,1,1,2.6,1.7,1,R,W189,Y777,CA1,PFC,210302,donï¿½t use HPC location was weird
 S,29,211108,1,1,2.425,1.625,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211108,2,0,2.425,1.625,1,R,W190,Y457,CA1,PFC,210713,no licks recorded
 S,29,211108,3,1,2.425,1.625,0,R,W190,Y457,CA1,PFC,210713,no licks recorded
@@ -187,3 +187,19 @@ S,28,211123,3,1,2.6,2,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211123,1,1,2.6,1.8,1,L,K503,Y777,PFC,CA1,210713,
 S,29,211123,2,1,2.6,1.8,0,L,K503,Y777,PFC,CA1,210713,
 S,29,211123,3,1,2.6,1.8,1,L,K503,Y777,PFC,CA1,210713,
+S,33,220420,1,1,2.35,1.575,1,L,W190,Y457,PFC,CA1,211123,"FIX HPC CHANNEL MAPPING, accidentally inverted headstages"
+S,33,220420,2,1,2.35,1.575,0,L,W190,Y457,PFC,CA1,211123,"FIX HPC CHANNEL MAPPING, accidentally inverted headstages"
+S,33,220420,3,1,2.35,1.575,1,L,W190,Y457,PFC,CA1,211123,"FIX HPC CHANNEL MAPPING, accidentally inverted headstages"
+S,33,220421,1,1,2.5,1.6,1,L,W190,Y457,PFC,CA1,211123,fixed headstages before this recording
+S,33,220421,2,1,2.5,1.6,0,L,W190,Y457,PFC,CA1,211123,fixed headstages before this recording
+S,33,220421,3,1,2.5,1.6,1,L,W190,Y457,PFC,CA1,211123,fixed headstages before this recording
+S,33,220422,1,1,2.5,1.65,1,L,W190,Y457,PFC,CA1,211123,
+S,33,220422,2,1,2.5,1.65,0,L,W190,Y457,PFC,CA1,211123,
+S,33,220422,3,1,2.5,1.65,1,L,W190,Y457,PFC,CA1,211123,
+S,33,220425,1,1,2.65,1.65,1,R,W190,Y457,CA1,PFC,221123,
+S,33,220425,2,1,2.65,1.65,0,R,W190,Y457,CA1,PFC,221123,
+S,33,220425,3,1,2.65,1.65,1,R,W190,Y457,CA1,PFC,221123,
+S,33,220426,1,1,2.55,1.875,1,R,W190,Y457,CA1,PFC,221123,
+S,33,220426,2,1,2.55,1.875,0,R,W190,Y457,CA1,PFC,221123,
+S,33,220426,3,1,2.55,1.875,1,R,W190,Y457,CA1,PFC,221123,
+S,33,220428,1,1,2.4,1.7,1,R,W190,Y457,CA1,PFC,221123,
