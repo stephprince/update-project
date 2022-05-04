@@ -10,9 +10,9 @@ from plots import show_event_aligned_psth, show_start_aligned_psth
 from units import align_by_time_intervals
 
 # set inputs
-animals = [17, 20, 25, 28, 29]
-dates_included = [210913]
-dates_excluded = []
+animals = [29]
+dates_included = []
+dates_excluded = []  # need to run S20_210511, S20_210519, S25_210909, S28_211118 later, weird spike sorting table issue
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
@@ -33,6 +33,7 @@ for name, session in unique_sessions:
     # get info for figure saving and labelling
     repo = Repo(search_parent_directories=True)
     short_hash = repo.head.object.hexsha[:10]
+    this_filename = __file__  # to add to metadata to know which script generated the figure
     figure_path = Path().absolute().parent.parent / 'results' / 'decoding' / f'{session_id}'
     Path(figure_path).mkdir(parents=True, exist_ok=True)
 
@@ -64,7 +65,7 @@ for name, session in unique_sessions:
     groups_update = {k: v[update_trial_inds] for k, v in groups_sorted.items()}
 
     # make individual neuron psths
-    window_long = 20  # seconds
+    window_long = 25  # seconds
     window_short = 3  # seconds before and after to plot
     for unit_index in range(len(nwbfile.units)):
         # get spikes aligned to event times and sorted
@@ -81,7 +82,7 @@ for name, session in unique_sessions:
                                                             start=-window_short, end=window_short,
                                                             rows_select=trial_mask)
 
-        for name, group in group_inds.items():
+        for group_name, group in group_inds.items():
             # plot the data
             mosaic = """
                     AAAAA
@@ -89,16 +90,15 @@ for name, session in unique_sessions:
                     CDEFG
                     HIJKL
                     """
-            # plt.style.use('dark_background')
             ax_dict = plt.figure(constrained_layout=True, figsize=(20, 16)).subplot_mosaic(mosaic)
 
             # plot psth aligned at start for all trials
-            show_start_aligned_psth(spikes_aligned_sorted, annotations_sorted, groups_sorted[name], window_long, labels,
+            show_start_aligned_psth(spikes_aligned_sorted, annotations_sorted, groups_sorted[group_name], window_long, labels,
                                     ax_dict['A'])
-            ax_dict['A'].set_title(f'PSTH for unit {unit_index} session {session_id} - {name}', fontsize=16)
+            ax_dict['A'].set_title(f'PSTH for unit {unit_index} session {session_id} - {group_name}', fontsize=16)
 
             # plot psth aligned at start for update only trials
-            show_start_aligned_psth(spikes_aligned_update, annotations_update, groups_update[name], window_long, labels,
+            show_start_aligned_psth(spikes_aligned_update, annotations_update, groups_update[group_name], window_long, labels,
                                     ax_dict['B'])
             ax_dict['B'].set_ylabel('trials (update only)')
 
@@ -109,7 +109,9 @@ for name, session in unique_sessions:
             ax_dict['H'].set_ylabel('trials')
 
             # save figure
-            filename = figure_path / f'psth_{name}_unit{unit_index}_git{short_hash}.pdf'
-            plt.savefig(filename, dpi=300)
+            filename = figure_path / f'psth_{group_name}_unit{unit_index}_git{short_hash}.pdf'
+            plt.savefig(filename, dpi=300, metadata={'Creator': this_filename})
 
         plt.close('all')
+
+    io.close()

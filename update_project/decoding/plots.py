@@ -36,7 +36,7 @@ def show_start_aligned_psth(start_aligned, note_times, group_inds, window, label
                          where=update_bool, facecolor='c', alpha=0.1)
         ax.fill_betweenx(y_to_fill_no_gaps, annotation_times['t_delay2'], annotation_times['t_choice_made'],
                          where=update_bool, facecolor='k', alpha=0.1)
-        ax.fill_betweenx(y_to_fill_no_gaps, annotation_times['t_choice_made'], np.zeros(len(y_to_fill))+20,
+        ax.fill_betweenx(y_to_fill_no_gaps, annotation_times['t_choice_made'], np.zeros(len(y_to_fill))+window,
                          facecolor='y', alpha=0.1)
 
         # add test annotations
