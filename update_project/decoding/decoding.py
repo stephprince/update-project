@@ -145,13 +145,15 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         track_bound_x_inds = [np.argmin(np.abs(xtick_values - x)) for x in track_bounds_xs]
         track_bound_y_inds = [np.argmin(np.abs(ytick_values - y)) for y in track_bounds_ys]
 
+        position_x_inds = [np.argmin(np.abs(xtick_values - x)) for x in stats['position_x']['mean'][:time_bin + 1]]
+        position_y_inds = [np.argmin(np.abs(ytick_values - x)) for x in stats['position_y']['mean'][:time_bin + 1]]
+
         axes[ax_dict[0]] = sns.heatmap(prob_map[:,:,time_bin], cmap='YlGnBu', ax=axes[ax_dict[0]],
-                                       vmin=0, vmax=0.75 * np.nanmax(prob_map),
+                                       vmin=0, vmax=0.5 * np.nanmax(prob_map),
                                        cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
         axes[ax_dict[0]].invert_yaxis()
-        axes[ax_dict[1]].plot(stats['position_x']['mean'][:time_bin + 1], stats['position_y']['mean'][:time_bin + 1],
-                              color='k', label='True position')
-        axes[ax_dict[1]].plot(stats['position_x']['mean'][time_bin], stats['position_y']['mean'][time_bin], color='k',
+        axes[ax_dict[0]].plot(position_x_inds, position_y_inds,color='k', label='True position')
+        axes[ax_dict[0]].plot(position_x_inds[-1], position_y_inds[-1], color='k',
                               marker='o', markersize='10', label='Current true position')
         axes[ax_dict[0]].plot(track_bound_x_inds, track_bound_y_inds, color='black')
         axes[ax_dict[0]].set(xticks=xtick_labels, yticks=ytick_labels,
@@ -166,9 +168,13 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         axes[ax_dict[1]].plot(track_bounds_xs, track_bounds_ys, color='black')
         axes[ax_dict[1]].set(xlim=[min(xtick_values), max(xtick_values)], ylim=[min(ytick_values), max(ytick_values)], xlabel='X position', ylabel='Y position')
         axes[ax_dict[1]].legend(loc='lower left')
-        axes[ax_dict[1]].text(0.95, 0.05, f'Time around update: {times[time_bin]} s', transform=axes[ax_dict[1]].transAxes, fontsize=14,
+        axes[ax_dict[1]].text(0.65, 0.1, f'Time to update: {np.round(times[time_bin],2)} s', transform=axes[ax_dict[1]].transAxes, fontsize=14,
                               verticalalignment='top', bbox=dict(boxstyle='round', facecolor='black', alpha=0.25))
+        axes[ax_dict[1]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
+                                  xycoords='data', xytext=(7, stats['position_y']['mean'][int(len(times)/2)]),
+                                  textcoords='data', va='center', arrowprops=dict(arrowstyle='<-'))
         axes[ax_dict[1]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
+
 
 def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset, trials_to_flip):
     interpolated_position = []
