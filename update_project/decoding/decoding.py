@@ -90,6 +90,17 @@ def plot_decoding_around_update(data_around_update, nbins, window, title, label,
     times = np.linspace(-window, window, num=nbins)
     time_tick_values = times.astype(int)
     time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
+    if label == 'x':
+        cmap_pos = 'RdGy'
+        cmap_decoding = 'PRGn'
+        scaling_value = 0.25
+    elif label == 'y':
+        cmap_pos = 'Greys'
+        if title == 'switch':
+            cmap_decoding = 'Blues'
+        elif title == 'stay':
+            cmap_decoding = 'RdPu'
+        scaling_value = 1
 
     prob_map = np.nanmean(data_around_update['probability'], axis=0)
     if data_around_update['probability']:  # skip if there is no data
@@ -97,43 +108,61 @@ def plot_decoding_around_update(data_around_update, nbins, window, title, label,
         data_values = np.linspace(np.min(data_around_update['decoding']), np.max(data_around_update['decoding']), n_position_bins)
         ytick_values = data_values.astype(int)
         ytick_labels = np.array([0, int(len(ytick_values) / 2), len(ytick_values) - 1])
+        update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2], [0, np.shape(data_around_update['position'])[1]]]
+        v_lims_position = [np.nanmin(data_around_update['position']), np.nanmax(data_around_update['position'])]
+        v_lims_decoding = [np.nanmin(data_around_update['decoding']), np.nanmax(data_around_update['decoding'])]
+        pos_values_after_update = np.sum(data_around_update['position'][time_tick_labels[1]:time_tick_labels[1]+10],axis=0)
+        sort_index = np.argsort(pos_values_after_update)
 
         axes[ax_dict[0]] = sns.heatmap(prob_map, cmap='YlGnBu', ax=axes[ax_dict[0]],
                                        vmin=0, vmax=0.75 * np.nanmax(prob_map),
                                        cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
-        axes[ax_dict[0]].plot([len(time_tick_values) / 2, len(time_tick_values) / 2], [0, len(ytick_values)],
-                              linestyle='dashed', color=[0, 0, 0, 0.5])
+        axes[ax_dict[0]].plot(update_time_values[0], update_time_values[1], linestyle='dashed', color=[0, 0, 0, 0.5])
         axes[ax_dict[0]].invert_yaxis()
         axes[ax_dict[0]].set(xticks=time_tick_labels, yticks=ytick_labels,
                              xticklabels=time_tick_values[time_tick_labels], yticklabels=ytick_values[ytick_labels],
-                             xlabel='Time around update (s)', ylabel=label)
-        axes[ax_dict[0]].set_title(f'{title} trials - probability density - {label}', fontsize=14)
+                             xlabel='Time around update (s)', ylabel=f'{label} position')
+        axes[ax_dict[0]].set_title(f'{title} trials - probability density - {label} position', fontsize=14)
 
         axes[ax_dict[1]].plot(times, stats['position']['mean'], color='k', label='True position')
         axes[ax_dict[1]].fill_between(times, stats['position']['lower'], stats['position']['upper'], alpha=0.2, color='k', label='95% CI')
         axes[ax_dict[1]].plot(times, stats['decoding']['mean'], color=color, label='Decoded position')
         axes[ax_dict[1]].fill_between(times, stats['decoding']['lower'], stats['decoding']['upper'], alpha=0.2, color=color, label='95% CI')
         axes[ax_dict[1]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
-        axes[ax_dict[1]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)', ylabel=label)
+        axes[ax_dict[1]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)', ylabel=f'{label} position')
         axes[ax_dict[1]].legend(loc='upper left')
-        axes[ax_dict[1]].set_title(f'{title} trials - decoded {label}', fontsize=14)
+        axes[ax_dict[1]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
 
-        axes[ax_dict[2]].plot(times, data_around_update['position'], color='k', alpha=0.25, label='True')
-        axes[ax_dict[2]].plot(times, data_around_update['decoding'], color=color, alpha=0.25, label='Decoded')
-        axes[ax_dict[2]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)', ylabel=label)
-        axes[ax_dict[2]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
-        axes[ax_dict[2]].set_title(f'{title} trials - {label}', fontsize=14)
+        axes[ax_dict[2]] = sns.heatmap(data_around_update['position'][:, sort_index].T, cmap=cmap_pos, ax=axes[ax_dict[2]],
+                                       vmin=scaling_value * limits[0], vmax=scaling_value * limits[1],
+                                       cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
+        axes[ax_dict[2]].plot(update_time_values[0], update_time_values[1], linestyle='dashed', color=[0, 0, 0, 0.5])
+        axes[ax_dict[2]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
+                             xlabel='Time around update (s)', ylabel='Trials')
+        axes[ax_dict[2]].set_title(f'{title} trials - true {label} position', fontsize=14)
 
-        axes[ax_dict[3]].plot(times, stats['error']['mean'], color='r', label='|True - decoded|')
-        axes[ax_dict[3]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color='r', label='95% CI')
-        axes[ax_dict[3]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k', alpha=0.25)
-        axes[ax_dict[3]].set(xlim=[-window, window], ylim=[0, np.max(stats['error']['upper'])], xlabel='Time around update(s)', ylabel=label)
-        axes[ax_dict[3]].set_title(f'{title} trials - decoding error {label}', fontsize=14)
-        axes[ax_dict[3]].legend(loc='upper left')
+        axes[ax_dict[3]] = sns.heatmap(data_around_update['decoding'][:, sort_index].T, cmap=cmap_decoding, ax=axes[ax_dict[3]],
+                                       vmin=scaling_value * limits[0] , vmax=scaling_value * limits[1],
+                                       cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
+        axes[ax_dict[3]].plot(update_time_values[0], update_time_values[1], linestyle='dashed', color=[0, 0, 0, 0.5])
+        axes[ax_dict[3]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
+                             xlabel='Time around update (s)', ylabel='Trials')
+        axes[ax_dict[3]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
+
+        axes[ax_dict[4]].plot(times, stats['error']['mean'], color='r', label='|True - decoded|')
+        axes[ax_dict[4]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color='r', label='95% CI')
+        axes[ax_dict[4]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k', alpha=0.25)
+        axes[ax_dict[4]].set(xlim=[-window, window], ylim=[0, np.max(stats['error']['upper'])], xlabel='Time around update(s)', ylabel=label)
+        axes[ax_dict[4]].set_title(f'{title} trials - decoding error {label} position', fontsize=14)
+        axes[ax_dict[4]].legend(loc='upper left')
 
 def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, color, axes, ax_dict):
     stats = data_around_update['stats']
     prob_map = np.nanmean(data_around_update['probability'], axis=0)
+    if title == 'switch':
+        correct_multiplier = -1
+    elif title == 'stay':
+        correct_multiplier = 1
     xlims = [-30, 30]
     ylims = [5, 285]
     track_bounds_xs, track_bounds_ys = create_track_boundaries()
@@ -158,6 +187,7 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         axes[ax_dict[0]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
                                   xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times)/2)]),
                                   textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
+        axes[ax_dict[0]].annotate('correct side', (15*correct_multiplier, 250), textcoords='data', va='center')
         axes[ax_dict[0]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
 
         im = axes[ax_dict[1]].imshow(prob_map[:,:,time_bin], cmap='YlGnBu', origin='lower', aspect='auto',
@@ -252,8 +282,8 @@ def get_stats(data, axis=0):
 
 def create_track_boundaries():
     # establish track boundaries
-    coords = [[2, 1], [2, 245], [35, 285], [25, 285], [8, 285], [0.5, 265], [-0.5, 265], [-8, 285], [-25, 285],
-              [-35, 285], [-2, 245], [-2, 1], [2, 1]]
+    coords = [[2, 1], [2, 245], [25, 275], [25, 285], [14, 285], [0.5, 265], [-0.5, 265], [-14, 285], [-25, 285],
+              [-25, 275], [-2, 245], [-2, 1], [2, 1]]
     xs, ys = zip(*coords)
 
     return xs, ys

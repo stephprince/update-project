@@ -50,7 +50,7 @@ for name, session in unique_sessions:
     trial_epochs = nwbfile.intervals['trials'].to_dataframe()
     non_update_epochs = trial_epochs[trial_epochs['update_type'] == 1]
     time_support_all_trials = nap.IntervalSet(start=trial_epochs['start_time'], end=trial_epochs['stop_time'], time_units='s')
-    time_support_non_update_trials = nap.IntervalSet(start=trial_epochs['start_time'], end=trial_epochs['stop_time'],
+    time_support_non_update_trials = nap.IntervalSet(start=non_update_epochs['start_time'], end=non_update_epochs['stop_time'],
                                                      time_units='s')
     position_tsg = nap.TsdFrame(position, time_units='s', time_support=time_support_all_trials)
 
@@ -137,16 +137,17 @@ for name, session in unique_sessions:
         # plot the decoding data
         print(f"Generating figures for {session_id}")
         mosaic = """
-        AEIM
-        BFJN
-        CGKO
-        DHLP
+        ABCD
+        EFGH
+        IJKL
+        MNOP
+        QRST
         """
         axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-        plot_decoding_around_update(y_around_switch, nbins, window, 'switch', 'y position', [0, 258], 'b', axes, ['A', 'B', 'C', 'D'])
-        plot_decoding_around_update(x_around_switch, nbins, window, 'switch', 'x position', [-15, 15], 'b', axes, ['E', 'F', 'G', 'H'])
-        plot_decoding_around_update(y_around_stay, nbins, window, 'stay', 'y position', [0, 258], 'm', axes, ['I', 'J', 'K', 'L'])
-        plot_decoding_around_update(x_around_stay, nbins, window, 'stay', 'x position', [-15, 15], 'm', axes, ['M', 'N', 'O', 'P'])
+        plot_decoding_around_update(y_around_switch, nbins, window, 'switch', 'y', [0, 258], 'b', axes, ['A', 'E', 'I', 'M', 'Q'])
+        plot_decoding_around_update(x_around_switch, nbins, window, 'switch', 'x', [-15, 15], 'purple', axes, ['B', 'F', 'J', 'N', 'R'])
+        plot_decoding_around_update(y_around_stay, nbins, window, 'stay', 'y', [0, 258], 'm', axes, ['C', 'G', 'K', 'O', 'S'])
+        plot_decoding_around_update(x_around_stay, nbins, window, 'stay', 'x', [-15, 15], 'g', axes, ['D', 'H', 'L', 'P', 'T'])
         plt.suptitle(f'{session_id} decoding around update trials', fontsize=20)
         plt.tight_layout()
 

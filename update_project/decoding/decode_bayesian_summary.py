@@ -7,7 +7,7 @@ import seaborn as sns
 from git import Repo
 from pynwb import NWBHDF5IO
 from pathlib import Path
-from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
 from scipy.interpolate import griddata
 
 from update_project.utils import get_session_info
@@ -15,9 +15,10 @@ from plots import show_event_aligned_psth, show_start_aligned_psth
 from units import align_by_time_intervals
 
 # set inputs
-animals = [20, 25, 28, 29]
-dates_included = []
-dates_excluded = []  # need to run S20_210511, S20_210519, S25_210909, S28_211118 later, weird spike sorting table issue
+animals = [25] # 17, 20, 25, 28, 29
+dates_included = [210913, 210914]
+dates_excluded = []
+overwrite_data = True
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
@@ -25,6 +26,11 @@ spreadsheet_filename = 'Y:/singer/Steph/Code/update-project/docs/metadata-summar
 all_session_info = get_session_info(filename=spreadsheet_filename, animals=animals,
                                     dates_included=dates_included, dates_excluded=dates_excluded)
 unique_sessions = all_session_info.groupby(['ID', 'Animal', 'Date'])
+
+# get output figure info
+repo = Repo(search_parent_directories=True)
+short_hash = repo.head.object.hexsha[:10]
+this_filename = __file__  # to add to metadata to know which script generated the figure
 
 # loop through sessions and run conversion
 for name, session in unique_sessions:
@@ -36,11 +42,9 @@ for name, session in unique_sessions:
     nwbfile = io.read()
 
     # get info for figure saving and labelling
-    repo = Repo(search_parent_directories=True)
-    short_hash = repo.head.object.hexsha[:10]
-    this_filename = __file__  # to add to metadata to know which script generated the figure
     figure_path = Path().absolute().parent.parent / 'results' / 'decoding' / f'{session_id}'
     Path(figure_path).mkdir(parents=True, exist_ok=True)
+    intermediate_data_path = figure_path / 'intermediate_data'
 
     # load position structure
     position_ss = nwbfile.processing['behavior']['position'].get_spatial_series('position')
@@ -48,53 +52,79 @@ for name, session in unique_sessions:
                 'y': pd.Series(index=position_ss.timestamps[:], data=position_ss.data[:, 1])}
     position = pd.DataFrame.from_dict(position)
     trial_epochs = nwbfile.intervals['trials'].to_dataframe()
-    time_support = nap.IntervalSet(start=trial_epochs['start_time'], end=trial_epochs['stop_time'], time_units='s')
-    position_tsg = nap.TsdFrame(position, time_units='s', time_support=time_support)
+    non_update_epochs = trial_epochs[trial_epochs['update_type'] == 1]
+    training_data, testing_data = train_test_split(non_update_epochs, test_size=0.2, random_state=21)
+    time_support_non_update = nap.IntervalSet(start=non_update_epochs['start_time'], end=non_update_epochs['stop_time'], time_units='s')
+    position_tsg = nap.TsdFrame(position, time_units='s', time_support=time_support_non_update)
+
+    # get binning info
+    nb_bins = 30  # position
+    bin_size = 1  # seconds
+    position_bins = np.linspace(np.min(position_tsg['y']), np.max(position_tsg['y']), nb_bins + 1)
 
     # load units structure
     units = nwbfile.units.to_dataframe()
     spikes_dict = {n:nap.Ts(t=units.loc[n,'spike_times'], time_units='s') for n in units.index}
     spikes = nap.TsGroup(spikes_dict, time_units='s')
 
-    # compute 2d tuning curves
-    tuning_curves2d, binsxy = nap.compute_2d_tuning_curves(group=spikes, feature=position_tsg, nb_bins=30)
+    if overwrite_data or not Path(intermediate_data_path / 'decoding_2d.npz').is_file():
+        Path(intermediate_data_path).mkdir(parents=True, exist_ok=True)
 
-    # decode 1d data
-    nb_bins = 30 # position
-    bin_size = 1 # seconds
-    tuning_curves1d = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['y'], nb_bins=nb_bins)
-    decoded, proby_feature = nap.decode_1d(tuning_curves=tuning_curves1d,
-                                           group=spikes,
-                                           ep=time_support,
-                                           bin_size=bin_size,  # second
-                                           feature=position_tsg['y'],
-                                           )
+        # compute 2d tuning curves
+        tuning_curves2d, binsxy = nap.compute_2d_tuning_curves(group=spikes, feature=position_tsg, nb_bins=nb_bins)
 
-    # get decoding error
-    time_index = []
-    position_mean = []
-    for index, trial in time_support.iterrows():
-        trial_bins = np.arange(trial['start'],trial['end']+bin_size, bin_size)
-        bins = pd.cut(position['y'].index, trial_bins)
-        position_mean.append(position['y'].groupby(bins).mean())
-        time_index.append(trial_bins[0:-1] + np.diff(trial_bins)/2)
-    time_index = np.hstack(time_index)
-    position_means = np.hstack(position_mean)
+        # decode 1d data
+        tuning_curves1d = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['y'], nb_bins=nb_bins)
+        decoded, proby_feature = nap.decode_1d(tuning_curves=tuning_curves1d,
+                                               group=spikes,
+                                               ep=time_support,
+                                               bin_size=bin_size,  # second
+                                               feature=position_tsg['y'],
+                                               )
 
-    actual_series = pd.Series(position_means, index=time_index, name='actual_position')
-    decoded_series = decoded.as_series()  # TODO - figure out why decoded and actual series are diff lengths
-    df_decode_results = pd.merge(decoded_series.rename('decoded_position'), actual_series, how='left', left_index=True, right_index=True)
-    df_decode_results['decoding_error'] = abs(df_decode_results['decoded_position'] - df_decode_results['actual_position'])
-    df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20, min_periods=1).mean()
-    df_decode_results['prob_dist'] = [x for x in proby_feature.as_dataframe().to_numpy()]
+        # get decoding error
+        time_index = []
+        position_mean = []
+        for index, trial in time_support.iterrows():
+            trial_bins = np.arange(trial['start'],trial['end']+bin_size, bin_size)
+            bins = pd.cut(position['y'].index, trial_bins)
+            position_mean.append(position['y'].groupby(bins).mean())
+            time_index.append(trial_bins[0:-1] + np.diff(trial_bins)/2)
+        time_index = np.hstack(time_index)
+        position_means = np.hstack(position_mean)
 
-    # get decoding matrices
-    position_bins = np.linspace(np.min(position_tsg['y']), np.max(position_tsg['y']), nb_bins + 1)
-    bins = pd.cut(df_decode_results['actual_position'], position_bins)
-    decoding_matrix = df_decode_results['decoded_position'].groupby(bins).apply(
-        lambda x: np.histogram(x, position_bins, density=True)[0])
-    decoding_matrix_prob = df_decode_results['prob_dist'].groupby(bins).apply(
-        lambda x: np.nanmean(np.vstack(x.values), axis=0))
+        actual_series = pd.Series(position_means, index=time_index, name='actual_position')
+        decoded_series = decoded.as_series()  # TODO - figure out why decoded and actual series are diff lengths
+        df_decode_results = pd.merge(decoded_series.rename('decoded_position'), actual_series, how='left', left_index=True, right_index=True)
+        df_decode_results['decoding_error'] = abs(df_decode_results['decoded_position'] - df_decode_results['actual_position'])
+        df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20, min_periods=1).mean()
+        df_decode_results['prob_dist'] = [x for x in proby_feature.as_dataframe().to_numpy()]
+
+        # get decoding matrices
+        bins = pd.cut(df_decode_results['actual_position'], position_bins)
+        decoding_matrix = df_decode_results['decoded_position'].groupby(bins).apply(
+            lambda x: np.histogram(x, position_bins, density=True)[0]).values
+        decoding_matrix_prob = df_decode_results['prob_dist'].groupby(bins).apply(
+            lambda x: np.nanmean(np.vstack(x.values), axis=0)).values
+
+        # save intermediate data
+        np.savez(intermediate_data_path / 'decoding_2d.npz', tuning_curves2d=tuning_curves2d, binsxy=binsxy)
+        np.savez(intermediate_data_path / 'decoding_1d.npz', tuning_curves1d=tuning_curves1d, decoded=decoded,
+                 proby_feature=proby_feature)
+        np.savez(intermediate_data_path / 'decoding_matrix.npz', decoding_matrix=decoding_matrix, decoding_matrix_prob=decoding_matrix_prob)
+        df_decode_results.to_csv(intermediate_data_path /'decoding_results.csv')
+    else:
+        decoding_2d = np.load(intermediate_data_path / 'decoding_2d.npz', allow_pickle=True)
+        tuning_curves2d = decoding_2d['tuning_curves2d']
+        binsxy = decoding_2d['binsxy']
+        decoding_1d = np.load(intermediate_data_path / 'decoding_1d.npz', allow_pickle=True)
+        tuning_curves1d = decoding_1d['tuning_curves1d']
+        decoded = decoding_1d['decoded']
+        proby_feature = decoding_1d['proby_feature']
+        decoding_summary = np.load(intermediate_data_path / 'decoding_matrix.npz', allow_pickle=True)
+        decoding_matrix_prob = decoding_summary['decoding_matrix_prob']
+        decoding_matrix = decoding_summary['decoding_matrix']
+        df_decode_results = pd.read_csv(intermediate_data_path /'decoding_results.csv', index_col=0)
 
     # plot the tuning curves
     counter = 0
@@ -170,8 +200,8 @@ for name, session in unique_sessions:
 
     tick_values = tuning_curves1d.index.values.astype(int)
     tick_labels = np.array([0, int(len(tick_values) / 2), len(tick_values) - 1])
-    axes['D'] = sns.heatmap(np.vstack(decoding_matrix.values), cmap='YlGnBu', ax=axes['D'], square=True,
-                            vmin=0, vmax=0.75*np.nanmax(np.vstack(decoding_matrix.values)),
+    axes['D'] = sns.heatmap(np.vstack(decoding_matrix), cmap='YlGnBu', ax=axes['D'], square=True,
+                            vmin=0, vmax=0.75*np.nanmax(np.vstack(decoding_matrix)),
                             cbar_kws={'pad':0.01, 'label':'proportion decoded', 'fraction':0.046})
     axes['D'].plot([0, 285], [0, 285], linestyle='dashed', color=[0, 0, 0, 0.5])
     axes['D'].invert_yaxis()
@@ -180,8 +210,8 @@ for name, session in unique_sessions:
                 xticklabels=tick_values[tick_labels], yticklabels=tick_values[tick_labels],
                 xlabel='Decoded Position', ylabel='Actual Position')
 
-    axes['E'] = sns.heatmap(np.vstack(decoding_matrix_prob.values), cmap='YlGnBu', ax=axes['E'], square=True,
-                            vmin=0, vmax=0.75 * np.nanmax(np.vstack(decoding_matrix_prob.values)),
+    axes['E'] = sns.heatmap(np.vstack(decoding_matrix_prob), cmap='YlGnBu', ax=axes['E'], square=True,
+                            vmin=0, vmax=0.75 * np.nanmax(np.vstack(decoding_matrix_prob)),
                             cbar_kws={'pad':0.01, 'label':'mean probability', 'fraction':0.046})
     axes['E'].plot([0, 285], [0, 285], linestyle='dashed', color=[0, 0, 0, 0.5])
     axes['E'].invert_yaxis()
@@ -204,3 +234,15 @@ for name, session in unique_sessions:
 
     plt.close('all')
     io.close()
+
+
+# plot decoding errors across animals
+for name, session in unique_sessions:
+
+    # load file
+    session_id = f"{name[0]}{name[1]}_{name[2]}"  # {ID}{Animal}_{Date} e.g. S25_210913
+    figure_path = Path().absolute().parent.parent / 'results' / 'decoding' / f'{session_id}'
+    df_decode_results = pd.read_csv(intermediate_data_path / 'decoding_results.csv')
+
+
+
