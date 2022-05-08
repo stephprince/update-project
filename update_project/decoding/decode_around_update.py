@@ -12,11 +12,11 @@ from decoding import get_decoding_around_update, plot_decoding_around_update, ge
 from update_project.camera_sync.cam_plot_utils import write_camera_video
 
 # set inputs
-animals = [25]
+animals = [25]  # 17, 20, 25, 28, 29
 dates_included = [210913] #210913
 dates_excluded = []
-overwrite_data = 0
-overwrite_figures = 1
+overwrite_data = False
+overwrite_figures = True
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
@@ -62,7 +62,7 @@ for name, session in unique_sessions:
     # load or generate decoding data
     window = 5  # seconds around update
     nbins = 50
-    if overwrite_data or ~Path(intermediate_data_path).is_dir():
+    if overwrite_data or not Path(intermediate_data_path).is_dir():
         Path(intermediate_data_path).mkdir(parents=True, exist_ok=True)
 
         # decode 1d data
@@ -123,17 +123,17 @@ for name, session in unique_sessions:
         xy_around_stay = get_2d_decoding_around_update(position_tsg, decoded_xy, probxy_feature, binsxy, stay_trials,
                                                    nbins=nbins, window=window)
 
-        np.save(intermediate_data_dir / 'xy_around_switch.npy', xy_around_switch)
-        np.save(intermediate_data_dir / 'xy_around_stay.npy', xy_around_stay)
+        np.save(intermediate_data_path / 'xy_around_switch.npy', xy_around_switch)
+        np.save(intermediate_data_path / 'xy_around_stay.npy', xy_around_stay)
     else:
-        x_around_switch = np.load(intermediate_data_path / 'x_around_switch.npy')
-        y_around_switch = np.load(intermediate_data_path / 'y_around_switch.npy')
-        y_around_stay = np.load(intermediate_data_path / 'y_around_stay.npy')
-        x_around_stay = np.load(intermediate_data_path / 'x_around_stay.npy')
-        xy_around_switch = np.load(intermediate_data_path / 'xy_around_switch.npy')
-        xy_around_stay = np.load(intermediate_data_path / 'xy_around_stay.npy')
+        x_around_switch = np.load(intermediate_data_path / 'x_around_switch.npy', allow_pickle=True).item()
+        y_around_switch = np.load(intermediate_data_path / 'y_around_switch.npy', allow_pickle=True).item()
+        y_around_stay = np.load(intermediate_data_path / 'y_around_stay.npy', allow_pickle=True).item()
+        x_around_stay = np.load(intermediate_data_path / 'x_around_stay.npy', allow_pickle=True).item()
+        xy_around_switch = np.load(intermediate_data_path / 'xy_around_switch.npy', allow_pickle=True).item()
+        xy_around_stay = np.load(intermediate_data_path / 'xy_around_stay.npy', allow_pickle=True).item()
 
-    if overwrite_figures or ~Path(figure_path / f'decoding_around_update_git{short_hash}.pdf').is_file():
+    if overwrite_figures or not Path(figure_path / f'decoding_around_update_git{short_hash}.pdf').is_file():
         # plot the decoding data
         print(f"Generating figures for {session_id}")
         mosaic = """
@@ -162,7 +162,7 @@ for name, session in unique_sessions:
                 AB
                 CD
                 """
-            axes = plt.figure(figsize=(20, 10)).subplot_mosaic(mosaic)
+            axes = plt.figure(figsize=(16, 8)).subplot_mosaic(mosaic)
             plot_2d_decoding_around_update(xy_around_switch, time_bin, times, 'switch', 'b', axes, ['A', 'B'])
             plot_2d_decoding_around_update(xy_around_stay, time_bin, times, 'stay', 'm', axes, ['C', 'D'])
             plt.suptitle(f'{session_id} decoding around update trials', fontsize=20)

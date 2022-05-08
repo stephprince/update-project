@@ -1,6 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import pandas as pd
+import seaborn as sns
 
 from scipy.interpolate import griddata, interp1d
 from scipy.stats import sem
@@ -133,48 +134,44 @@ def plot_decoding_around_update(data_around_update, nbins, window, title, label,
 def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, color, axes, ax_dict):
     stats = data_around_update['stats']
     prob_map = np.nanmean(data_around_update['probability'], axis=0)
+    xlims = [-30, 30]
+    ylims = [5, 285]
+    track_bounds_xs, track_bounds_ys = create_track_boundaries()
 
     if data_around_update['probability']:  # skip if there is no data
-        n_position_bins = np.shape(prob_map)[0]
-        xtick_values = np.linspace(-30, 30, n_position_bins+1).astype(int)
-        ytick_values = np.linspace(5, 285, n_position_bins+1).astype(int)
-        ytick_labels = np.array([0, int(len(ytick_values) / 2), len(ytick_values)-1])
-        xtick_labels = np.array([0, int(len(xtick_values) / 2), len(xtick_values)-1])
+        positions_y = stats['position_y']['mean'][:time_bin + 1]
+        positions_x = stats['position_x']['mean'][:time_bin + 1]
 
-        track_bounds_xs, track_bounds_ys = create_track_boundaries()
-        track_bound_x_inds = [np.argmin(np.abs(xtick_values - x)) for x in track_bounds_xs]
-        track_bound_y_inds = [np.argmin(np.abs(ytick_values - y)) for y in track_bounds_ys]
-
-        position_x_inds = [np.argmin(np.abs(xtick_values - x)) for x in stats['position_x']['mean'][:time_bin + 1]]
-        position_y_inds = [np.argmin(np.abs(ytick_values - x)) for x in stats['position_y']['mean'][:time_bin + 1]]
-
-        axes[ax_dict[0]] = sns.heatmap(prob_map[:,:,time_bin], cmap='YlGnBu', ax=axes[ax_dict[0]],
-                                       vmin=0, vmax=0.5 * np.nanmax(prob_map),
-                                       cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
-        axes[ax_dict[0]].invert_yaxis()
-        axes[ax_dict[0]].plot(position_x_inds, position_y_inds,color='k', label='True position')
-        axes[ax_dict[0]].plot(position_x_inds[-1], position_y_inds[-1], color='k',
-                              marker='o', markersize='10', label='Current true position')
-        axes[ax_dict[0]].plot(track_bound_x_inds, track_bound_y_inds, color='black')
-        axes[ax_dict[0]].set(xticks=xtick_labels, yticks=ytick_labels,
-                             xticklabels=xtick_values[xtick_labels], yticklabels=ytick_values[ytick_labels],
-                             xlabel='X position', ylabel='Y position')
-        axes[ax_dict[0]].set_title(f'{title} trials - probability density', fontsize=14)
-
-        axes[ax_dict[1]].plot(stats['position_x']['mean'][:time_bin+1], stats['position_y']['mean'][:time_bin+1], color='k', label='True position')
-        axes[ax_dict[1]].plot(stats['position_x']['mean'][time_bin], stats['position_y']['mean'][time_bin], color='k', marker='o', markersize='10', label='Current true position')
-        axes[ax_dict[1]].plot(stats['decoding_x']['mean'][:time_bin+1], stats['decoding_y']['mean'][:time_bin+1], color=color, label='Decoded position')
-        axes[ax_dict[1]].plot(stats['decoding_x']['mean'][time_bin], stats['decoding_y']['mean'][time_bin], color=color, marker='o', markersize='10', label='Current decoded position')
-        axes[ax_dict[1]].plot(track_bounds_xs, track_bounds_ys, color='black')
-        axes[ax_dict[1]].set(xlim=[min(xtick_values), max(xtick_values)], ylim=[min(ytick_values), max(ytick_values)], xlabel='X position', ylabel='Y position')
-        axes[ax_dict[1]].legend(loc='lower left')
-        axes[ax_dict[1]].text(0.65, 0.1, f'Time to update: {np.round(times[time_bin],2)} s', transform=axes[ax_dict[1]].transAxes, fontsize=14,
+        axes[ax_dict[0]].plot(positions_x, positions_y, color='k', label='True position')
+        axes[ax_dict[0]].plot(positions_x[-1], positions_y[-1], color='k', marker='o', markersize='10',
+                              label='Current true position')
+        axes[ax_dict[0]].plot(stats['decoding_x']['mean'][:time_bin+1], stats['decoding_y']['mean'][:time_bin+1],
+                              color=color, label='Decoded position')
+        axes[ax_dict[0]].plot(stats['decoding_x']['mean'][time_bin], stats['decoding_y']['mean'][time_bin], color=color,
+                              marker='o', markersize='10', label='Current decoded position')
+        axes[ax_dict[0]].plot(track_bounds_xs, track_bounds_ys, color='black')
+        axes[ax_dict[0]].set(xlim=[-25, 25], ylim=ylims, xlabel='X position', ylabel='Y position')
+        axes[ax_dict[0]].legend(loc='lower left')
+        axes[ax_dict[0]].text(0.65, 0.1, f'Time to update: {np.round(times[time_bin],2):.2f} s',
+                              transform=axes[ax_dict[0]].transAxes, fontsize=14,
                               verticalalignment='top', bbox=dict(boxstyle='round', facecolor='black', alpha=0.25))
-        axes[ax_dict[1]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
-                                  xycoords='data', xytext=(7, stats['position_y']['mean'][int(len(times)/2)]),
-                                  textcoords='data', va='center', arrowprops=dict(arrowstyle='<-'))
-        axes[ax_dict[1]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
+        axes[ax_dict[0]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
+                                  xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times)/2)]),
+                                  textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
+        axes[ax_dict[0]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
 
+        im = axes[ax_dict[1]].imshow(prob_map[:,:,time_bin], cmap='YlGnBu', origin='lower', aspect='auto',
+                                     vmin=0, vmax=0.5 * np.nanmax(prob_map),
+                                     extent=[xlims[0], xlims[1], ylims[0], ylims[1]])
+        axes[ax_dict[1]].plot(positions_x, positions_y,color='k', label='True position')
+        axes[ax_dict[1]].plot(positions_x[-1], positions_y[-1], color='k', marker='o', markersize='10', label='Current true position')
+        axes[ax_dict[1]].plot(track_bounds_xs, track_bounds_ys, color='black')
+        axes[ax_dict[1]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
+                                  xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times)/2)]),
+                                  textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
+        axes[ax_dict[1]].set(xlim=[-25, 25], ylim=ylims,  xlabel='X position', ylabel='Y position')  # cutoff some bc lo
+        axes[ax_dict[1]].set_title(f'{title} trials - probability density', fontsize=14)
+        plt.colorbar(im, ax=axes[ax_dict[1]], label='Probability density', pad=0.04, location='right', fraction=0.046)
 
 def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset, trials_to_flip):
     interpolated_position = []
@@ -255,8 +252,8 @@ def get_stats(data, axis=0):
 
 def create_track_boundaries():
     # establish track boundaries
-    coords = [[2, 1], [2, 245], [10, 260], [10, 280], [8, 280], [0.5, 267], [-0.5, 267], [-8, 280], [-10, 280],
-              [-10, 260], [-2, 245], [-2, 1], [2, 1]]
+    coords = [[2, 1], [2, 245], [35, 285], [25, 285], [8, 285], [0.5, 265], [-0.5, 265], [-8, 285], [-25, 285],
+              [-35, 285], [-2, 245], [-2, 1], [2, 1]]
     xs, ys = zip(*coords)
 
     return xs, ys
