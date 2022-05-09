@@ -12,10 +12,10 @@ from decoding import get_decoding_around_update, plot_decoding_around_update, ge
 from update_project.camera_sync.cam_plot_utils import write_camera_video
 
 # set inputs
-animals = [20, 25]  # 17, 20, 25, 28, 29
-dates_included = [210521, 210913]  #210913
+animals = [25]  # 17, 20, 25, 28, 29
+dates_included = [210913]  #210913
 dates_excluded = []
-overwrite_data = True
+overwrite_data = False
 overwrite_figures = True
 
 # load session info
@@ -69,8 +69,8 @@ for name, session in unique_sessions:
         print(f"Decoding 1d data for {session_id}")
         nb_bins = 30 # position
         bin_size = 0.5 # seconds
-        tuning_curves1d_y = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['y'], nb_bins=nb_bins, ep=time_support_non_update_trials)
-        tuning_curves1d_x = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['x'], nb_bins=nb_bins, ep=time_support_non_update_trials)
+        tuning_curves1d_y = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['y'], nb_bins=nb_bins, ep=time_support_all_trials)
+        tuning_curves1d_x = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['x'], nb_bins=nb_bins, ep=time_support_all_trials)
         decoded_y, proby_feature = nap.decode_1d(tuning_curves=tuning_curves1d_y,
                                                group=spikes,
                                                ep=time_support_all_trials,
@@ -86,7 +86,7 @@ for name, session in unique_sessions:
 
         # decode 2d data
         print(f"Decoding 2d data for {session_id}")
-        tuning_curves2d, binsxy = nap.compute_2d_tuning_curves(group=spikes, feature=position_tsg, nb_bins=nb_bins, ep=time_support_non_update_trials)
+        tuning_curves2d, binsxy = nap.compute_2d_tuning_curves(group=spikes, feature=position_tsg, nb_bins=nb_bins, ep=time_support_all_trials)
         decoded_xy, probxy_feature = nap.decode_2d(tuning_curves=tuning_curves2d,
                                                    group=spikes,
                                                    ep=time_support_all_trials,

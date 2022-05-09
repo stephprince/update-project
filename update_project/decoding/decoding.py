@@ -210,11 +210,11 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         axes[ax_dict[0]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times) / 2)]),
                                   xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times) / 2)]),
                                   textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
-        axes[ax_dict[0]].annotate('correct side', (17 * correct_multiplier, 250), textcoords='data', va='center')
+        axes[ax_dict[0]].annotate('correct side', (18 * correct_multiplier, 250), textcoords='data', va='center')
         axes[ax_dict[0]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
 
         im = axes[ax_dict[1]].imshow(prob_map[:, :, time_bin], cmap='YlGnBu', origin='lower', aspect='auto',
-                                     vmin=0, vmax=0.5 * np.nanmax(prob_map),
+                                     vmin=0, vmax=0.6 * np.nanmax(prob_map),
                                      extent=[xlims[0], xlims[1], ylims[0], ylims[1]])
         axes[ax_dict[1]].plot(positions_x, positions_y, color='k', label='True position')
         axes[ax_dict[1]].plot(positions_x[-1], positions_y[-1], color='k', marker='o', markersize='10',
@@ -223,7 +223,7 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         axes[ax_dict[1]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times) / 2)]),
                                   xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times) / 2)]),
                                   textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
-        axes[ax_dict[1]].annotate('correct side', (17 * correct_multiplier, 250), textcoords='data', va='center')
+        axes[ax_dict[1]].annotate('correct side', (18 * correct_multiplier, 250), textcoords='data', va='center')
         axes[ax_dict[1]].set(xlim=[-25, 25], ylim=ylims, xlabel='X position', ylabel='Y position')  # cutoff some bc lo
         axes[ax_dict[1]].set_title(f'{title} trials - probability density', fontsize=14)
         plt.colorbar(im, ax=axes[ax_dict[1]], label='Probability density', pad=0.04, location='right', fraction=0.046)
@@ -428,21 +428,44 @@ def plot_decoding_error_summary(all_decoding_data, decoding_matrix_prob, positio
     plt.colorbar(im, ax=axes[ax_dict[0]], label='probability / chance', pad=0.04, location='right', fraction=0.046)
 
     # plot box/violin plot of decoding errors across sessions
+    h_offset = 0.15
     axes[ax_dict[1]] = sns.violinplot(data=all_decoding_data, y='decoding_error', color='k', ax=axes[ax_dict[1]])
     plt.setp(axes[ax_dict[1]].collections, alpha=.25)
     axes[ax_dict[1]].set_title(f'Group error - {title} position')
+    axes[ax_dict[1]].set_ylim([0, limits[1]-limits[0]])
+    axes[ax_dict[1]].annotate(f"median: {all_decoding_data['decoding_error'].median():.2f}", (h_offset, limits[1]-limits[0]-text_offset*2),
+                              textcoords='data', ha='left')
+    axes[ax_dict[1]].annotate(f"mean: {all_decoding_data['decoding_error'].mean():.2f}", (h_offset, limits[1]-limits[0]-text_offset),
+                              textcoords='data', ha='left')
 
     axes[ax_dict[2]] = sns.violinplot(data=all_decoding_data, y='decoding_error', x='animal', palette='husl', ax=axes[ax_dict[2]])
     plt.setp(axes[ax_dict[2]].collections, alpha=.25)
     axes[ax_dict[2]].set_title(f'Individual error - {title} position')
+    axes[ax_dict[2]].set_ylim([0, limits[1]-limits[0]])
+    medians = all_decoding_data.groupby(['animal'])['decoding_error'].median()
+    means = all_decoding_data.groupby(['animal'])['decoding_error'].mean()
+    for xtick in axes[ax_dict[2]].get_xticks():
+        axes[ax_dict[2]].annotate(f"median: {medians.iloc[xtick]:.2f}", (xtick+h_offset, limits[1]-limits[0]-text_offset*2), textcoords='data', ha='left')
+        axes[ax_dict[2]].annotate(f"mean: {means.iloc[xtick]:.2f}", (xtick+h_offset, limits[1]-limits[0]-text_offset), textcoords='data', ha='left')
 
     axes[ax_dict[3]] = sns.violinplot(data=session_rmse, y='session_rmse', color='k', ax=axes[ax_dict[3]])
     plt.setp(axes[ax_dict[3]].collections, alpha=.25)
     sns.stripplot(data=session_rmse, y='session_rmse', color="k", size=3, jitter=True, ax=axes[ax_dict[3]])
     axes[ax_dict[3]].set_title(f'Group session RMSE - {title} position')
+    axes[ax_dict[3]].set_ylim([0, limits[1]-limits[0]])
+    axes[ax_dict[3]].annotate(f"median: {session_rmse['session_rmse'].median():.2f}", (h_offset, limits[1]-limits[0]-text_offset*2),
+                              textcoords='data', ha='left')
+    axes[ax_dict[3]].annotate(f"mean: {session_rmse['session_rmse'].mean():.2f}", (h_offset, limits[1]-limits[0]-text_offset),
+                              textcoords='data', ha='left')
 
     axes[ax_dict[4]] = sns.violinplot(data=session_rmse, y='session_rmse', x='animal', palette='husl', ax=axes[ax_dict[4]])
     plt.setp(axes[ax_dict[4]].collections, alpha=.25)
     sns.stripplot(data=session_rmse, y='session_rmse', x='animal', color="k", size=3, jitter=True, ax=axes[ax_dict[4]])
     axes[ax_dict[4]].set_title(f'Individual session RMSE - {title} position')
+    axes[ax_dict[4]].set_ylim([0, limits[1]-limits[0]])
+    medians = session_rmse.groupby(['animal'])['session_rmse'].median()
+    means = session_rmse.groupby(['animal'])['session_rmse'].mean()
+    for xtick in axes[ax_dict[4]].get_xticks():
+        axes[ax_dict[4]].annotate(f"median: {medians.iloc[xtick]:.2f}", (xtick+h_offset, limits[1]-limits[0]-text_offset*2), textcoords='data', ha='left')
+        axes[ax_dict[4]].annotate(f"mean: {means.iloc[xtick]:.2f}", (xtick+h_offset, limits[1]-limits[0]-text_offset), textcoords='data', ha='left')
 

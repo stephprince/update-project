@@ -73,7 +73,7 @@ plot_decoding_error_summary(all_decoding_data['x'], decoding_matrix_prob['x'], p
 plot_decoding_error_summary(all_decoding_data['y'], decoding_matrix_prob['y'], position_bins['y'], session_rmse['y'],
                             locations['y'], nb_bins, 'y', axes, ['F', 'G', 'H', 'I', 'J'])
 
-plt.suptitle(f'Group decoding accuracy', fontsize=20)
+plt.suptitle(f'Group decoding accuracy - non update trials only', fontsize=20)
 plt.tight_layout()
 
 # save figure
