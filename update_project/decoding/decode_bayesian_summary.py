@@ -15,9 +15,9 @@ from units import align_by_time_intervals
 
 # set inputs
 animals = [17, 20, 25, 28, 29] # 17, 20, 25, 28, 29
-dates_included = []
+dates_included = [210521]
 dates_excluded = []
-overwrite_data = False
+overwrite_data = True
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
@@ -96,7 +96,7 @@ for name, session in unique_sessions:
         decoded_series = decoded.as_series()  # TODO - figure out why decoded and actual series are diff lengths
         df_decode_results = pd.merge(decoded_series.rename('decoded_position'), actual_series, how='left', left_index=True, right_index=True)
         df_decode_results['decoding_error'] = abs(df_decode_results['decoded_position'] - df_decode_results['actual_position'])
-        df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20, min_periods=1).mean()
+        df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20, min_periods=20).mean()
         df_decode_results['prob_dist'] = [x for x in proby_feature.as_dataframe().to_numpy()]
 
         # get decoding matrices

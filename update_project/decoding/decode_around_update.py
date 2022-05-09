@@ -12,10 +12,10 @@ from decoding import get_decoding_around_update, plot_decoding_around_update, ge
 from update_project.camera_sync.cam_plot_utils import write_camera_video
 
 # set inputs
-animals = [25]  # 17, 20, 25, 28, 29
-dates_included = [210913] #210913
+animals = [20, 25]  # 17, 20, 25, 28, 29
+dates_included = [210521, 210913]  #210913
 dates_excluded = []
-overwrite_data = False
+overwrite_data = True
 overwrite_figures = True
 
 # load session info
