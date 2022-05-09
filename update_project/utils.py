@@ -2,7 +2,7 @@ import pandas as pd
 
 def get_session_info(filename, animals, dates_included=None, dates_excluded=None, behavior=None):
     # import all session info
-    df_all = pd.read_csv(filename, skiprows=[1])  # skip the first row that's just the detailed header info
+    df_all = pd.read_csv(filename, skiprows=[1], encoding='cp1252')  # skip the first row that's just the detailed header info
 
     # if None values, deal with appropriately so it doesn't negatively affect the filtering
     dates_incl = dates_included or df_all['Date']                   # if no value given, include all dates
