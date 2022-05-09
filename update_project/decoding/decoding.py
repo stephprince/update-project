@@ -199,6 +199,7 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         axes[ax_dict[1]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
                                   xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times)/2)]),
                                   textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
+        axes[ax_dict[1]].annotate('correct side', (17*correct_multiplier, 250), textcoords='data', va='center')
         axes[ax_dict[1]].set(xlim=[-25, 25], ylim=ylims,  xlabel='X position', ylabel='Y position')  # cutoff some bc lo
         axes[ax_dict[1]].set_title(f'{title} trials - probability density', fontsize=14)
         plt.colorbar(im, ax=axes[ax_dict[1]], label='Probability density', pad=0.04, location='right', fraction=0.046)
