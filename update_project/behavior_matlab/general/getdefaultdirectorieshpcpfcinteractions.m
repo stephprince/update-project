@@ -3,11 +3,12 @@ function dirs = getdefaultdirectorieshpcpfcinteractions
 %this function sets all the default directories used for the analyses
 
 %% directory to save all the data into
-dirs.projectdir = '\\neuro-cloud\labs\singer\Steph\Code\update-project\';
+dirs.baseserverdir = '\\ad.gatech.edu\bme\labs\singer\';
+dirs.projectdir = [dirs.baseserverdir 'Steph\Code\update-project\'];
 
 %% directories to get and save data to
-dirs.virmendatadir = '\\neuro-cloud\labs\singer\Virmen Logs\UpdateTask\';
-dirs.processeddatadir = '\\neuro-cloud\labs\singer\ProcessedData\UpdateTask\';
+dirs.virmendatadir = [dirs.baseserverdir 'Virmen Logs\UpdateTask\'];
+dirs.processeddatadir = [dirs.baseserverdir  'ProcessedData\UpdateTask\'];
 dirs.savedfiguresdir = [dirs.projectdir 'results\'];
 
 %% files to use
