@@ -7,7 +7,6 @@ import seaborn as sns
 from git import Repo
 from pynwb import NWBHDF5IO
 from pathlib import Path
-from sklearn.model_selection import train_test_split
 from scipy.interpolate import griddata
 
 from update_project.utils import get_session_info
@@ -15,10 +14,10 @@ from plots import show_event_aligned_psth, show_start_aligned_psth
 from units import align_by_time_intervals
 
 # set inputs
-animals = [25] # 17, 20, 25, 28, 29
-dates_included = [210913, 210914]
+animals = [17, 20, 25, 28, 29] # 17, 20, 25, 28, 29
+dates_included = []
 dates_excluded = []
-overwrite_data = True
+overwrite_data = False
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
@@ -53,13 +52,13 @@ for name, session in unique_sessions:
     position = pd.DataFrame.from_dict(position)
     trial_epochs = nwbfile.intervals['trials'].to_dataframe()
     non_update_epochs = trial_epochs[trial_epochs['update_type'] == 1]
-    training_data, testing_data = train_test_split(non_update_epochs, test_size=0.2, random_state=21)
+    time_support_all_trials = nap.IntervalSet(start=trial_epochs['start_time'], end=trial_epochs['stop_time'], time_units='s')
     time_support_non_update = nap.IntervalSet(start=non_update_epochs['start_time'], end=non_update_epochs['stop_time'], time_units='s')
-    position_tsg = nap.TsdFrame(position, time_units='s', time_support=time_support_non_update)
+    position_tsg = nap.TsdFrame(position, time_units='s', time_support=time_support_all_trials)
 
     # get binning info
     nb_bins = 30  # position
-    bin_size = 1  # seconds
+    bin_size = 0.5  # seconds
     position_bins = np.linspace(np.min(position_tsg['y']), np.max(position_tsg['y']), nb_bins + 1)
 
     # load units structure
@@ -71,13 +70,13 @@ for name, session in unique_sessions:
         Path(intermediate_data_path).mkdir(parents=True, exist_ok=True)
 
         # compute 2d tuning curves
-        tuning_curves2d, binsxy = nap.compute_2d_tuning_curves(group=spikes, feature=position_tsg, nb_bins=nb_bins)
+        tuning_curves2d, binsxy = nap.compute_2d_tuning_curves(group=spikes, feature=position_tsg, nb_bins=nb_bins, ep=time_support_non_update)
 
         # decode 1d data
-        tuning_curves1d = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['y'], nb_bins=nb_bins)
+        tuning_curves1d = nap.compute_1d_tuning_curves(group=spikes, feature=position_tsg['y'], nb_bins=nb_bins, ep=time_support_non_update)
         decoded, proby_feature = nap.decode_1d(tuning_curves=tuning_curves1d,
                                                group=spikes,
-                                               ep=time_support,
+                                               ep=time_support_all_trials,
                                                bin_size=bin_size,  # second
                                                feature=position_tsg['y'],
                                                )
@@ -85,7 +84,7 @@ for name, session in unique_sessions:
         # get decoding error
         time_index = []
         position_mean = []
-        for index, trial in time_support.iterrows():
+        for index, trial in time_support_all_trials.iterrows():
             trial_bins = np.arange(trial['start'],trial['end']+bin_size, bin_size)
             bins = pd.cut(position['y'].index, trial_bins)
             position_mean.append(position['y'].groupby(bins).mean())
@@ -234,15 +233,4 @@ for name, session in unique_sessions:
 
     plt.close('all')
     io.close()
-
-
-# plot decoding errors across animals
-for name, session in unique_sessions:
-
-    # load file
-    session_id = f"{name[0]}{name[1]}_{name[2]}"  # {ID}{Animal}_{Date} e.g. S25_210913
-    figure_path = Path().absolute().parent.parent / 'results' / 'decoding' / f'{session_id}'
-    df_decode_results = pd.read_csv(intermediate_data_path / 'decoding_results.csv')
-
-
 

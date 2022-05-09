@@ -187,7 +187,7 @@ def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, c
         axes[ax_dict[0]].annotate('update cue on here', (2, stats['position_y']['mean'][int(len(times)/2)]),
                                   xycoords='data', xytext=(5, stats['position_y']['mean'][int(len(times)/2)]),
                                   textcoords='data', va='center', arrowprops=dict(arrowstyle='->'))
-        axes[ax_dict[0]].annotate('correct side', (15*correct_multiplier, 250), textcoords='data', va='center')
+        axes[ax_dict[0]].annotate('correct side', (17*correct_multiplier, 250), textcoords='data', va='center')
         axes[ax_dict[0]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
 
         im = axes[ax_dict[1]].imshow(prob_map[:,:,time_bin], cmap='YlGnBu', origin='lower', aspect='auto',
