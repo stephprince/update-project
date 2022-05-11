@@ -9,7 +9,7 @@ from nwbwidgets.utils.timeseries import bisect_timeseries_by_times, align_by_tri
 # load the nwb files
 nwb_filename = Path('../../data//test_behavior.nwb')
 
-io = NWBHDF5IO(nwb_filename,'r')
+io = NWBHDF5IO(str(nwb_filename),'r')
 nwbfile = io.read()
 
 # compile behavioral data

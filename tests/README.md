@@ -10,7 +10,7 @@ Run the follow commands
 
 ```python
 cd /path/to/files/update-project/update-project
-py.test shablona
+py.test update-project
 ```
 
 If you are using pycharm, you can also use the built in testing configuration
