@@ -9,9 +9,7 @@ from pynwb import NWBHDF5IO
 from pathlib import Path
 from scipy.interpolate import griddata
 
-from update_project.utils import get_session_info
-from plots import show_event_aligned_psth, show_start_aligned_psth
-from units import align_by_time_intervals
+from update_project.session_loader import get_session_info
 
 # set inputs
 animals = [17, 20, 25, 28, 29] # 17, 20, 25, 28, 29

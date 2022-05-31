@@ -7,7 +7,7 @@ from git import Repo
 from pynwb import NWBHDF5IO
 from pathlib import Path
 
-from update_project.utils import get_session_info
+from update_project.session_loader import get_session_info
 from decoding import get_decoding_around_update, plot_decoding_around_update, get_2d_decoding_around_update, plot_2d_decoding_around_update
 from update_project.camera_sync.cam_plot_utils import write_camera_video
 

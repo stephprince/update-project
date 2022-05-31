@@ -6,7 +6,7 @@ import seaborn as sns
 from git import Repo
 from pathlib import Path
 
-from update_project.utils import get_session_info
+from update_project.session_loader import get_session_info
 from update_project.decoding.decoding import get_decoding_error_summary, plot_decoding_error_summary
 
 # set inputs
