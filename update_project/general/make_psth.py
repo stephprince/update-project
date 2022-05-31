@@ -5,7 +5,7 @@ from git import Repo
 from pynwb import NWBHDF5IO
 from pathlib import Path
 
-from update_project.utils import get_session_info
+from update_project.session_loader import get_session_info
 from plots import show_event_aligned_psth, show_start_aligned_psth
 from units import align_by_time_intervals
 
@@ -16,7 +16,7 @@ dates_excluded = []  # need to run S20_210511, S20_210519, S25_210909, S28_21111
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
-spreadsheet_filename = 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv'
+spreadsheet_filename = '/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv'
 all_session_info = get_session_info(filename=spreadsheet_filename, animals=animals,
                                     dates_included=dates_included, dates_excluded=dates_excluded)
 unique_sessions = all_session_info.groupby(['ID', 'Animal', 'Date'])
