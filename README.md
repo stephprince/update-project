@@ -50,6 +50,8 @@ import update_project
     - location: this folder, `/ad.gatech.edu/bme/labs/singer/Steph/Code/update-project`
     - sub folders:
         - **doc/** - contains relevant documentation files (behavior csvs, methodology, manuscript drafts, etc.)
+                - ephys recording summary: `/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv`
+                - behavior summary: `/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv`
         - **results/** -  contains relevant output figures and intermediary data structures, not stored on github
         - **requirements.txt** -  contains the minimal package requirements for the project.
         - **update-project/** -  contains relevant matlab and python code
