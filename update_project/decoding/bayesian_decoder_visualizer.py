@@ -1,44 +1,157 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 
 from pathlib import Path
-from scipy.interpolate import griddata
-from decoding import plot_decoding_around_update, plot_2d_decoding_around_update
+
 from update_project.camera_sync.cam_plot_utils import write_camera_video
-from update_project.utils import create_track_boundaries
+from update_project.general.utils import create_track_boundaries
+from update_project.decoding.interpolate import griddata_time_intervals
 
 
 class BayesianDecoderVisualizer:
-    def __init__(self, dim_num):
-        self.dim_num = dim_num
+    def __init__(self, data, type='session'):
+        self.data = data
+        self.type = type
 
-    def plot_decoding_around_update(self):
+        # get example times
+        if self.type == 'session':
+            times, locs = self._get_example_period()
+            self.start_time = np.min(times)
+            self.end_time = np.max(times)
+            self.start_loc = np.min(locs)
+            self.end_loc = np.max(locs)
 
-        if self.dim_num == 1:
+        # calculate some of the basic input structures to plotting functions
+        self.confusion_matrix = self._get_confusion_matrix()
+        self.prob_density_grid = self._get_prob_density_grid()
+
+    def plot(self):
+        if self.type == 'session':
+            print(f'Plotting data for session {self.data.results_io.session_id}...')
+            self.plot_session_summary()
+            self.plot_aligned_data()
+        elif self.type == 'group':
+            print(f'Plotting data for group')
+            self.plot_group_summary()
+
+    def _get_confusion_matrix(self):
+        # get decoding matrices
+        if self.data.convert_to_binary:
+            bins = [-1, 0, 1]
+        else:
+            bins = self.data.bins
+        bins = pd.cut(self.data.summary_df['actual_feature'], bins, include_lowest=True)
+        decoding_matrix = self.data.summary_df['prob_dist'].groupby(bins).apply(
+            lambda x: np.nanmean(np.vstack(x.values), axis=0)).values
+
+        confusion_matrix = np.vstack(decoding_matrix).T  # transpose so that true position is on the x-axis
+
+        return confusion_matrix
+
+    def _get_example_period(self, window=500):
+        time_window = self.data.decoder_bin_size*window
+        times = [self.data.summary_df['decoding_error_rolling'].idxmin()]  # get times/locs with minimum error
+        locs = [self.data.summary_df.index.searchsorted(times[0])]
+        if (times[0] + time_window) < self.data.summary_df.index.max():
+            locs.append(self.data.summary_df.index.searchsorted(times[0] + time_window))
+        else:
+            locs.append(self.data.summary_df.index.searchsorted(times[0] - time_window))
+        times.append(self.data.summary_df.iloc[locs[1]].name)
+
+        return times, locs
+
+    def _get_prob_density_grid(self):
+        nbins = int(self.end_loc - self.start_loc)
+        trials_to_flip = self.data.test_data['turn_type'] == 100  # set all to false
+        grid_prob = griddata_time_intervals(self.data.prob_densities, [self.start_loc], [self.end_loc], nbins,
+                                            trials_to_flip, method='linear')
+
+        return np.squeeze(grid_prob)
+
+    def plot_session_summary(self):
+        # plot the decoding data
+        mosaic = """
+           AAAAAA
+           BBBBBB
+           CCCCCC
+           DDDEEE
+           DDDEEE
+           """
+        axes = plt.figure(figsize=(15, 15)).subplot_mosaic(mosaic)
+        label = self.data.feature_names[0]
+        range = self.data.bins[-1] - self.data.bins[0]
+
+        im = axes['A'].imshow(self.prob_density_grid, aspect='auto', origin='lower', cmap='YlGnBu', vmin=0, vmax=0.75,
+                              extent=[self.start_time, self.end_time, self.data.bins[0], self.data.bins[-1]], )
+        axes['A'].plot(self.data.features_test.loc[self.start_time:self.end_time], label='True', color=[0, 0, 0, 0.5],
+                       linestyle='dashed')
+        axes['A'].set(xlim=[self.start_time, self.end_time], ylim=[self.data.bins[0], self.data.bins[-1]], xlabel='Time (s)', ylabel=label)
+        axes['A'].set_title(f'Bayesian decoding - {self.data.results_io.session_id} - example period', fontsize=14)
+        axes['A'].legend(loc='upper right')
+
+        axes['B'].plot(self.data.features_test.loc[self.start_time:self.end_time], color=[0, 0, 0, 0.5], label='True')
+        axes['B'].plot(self.data.decoded_values.loc[self.start_time:self.end_time], color='b', label='Decoded')
+        axes['B'].set(xlim=[self.start_time, self.end_time], ylim=[self.data.bins[0], self.data.bins[-1]], xlabel='Time (s)', ylabel=label)
+        axes['B'].legend(loc='upper right')
+
+        axes['C'].plot(self.data.summary_df['decoding_error'].loc[self.start_time:self.end_time], color=[0, 0, 0],
+                       label='True')
+        axes['C'].set(xlim=[self.start_time, self.end_time], ylim=[0, range], xlabel='Time (s)', ylabel='Decoding error')
+
+        tick_values = self.data.model.index.values.astype(int)
+        tick_labels = np.array([0, int(len(tick_values) / 2), len(tick_values) - 1])
+        axes['D'] = sns.heatmap(self.confusion_matrix, cmap='YlGnBu', ax=axes['D'], square=True,
+                                vmin=0, vmax=0.5 * np.nanmax(self.confusion_matrix),
+                                cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
+        axes['D'].plot([0, 285], [0, 285], linestyle='dashed', color=[0, 0, 0, 0.5])
+        axes['D'].invert_yaxis()
+        axes['D'].set_title('Decoding accuracy ', fontsize=14)
+        axes['D'].set(xticks=tick_labels, yticks=tick_labels,
+                      xticklabels=tick_values[tick_labels], yticklabels=tick_values[tick_labels],
+                      xlabel=f'True {label}', ylabel=f'Decoded {label}')
+
+        axes['E'] = sns.ecdfplot(self.data.summary_df['decoding_error'], ax=axes['E'], color='k')
+        axes['E'].set_title('Decoding accuracy - error')
+        axes['E'].set(xlabel='Decoding error', ylabel='Proportion')
+        axes['E'].set_aspect(1. / axes['E'].get_data_ratio(), adjustable='box')
+
+        plt.colorbar(im, ax=axes['A'], label='Probability density', pad=0.06, location='bottom', shrink=0.25,
+                     anchor=(0.9, 1))
+        plt.tight_layout()
+
+        # save figure
+        kwargs = self.data.results_io.get_figure_args(f'decoding_summary_{label}', results_type='session')
+        plt.savefig(**kwargs)
+
+        plt.close('all')
+
+    def plot_aligned_data(self):
+        window = self.data.aligned_data_window
+        nbins = self.data.aligned_data_nbins
+        if self.data.dim_num == 1:
             mosaic = """
-            ABCD
-            EFGH
-            IJKL
-            MNOP
-            QRST
+            AACC
+            EEGG
+            IIKK
+            MMOO
+            QQSS
             """
             axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-            plot_decoding_around_update(y_around_switch, nbins, window, 'switch', 'y', [0, 258], 'b', axes, ['A', 'E', 'I', 'M', 'Q'])
-            plot_decoding_around_update(x_around_switch, nbins, window, 'switch', 'x', [-15, 15], 'purple', axes, ['B', 'F', 'J', 'N', 'R'])
-            plot_decoding_around_update(y_around_stay, nbins, window, 'stay', 'y', [0, 258], 'm', axes, ['C', 'G', 'K', 'O', 'S'])
-            plot_decoding_around_update(x_around_stay, nbins, window, 'stay', 'x', [-15, 15], 'g', axes, ['D', 'H', 'L', 'P', 'T'])
-            plt.suptitle(f'{session_id} decoding around update trials', fontsize=20)
+            feature_name = self.data.feature_names[0]
+            self.plot_1d_around_update(self.data.aligned_data['switch'][feature_name], nbins, window, 'switch',
+                                       feature_name, 'b', axes, ['A', 'E', 'I', 'M', 'Q'])
+            self.plot_1d_around_update(self.data.aligned_data['stay'][feature_name], nbins, window, 'stay',
+                                       feature_name, 'm', axes, ['C', 'G', 'K', 'O', 'S'])
+            plt.suptitle(f'{self.data.results_io.session_id} decoding around update trials', fontsize=20)
             plt.tight_layout()
 
-            kwargs = UpdateTaskFigureGenerator.get_figure_args(fname='decoding_around_update', session_id=session_id,
-                                                               format='pdf')
+            kwargs = self.data.results_io.get_figure_args(f'decoding_around_update_{feature_name}', results_type='session')
             plt.savefig(**kwargs)
-
-        elif self.dim_num == 2:
+        elif self.data.dim_num == 2:
             # plot 2d decoding around update
             times = np.linspace(-window, window, num=nbins)
-            Path(figure_path / 'timelapse_figures').mkdir(parents=True, exist_ok=True)
             plot_filenames = []
             for time_bin in range(nbins):
                 mosaic = """
@@ -46,36 +159,41 @@ class BayesianDecoderVisualizer:
                     CD
                     """
                 axes = plt.figure(figsize=(16, 8)).subplot_mosaic(mosaic)
-                plot_2d_decoding_around_update(xy_around_switch, time_bin, times, 'switch', 'b', axes, ['A', 'B'])
-                plot_2d_decoding_around_update(xy_around_stay, time_bin, times, 'stay', 'm', axes, ['C', 'D'])
-                plt.suptitle(f'{session_id} decoding around update trials', fontsize=20)
+                self.plot_2d_around_update(self.data.aligned_data['switch'], time_bin, times, 'switch', 'b', axes,
+                                           ['A', 'B'])
+                self.plot_2d_around_update(self.data.aligned_data['stay'], time_bin, times, 'stay', 'm', axes,
+                                           ['C', 'D'])
+                plt.suptitle(f'{self.data.results_io.session_id} decoding around update trials', fontsize=20)
                 plt.tight_layout()
 
-                filename = 'timelapse_figures'/ f'decoding_around_update_frame_no{time_bin}'
-                kwargs = UpdateTaskFigureGenerator.get_figure_args(fname=filename,
-                                                                   session_id=session_id,
-                                                                   format='pdf')
+                filename = f'decoding_around_update_frame_no{time_bin}'
+                kwargs = self.data.results_io.get_figure_args(fname=filename, format='pdf',
+                                                              results_name='timelapse_figures')
+                plot_filenames.append(kwargs['fname'])
+
                 plt.savefig(**kwargs)
                 plt.close()
-                plot_filenames.append(filename)
 
             # make videos for each plot type
-            fps = 5.0
             vid_filename = f'decoding_around_update_video'
-            write_camera_video(figure_path, fps, plot_filenames, vid_filename)
+            results_path = self.data.results_io.get_results_path(results_type='session')
+            write_camera_video(results_path, plot_filenames, vid_filename)
 
         plt.close('all')
 
-    def plot_decoding_around_update(self, data_around_update, nbins, window, title, label, limits, color, axes, ax_dict):
+    def plot_1d_around_update(self, data_around_update, nbins, window, title, label, color, axes,
+                              ax_dict):
+
+        limits = [np.min(np.min(data_around_update['feature'])), np.max(np.max(data_around_update['feature']))]
         stats = data_around_update['stats']
         times = np.linspace(-window, window, num=nbins)
         time_tick_values = times.astype(int)
         time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
-        if label == 'x':
+        if self.data.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
             cmap_pos = 'RdGy'
             cmap_decoding = 'PRGn'
-            scaling_value = 0.25
-        elif label == 'y':
+            scaling_value = 0.5
+        elif self.data.feature_names[0] in ['y_position']:  # sequential color map for seq data
             cmap_pos = 'Greys'
             if title == 'switch':
                 cmap_decoding = 'Blues'
@@ -91,11 +209,9 @@ class BayesianDecoderVisualizer:
             ytick_values = data_values.astype(int)
             ytick_labels = np.array([0, int(len(ytick_values) / 2), len(ytick_values) - 1])
             update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
-                                  [0, np.shape(data_around_update['position'])[1]]]
-            v_lims_position = [np.nanmin(data_around_update['position']), np.nanmax(data_around_update['position'])]
-            v_lims_decoding = [np.nanmin(data_around_update['decoding']), np.nanmax(data_around_update['decoding'])]
+                                  [0, np.shape(data_around_update['feature'])[1]]]
             pos_values_after_update = np.sum(
-                data_around_update['position'][time_tick_labels[1]:time_tick_labels[1] + 10],
+                data_around_update['feature'][time_tick_labels[1]:time_tick_labels[1] + 10],
                 axis=0)
             sort_index = np.argsort(pos_values_after_update)
 
@@ -107,22 +223,22 @@ class BayesianDecoderVisualizer:
             axes[ax_dict[0]].invert_yaxis()
             axes[ax_dict[0]].set(xticks=time_tick_labels, yticks=ytick_labels,
                                  xticklabels=time_tick_values[time_tick_labels], yticklabels=ytick_values[ytick_labels],
-                                 xlabel='Time around update (s)', ylabel=f'{label} position')
-            axes[ax_dict[0]].set_title(f'{title} trials - probability density - {label} position', fontsize=14)
+                                 xlabel='Time around update (s)', ylabel=f'{label}')
+            axes[ax_dict[0]].set_title(f'{title} trials - probability density - {label}', fontsize=14)
 
-            axes[ax_dict[1]].plot(times, stats['position']['mean'], color='k', label='True position')
-            axes[ax_dict[1]].fill_between(times, stats['position']['lower'], stats['position']['upper'], alpha=0.2,
+            axes[ax_dict[1]].plot(times, stats['feature']['mean'], color='k', label='True position')
+            axes[ax_dict[1]].fill_between(times, stats['feature']['lower'], stats['feature']['upper'], alpha=0.2,
                                           color='k', label='95% CI')
             axes[ax_dict[1]].plot(times, stats['decoding']['mean'], color=color, label='Decoded position')
             axes[ax_dict[1]].fill_between(times, stats['decoding']['lower'], stats['decoding']['upper'], alpha=0.2,
                                           color=color, label='95% CI')
             axes[ax_dict[1]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
             axes[ax_dict[1]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)',
-                                 ylabel=f'{label} position')
+                                 ylabel=f'{label}')
             axes[ax_dict[1]].legend(loc='upper left')
             axes[ax_dict[1]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
 
-            axes[ax_dict[2]] = sns.heatmap(data_around_update['position'][:, sort_index].T, cmap=cmap_pos,
+            axes[ax_dict[2]] = sns.heatmap(data_around_update['feature'][:, sort_index].T, cmap=cmap_pos,
                                            ax=axes[ax_dict[2]],
                                            vmin=scaling_value * limits[0], vmax=scaling_value * limits[1],
                                            cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
@@ -130,7 +246,7 @@ class BayesianDecoderVisualizer:
                                   color=[0, 0, 0, 0.5])
             axes[ax_dict[2]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
                                  xlabel='Time around update (s)', ylabel='Trials')
-            axes[ax_dict[2]].set_title(f'{title} trials - true {label} position', fontsize=14)
+            axes[ax_dict[2]].set_title(f'{title} trials - true {label}', fontsize=14)
 
             axes[ax_dict[3]] = sns.heatmap(data_around_update['decoding'][:, sort_index].T, cmap=cmap_decoding,
                                            ax=axes[ax_dict[3]],
@@ -140,7 +256,7 @@ class BayesianDecoderVisualizer:
                                   color=[0, 0, 0, 0.5])
             axes[ax_dict[3]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
                                  xlabel='Time around update (s)', ylabel='Trials')
-            axes[ax_dict[3]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
+            axes[ax_dict[3]].set_title(f'{title} trials - decoded {label}', fontsize=14)
 
             axes[ax_dict[4]].plot(times, stats['error']['mean'], color='r', label='|True - decoded|')
             axes[ax_dict[4]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color='r',
@@ -149,10 +265,10 @@ class BayesianDecoderVisualizer:
                                   alpha=0.25)
             axes[ax_dict[4]].set(xlim=[-window, window], ylim=[0, np.max(stats['error']['upper'])],
                                  xlabel='Time around update(s)', ylabel=label)
-            axes[ax_dict[4]].set_title(f'{title} trials - decoding error {label} position', fontsize=14)
+            axes[ax_dict[4]].set_title(f'{title} trials - decoding error {label}', fontsize=14)
             axes[ax_dict[4]].legend(loc='upper left')
 
-    def plot_2d_decoding_around_update(data_around_update, time_bin, times, title, color, axes, ax_dict):
+    def plot_2d_around_update(self, data_around_update, time_bin, times, title, color, axes, ax_dict):
         stats = data_around_update['stats']
         prob_map = np.nanmean(data_around_update['probability'], axis=0)
         if title == 'switch':
@@ -164,8 +280,8 @@ class BayesianDecoderVisualizer:
         track_bounds_xs, track_bounds_ys = create_track_boundaries()
 
         if data_around_update['probability']:  # skip if there is no data
-            positions_y = stats['position_y']['mean'][:time_bin + 1]
-            positions_x = stats['position_x']['mean'][:time_bin + 1]
+            positions_y = stats['feature']['mean'][:time_bin + 1]
+            positions_x = stats['feature']['mean'][:time_bin + 1]
 
             axes[ax_dict[0]].plot(positions_x, positions_y, color='k', label='True position')
             axes[ax_dict[0]].plot(positions_x[-1], positions_y[-1], color='k', marker='o', markersize='10',
@@ -205,8 +321,7 @@ class BayesianDecoderVisualizer:
             plt.colorbar(im, ax=axes[ax_dict[1]], label='Probability density', pad=0.04, location='right',
                          fraction=0.046)
 
-
-    def plot_decoding_accuracy(self):
+    def plot_group_summary(self):
         # plot data for all sessions
         mosaic = """
         AABCC
@@ -220,189 +335,94 @@ class BayesianDecoderVisualizer:
                      'y': {'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35, 'delay2 cue': 250.35,
                            'choice cue': 285}}
 
-        plot_decoding_error_summary(all_decoding_data['x'], decoding_matrix_prob['x'], position_bins['x'],
-                                    session_rmse['x'],
-                                    locations['x'], nb_bins, 'x', axes, ['A', 'B', 'C', 'D', 'E'])
-        plot_decoding_error_summary(all_decoding_data['y'], decoding_matrix_prob['y'], position_bins['y'],
-                                    session_rmse['y'],
-                                    locations['y'], nb_bins, 'y', axes, ['F', 'G', 'H', 'I', 'J'])
+        pos_values = position_bins.astype(int)
+        limits = [np.min(pos_values), np.max(pos_values)]
+        matrix = np.vstack(decoding_matrix_prob) * nb_bins
+        im = axes[ax_dict[0]].imshow(matrix.T, cmap='YlGnBu', origin='lower',  # aspect='auto',
+                                     vmin=0, vmax=0.3 * np.nanmax(matrix),
+                                     extent=[limits[0], limits[1], limits[0], limits[1]])
+        text_offset = (limits[1] - limits[0]) / 15
+        previous = np.min(pos_values)
+        for key, value in locations.items():
+            axes[ax_dict[0]].plot([value, value], [limits[0], limits[1]], linestyle='dashed', color=[0, 0, 0, 0.5])
+            axes[ax_dict[0]].plot([limits[0], limits[1]], [value, value], linestyle='dashed', color=[0, 0, 0, 0.5])
+            annotation_loc = np.mean([previous, value])
+            axes[ax_dict[0]].annotate(f'{key}', (annotation_loc, limits[0]), xycoords='data',
+                                      xytext=(annotation_loc, limits[0] - text_offset),
+                                      textcoords='data', ha='center')
+            axes[ax_dict[0]].annotate(f'{key}', (limits[0], annotation_loc), xycoords='data',
+                                      xytext=(limits[0] - text_offset, annotation_loc),
+                                      textcoords='data', ha='center')
+            previous = value
+        axes[ax_dict[0]].set_title(f'{title} decoding accuracy - avg prob', fontsize=14)
+        axes[ax_dict[0]].set_xlabel(f'Actual {title} position', labelpad=20)
+        axes[ax_dict[0]].set_ylabel(f'Decoded {title} position', labelpad=20)
+
+        plt.colorbar(im, ax=axes[ax_dict[0]], label='probability / chance', pad=0.04, location='right',
+                     fraction=0.046)
+
+        # plot box/violin plot of decoding errors across sessions
+        h_offset = 0.15
+        axes[ax_dict[1]] = sns.violinplot(data=all_decoding_data, y='decoding_error', color='k',
+                                          ax=axes[ax_dict[1]])
+        plt.setp(axes[ax_dict[1]].collections, alpha=.25)
+        axes[ax_dict[1]].set_title(f'Group error - {title} position')
+        axes[ax_dict[1]].set_ylim([0, limits[1] - limits[0]])
+        axes[ax_dict[1]].annotate(f"median: {all_decoding_data['decoding_error'].median():.2f}",
+                                  (h_offset, limits[1] - limits[0] - text_offset * 2),
+                                  textcoords='data', ha='left')
+        axes[ax_dict[1]].annotate(f"mean: {all_decoding_data['decoding_error'].mean():.2f}",
+                                  (h_offset, limits[1] - limits[0] - text_offset),
+                                  textcoords='data', ha='left')
+
+        axes[ax_dict[2]] = sns.violinplot(data=all_decoding_data, y='decoding_error', x='animal', palette='husl',
+                                          ax=axes[ax_dict[2]])
+        plt.setp(axes[ax_dict[2]].collections, alpha=.25)
+        axes[ax_dict[2]].set_title(f'Individual error - {title} position')
+        axes[ax_dict[2]].set_ylim([0, limits[1] - limits[0]])
+        medians = all_decoding_data.groupby(['animal'])['decoding_error'].median()
+        means = all_decoding_data.groupby(['animal'])['decoding_error'].mean()
+        for xtick in axes[ax_dict[2]].get_xticks():
+            axes[ax_dict[2]].annotate(f"median: {medians.iloc[xtick]:.2f}",
+                                      (xtick + h_offset, limits[1] - limits[0] - text_offset * 2),
+                                      textcoords='data', ha='left')
+            axes[ax_dict[2]].annotate(f"mean: {means.iloc[xtick]:.2f}",
+                                      (xtick + h_offset, limits[1] - limits[0] - text_offset), textcoords='data',
+                                      ha='left')
+
+        axes[ax_dict[3]] = sns.violinplot(data=session_rmse, y='session_rmse', color='k', ax=axes[ax_dict[3]])
+        plt.setp(axes[ax_dict[3]].collections, alpha=.25)
+        sns.stripplot(data=session_rmse, y='session_rmse', color="k", size=3, jitter=True, ax=axes[ax_dict[3]])
+        axes[ax_dict[3]].set_title(f'Group session RMSE - {title} position')
+        axes[ax_dict[3]].set_ylim([0, limits[1] - limits[0]])
+        axes[ax_dict[3]].annotate(f"median: {session_rmse['session_rmse'].median():.2f}",
+                                  (h_offset, limits[1] - limits[0] - text_offset * 2),
+                                  textcoords='data', ha='left')
+        axes[ax_dict[3]].annotate(f"mean: {session_rmse['session_rmse'].mean():.2f}",
+                                  (h_offset, limits[1] - limits[0] - text_offset),
+                                  textcoords='data', ha='left')
+
+        axes[ax_dict[4]] = sns.violinplot(data=session_rmse, y='session_rmse', x='animal', palette='husl',
+                                          ax=axes[ax_dict[4]])
+        plt.setp(axes[ax_dict[4]].collections, alpha=.25)
+        sns.stripplot(data=session_rmse, y='session_rmse', x='animal', color="k", size=3, jitter=True,
+                      ax=axes[ax_dict[4]])
+        axes[ax_dict[4]].set_title(f'Individual session RMSE - {title} position')
+        axes[ax_dict[4]].set_ylim([0, limits[1] - limits[0]])
+        medians = session_rmse.groupby(['animal'])['session_rmse'].median()
+        means = session_rmse.groupby(['animal'])['session_rmse'].mean()
+        for xtick in axes[ax_dict[4]].get_xticks():
+            axes[ax_dict[4]].annotate(f"median: {medians.iloc[xtick]:.2f}",
+                                      (xtick + h_offset, limits[1] - limits[0] - text_offset * 2),
+                                      textcoords='data', ha='left')
+            axes[ax_dict[4]].annotate(f"mean: {means.iloc[xtick]:.2f}",
+                                      (xtick + h_offset, limits[1] - limits[0] - text_offset), textcoords='data',
+                                      ha='left')
 
         plt.suptitle(f'Group decoding accuracy - non update trials only', fontsize=20)
         plt.tight_layout()
 
-
-        kwargs = UpdateTaskFigureGenerator.get_figure_args(fname='decoding_error_summary_position',
-                                                           session_id=session_id,
-                                                           format='pdf')
+        kwargs = self.data.results_io.get_figure_args(fname='decoding_error_summary_position',
+                                                      session_id=session_id,
+                                                      format='pdf')
         plt.savefig(filename, dpi=300, metadata={'Creator': this_filename})
-
-    def plot_decoding_summary(self):
-        # plot the decoding data
-        mosaic = """
-           AAAAAA
-           BBBBBB
-           CCCCCC
-           DDEEFF
-           DDEEFF
-           """
-        axes = plt.figure(figsize=(15, 15)).subplot_mosaic(mosaic)
-
-        time_window = 250
-        min_error_time = df_decode_results['decoding_error_rolling'].idxmin()
-        min_error_index = np.searchsorted(df_decode_results.index, min_error_time)
-        if (min_error_index + time_window) < len(df_decode_results):
-            start_time = min_error_time
-            end_time = df_decode_results.index[min_error_index + time_window]
-        else:
-            start_time = df_decode_results.index[min_error_index - time_window]
-            end_time = min_error_time
-
-        prob = proby_feature.loc[start_time:end_time].stack().reset_index().values
-        x1 = np.linspace(min(prob[:, 0]), max(prob[:, 0]), int(end_time - start_time))
-        y1 = np.linspace(min(prob[:, 1]), max(prob[:, 1]), len(proby_feature.columns))
-        grid_x, grid_y = np.meshgrid(x1, y1)
-        grid_prob = griddata(prob[:, 0:2], prob[:, 2], (grid_x, grid_y), method='nearest', fill_value=np.nan)
-
-        im = axes['A'].imshow(grid_prob, aspect='auto', origin='lower', cmap='YlGnBu',  # RdPu
-                              extent=[start_time, end_time, position_bins[0], position_bins[-1]],
-                              vmin=0, vmax=0.75)
-        axes['A'].plot((position_tsg['y'].loc[start_time:end_time]), label='True', color=[0, 0, 0, 0.5],
-                       linestyle='dashed')
-        axes['A'].set(xlim=[start_time, end_time], ylim=[0, 285],
-                      xlabel='Time (s)', ylabel='Y position')
-        axes['A'].set_title(f'Bayesian decoding - {session_id} - example period', fontsize=14)
-        axes['A'].legend(loc='upper right')
-
-        axes['B'].plot(position_tsg['y'].loc[start_time:end_time], color=[0, 0, 0, 0.5], label='True')
-        axes['B'].plot(decoded.loc[start_time:end_time], color='b', label='Decoded')
-        axes['B'].set(xlim=[start_time, end_time], ylim=[0, 285],
-                      xlabel='Time (s)', ylabel='Y position')
-        axes['B'].legend(loc='upper right')
-
-        axes['C'].plot(df_decode_results['decoding_error'].loc[start_time:end_time], color=[0, 0, 0], label='True')
-        axes['C'].set(xlim=[start_time, end_time], ylim=[0, 285],
-                      xlabel='Time (s)', ylabel='Decoding error')
-
-        tick_values = tuning_curves1d.index.values.astype(int)
-        tick_labels = np.array([0, int(len(tick_values) / 2), len(tick_values) - 1])
-        axes['D'] = sns.heatmap(np.vstack(decoding_matrix), cmap='YlGnBu', ax=axes['D'], square=True,
-                                vmin=0, vmax=0.75 * np.nanmax(np.vstack(decoding_matrix)),
-                                cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
-        axes['D'].plot([0, 285], [0, 285], linestyle='dashed', color=[0, 0, 0, 0.5])
-        axes['D'].invert_yaxis()
-        axes['D'].set_title('Decoding accuracy - peak', fontsize=14)
-        axes['D'].set(xticks=tick_labels, yticks=tick_labels,
-                      xticklabels=tick_values[tick_labels], yticklabels=tick_values[tick_labels],
-                      xlabel='Decoded Position', ylabel='Actual Position')
-
-        axes['E'] = sns.heatmap(np.vstack(decoding_matrix_prob), cmap='YlGnBu', ax=axes['E'], square=True,
-                                vmin=0, vmax=0.75 * np.nanmax(np.vstack(decoding_matrix_prob)),
-                                cbar_kws={'pad': 0.01, 'label': 'mean probability', 'fraction': 0.046})
-        axes['E'].plot([0, 285], [0, 285], linestyle='dashed', color=[0, 0, 0, 0.5])
-        axes['E'].invert_yaxis()
-        axes['E'].set_title('Decoding accuracy - avg prob', fontsize=14)
-        axes['E'].set(xticks=tick_labels, yticks=tick_labels,
-                      xticklabels=tick_values[tick_labels], yticklabels=tick_values[tick_labels],
-                      xlabel='Decoded Position', ylabel='Actual Position')
-
-        axes['F'] = sns.ecdfplot(df_decode_results['decoding_error'], ax=axes['F'], color='k')
-        axes['F'].set_title('Decoding accuracy - error')
-        axes['F'].set(xlabel='Decoding error', ylabel='Proportion')
-        axes['F'].set_aspect(1. / axes['F'].get_data_ratio(), adjustable='box')
-
-        plt.colorbar(im, ax=axes['A'], label='Probability density', pad=0.06, location='bottom', shrink=0.25,
-                     anchor=(0.9, 1))
-        plt.tight_layout()
-
-        # save figure
-        filename = figure_path / f'decoding_summary_git{short_hash}.pdf'
-        plt.savefig(filename, dpi=300, metadata={'Creator': this_filename})
-
-        plt.close('all')
-        io.close()
-
-        def plot_decoding_error_summary(all_decoding_data, decoding_matrix_prob, position_bins, session_rmse, locations,
-                                        nb_bins, title, axes, ax_dict):
-            pos_values = position_bins.astype(int)
-            limits = [np.min(pos_values), np.max(pos_values)]
-            matrix = np.vstack(decoding_matrix_prob) * nb_bins
-            im = axes[ax_dict[0]].imshow(matrix.T, cmap='YlGnBu', origin='lower',  # aspect='auto',
-                                         vmin=0, vmax=0.3 * np.nanmax(matrix),
-                                         extent=[limits[0], limits[1], limits[0], limits[1]])
-            text_offset = (limits[1] - limits[0]) / 15
-            previous = np.min(pos_values)
-            for key, value in locations.items():
-                axes[ax_dict[0]].plot([value, value], [limits[0], limits[1]], linestyle='dashed', color=[0, 0, 0, 0.5])
-                axes[ax_dict[0]].plot([limits[0], limits[1]], [value, value], linestyle='dashed', color=[0, 0, 0, 0.5])
-                annotation_loc = np.mean([previous, value])
-                axes[ax_dict[0]].annotate(f'{key}', (annotation_loc, limits[0]), xycoords='data',
-                                          xytext=(annotation_loc, limits[0] - text_offset),
-                                          textcoords='data', ha='center')
-                axes[ax_dict[0]].annotate(f'{key}', (limits[0], annotation_loc), xycoords='data',
-                                          xytext=(limits[0] - text_offset, annotation_loc),
-                                          textcoords='data', ha='center')
-                previous = value
-            axes[ax_dict[0]].set_title(f'{title} decoding accuracy - avg prob', fontsize=14)
-            axes[ax_dict[0]].set_xlabel(f'Actual {title} position', labelpad=20)
-            axes[ax_dict[0]].set_ylabel(f'Decoded {title} position', labelpad=20)
-
-            plt.colorbar(im, ax=axes[ax_dict[0]], label='probability / chance', pad=0.04, location='right',
-                         fraction=0.046)
-
-            # plot box/violin plot of decoding errors across sessions
-            h_offset = 0.15
-            axes[ax_dict[1]] = sns.violinplot(data=all_decoding_data, y='decoding_error', color='k',
-                                              ax=axes[ax_dict[1]])
-            plt.setp(axes[ax_dict[1]].collections, alpha=.25)
-            axes[ax_dict[1]].set_title(f'Group error - {title} position')
-            axes[ax_dict[1]].set_ylim([0, limits[1] - limits[0]])
-            axes[ax_dict[1]].annotate(f"median: {all_decoding_data['decoding_error'].median():.2f}",
-                                      (h_offset, limits[1] - limits[0] - text_offset * 2),
-                                      textcoords='data', ha='left')
-            axes[ax_dict[1]].annotate(f"mean: {all_decoding_data['decoding_error'].mean():.2f}",
-                                      (h_offset, limits[1] - limits[0] - text_offset),
-                                      textcoords='data', ha='left')
-
-            axes[ax_dict[2]] = sns.violinplot(data=all_decoding_data, y='decoding_error', x='animal', palette='husl',
-                                              ax=axes[ax_dict[2]])
-            plt.setp(axes[ax_dict[2]].collections, alpha=.25)
-            axes[ax_dict[2]].set_title(f'Individual error - {title} position')
-            axes[ax_dict[2]].set_ylim([0, limits[1] - limits[0]])
-            medians = all_decoding_data.groupby(['animal'])['decoding_error'].median()
-            means = all_decoding_data.groupby(['animal'])['decoding_error'].mean()
-            for xtick in axes[ax_dict[2]].get_xticks():
-                axes[ax_dict[2]].annotate(f"median: {medians.iloc[xtick]:.2f}",
-                                          (xtick + h_offset, limits[1] - limits[0] - text_offset * 2),
-                                          textcoords='data', ha='left')
-                axes[ax_dict[2]].annotate(f"mean: {means.iloc[xtick]:.2f}",
-                                          (xtick + h_offset, limits[1] - limits[0] - text_offset), textcoords='data',
-                                          ha='left')
-
-            axes[ax_dict[3]] = sns.violinplot(data=session_rmse, y='session_rmse', color='k', ax=axes[ax_dict[3]])
-            plt.setp(axes[ax_dict[3]].collections, alpha=.25)
-            sns.stripplot(data=session_rmse, y='session_rmse', color="k", size=3, jitter=True, ax=axes[ax_dict[3]])
-            axes[ax_dict[3]].set_title(f'Group session RMSE - {title} position')
-            axes[ax_dict[3]].set_ylim([0, limits[1] - limits[0]])
-            axes[ax_dict[3]].annotate(f"median: {session_rmse['session_rmse'].median():.2f}",
-                                      (h_offset, limits[1] - limits[0] - text_offset * 2),
-                                      textcoords='data', ha='left')
-            axes[ax_dict[3]].annotate(f"mean: {session_rmse['session_rmse'].mean():.2f}",
-                                      (h_offset, limits[1] - limits[0] - text_offset),
-                                      textcoords='data', ha='left')
-
-            axes[ax_dict[4]] = sns.violinplot(data=session_rmse, y='session_rmse', x='animal', palette='husl',
-                                              ax=axes[ax_dict[4]])
-            plt.setp(axes[ax_dict[4]].collections, alpha=.25)
-            sns.stripplot(data=session_rmse, y='session_rmse', x='animal', color="k", size=3, jitter=True,
-                          ax=axes[ax_dict[4]])
-            axes[ax_dict[4]].set_title(f'Individual session RMSE - {title} position')
-            axes[ax_dict[4]].set_ylim([0, limits[1] - limits[0]])
-            medians = session_rmse.groupby(['animal'])['session_rmse'].median()
-            means = session_rmse.groupby(['animal'])['session_rmse'].mean()
-            for xtick in axes[ax_dict[4]].get_xticks():
-                axes[ax_dict[4]].annotate(f"median: {medians.iloc[xtick]:.2f}",
-                                          (xtick + h_offset, limits[1] - limits[0] - text_offset * 2),
-                                          textcoords='data', ha='left')
-                axes[ax_dict[4]].annotate(f"mean: {means.iloc[xtick]:.2f}",
-                                          (xtick + h_offset, limits[1] - limits[0] - text_offset), textcoords='data',
-                                          ha='left')

@@ -1,65 +1,51 @@
 from pynwb import NWBHDF5IO
 
 from update_project.session_loader import SessionLoader
-from bayesian_decoder import BayesianDecoder
+from update_project.decoding.bayesian_decoder import BayesianDecoder
+from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
 
-# setup
+# setup sessions
 animals = [25]  # 17, 20, 25, 28, 29
-dates_included = [210913]  #210913
+dates_included = [210913]  # 210913
 dates_excluded = []
-overwrite = True
-
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 unique_sessions = session_db.load_sessions()
 
-# run decoder for individual sessions
+# setup parameters
+overwrite = True
+params = dict(units_threshold=0,
+              speed_threshold=0,
+              firing_threshold=0,
+              units_types=dict(region=['CA1', 'PFC'],
+                               cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
+              encoder_trial_types=dict(update_type=[1], correct=[0, 1]),
+              encoder_bin_num=30,
+              decoder_trial_types=dict(update_type=[1, 2, 3], correct=[0, 1]),
+              decoder_bin_size=0.25,
+              decoder_bin_type='time',
+              decoder_test_size=0.25,
+              )
+features = ['x_position', 'y_position', 'view_angle', 'choice', 'turn_type']
+
+# run decoder for all sessions
+group_data = dict()
 for name, session in unique_sessions:
 
     # load nwb file
-    session_id = f"{name[0]}{name[1]}_{name[2]}"  # {ID}{Animal}_{Date} e.g. S25_210913
-    io = NWBHDF5IO(str(session_db.get_base_path() / f'{session_id}.nwb'), 'r')
+    io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
-    # run decoder
-    params = dict(units_threshold=20,
-                  speed_threshold=1,
-                  firing_threshold=0,
-                  encoder_trial_types=dict(update_type=[1]),
-                  encoder_bin_num=30,
-                  decoder_trial_types=dict(update_type=[1, 2, 3]),
-                  decoder_bin_size=0.25,
-                  decoder_bin_type='time',)
-    features = ['x_position', 'y_position', 'view_angle', 'choice']
     for feat in features:
-        # build decoding model
-        view_angle_decoder = BayesianDecoder(nwbfile=nwbfile, params=params, session_id=session_id, feature=feat,
-                                             overwrite=overwrite)
-        view_angle_decoder.run_decoding()
+        decoder = BayesianDecoder(nwbfile=nwbfile, params=params, session_id=session_db.get_session_id(name),
+                                  features=[feat])  # initialize decoder class
+        decoder.run_decoding(overwrite=overwrite)   # build decoding model
 
-        # compile and save data structures
-        view_angle_decoder.summarize()  # general summary of decoding accuracy
-        view_angle_decoder.aggregate(trial_types=['switch', 'stay'], times='t_update', nbins=50, window=5, flip=True)  # around update times
-        view_angle_decoder.export_data()
+        visualizer = BayesianDecoderVisualizer(decoder, type='session')
+        visualizer.plot()  # plot data
 
-        # save intermediate data
-        view_angle_decoder.plot()
-
+        # save for group plotting
+        group_data[session][feat] = decoder
 
 # get decoder group summary data
-BayesianDecoderSummarizer
-
-
-
-
-    # decode view angle
-
-
-
-    # get plotting args
-    filename = 'bayesian_decoding_summary'
-    fig_args = fig_generator.get_figure_args(filename=filename, session_id=session_id)
-
-
-
-
-
+group_visualizer = BayesianDecoderVisualizer(group_data, type='group')
+group_visualizer.plot()

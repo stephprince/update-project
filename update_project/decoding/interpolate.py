@@ -1,3 +1,4 @@
+import numpy as np
 from scipy.interpolate import griddata, interp1d
 
 
@@ -16,7 +17,7 @@ def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset,
     return interpolated_position
 
 
-def griddata_time_intervals(data, start_locs, stop_locs, time_offset, nbins, trials_to_flip):
+def griddata_time_intervals(data, start_locs, stop_locs, nbins, trials_to_flip, time_offset=[0], method='linear'):
     grid_prob = []
     for start, stop, offset, flip_bool in zip(start_locs, stop_locs, time_offset, trials_to_flip):
         proby = data.iloc[start:stop].stack().reset_index().values
@@ -28,7 +29,7 @@ def griddata_time_intervals(data, start_locs, stop_locs, time_offset, nbins, tri
         x1 = np.linspace(min(proby[:, 0]), max(proby[:, 0]), nbins)  # time bins
         y1 = np.linspace(min(proby[:, 1]), max(proby[:, 1]), len(data.columns))  # position bins
         grid_x, grid_y = np.meshgrid(x1, y1)
-        grid_prob_y = griddata(proby[:, 0:2], proby[:, 2], (grid_x, grid_y), method='linear', fill_value=np.nan)
+        grid_prob_y = griddata(proby[:, 0:2], proby[:, 2], (grid_x, grid_y), method=method, fill_value=np.nan)
         grid_prob.append(grid_prob_y)
 
     return grid_prob
