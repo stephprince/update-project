@@ -1,5 +1,7 @@
 import pandas as pd
 
+from pathlib import Path
+
 
 class SessionLoader:
     def __init__(self, animals, base_path=None, csv_filename=None, dates_included=None, dates_excluded=None,
@@ -11,6 +13,17 @@ class SessionLoader:
         self.dates_included = dates_included
         self.dates_excluded = dates_excluded
         self.behavior = behavior
+
+    @staticmethod
+    def get_session_id(session_name):
+        session_id = f"{session_name[0]}{session_name[1]}_{session_name[2]}"  # {ID}{Animal}_{Date} e.g. S25_210913
+
+        return session_id
+
+    def get_session_path(self, session_name):
+        session_path = f'{self.base_path / self.get_session_id(session_name)}.nwb'
+
+        return session_path
 
     def get_session_info(self):
         # import all session info
@@ -37,6 +50,3 @@ class SessionLoader:
         unique_sessions = all_session_info.groupby(['ID', 'Animal', 'Date'])
 
         return unique_sessions
-
-    def get_base_path(self):
-        return self.base_path
