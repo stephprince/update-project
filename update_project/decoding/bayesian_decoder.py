@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 import pandas as pd
 import pynapple as nap
 import warnings
@@ -14,10 +15,11 @@ from update_project.results_io import ResultsIO
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.statistics import get_fig_stats
+from update_project.general.utils import load_pickled_data
 
 
 class BayesianDecoder:
-    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params: dict, overwrite=False):
+    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params: dict):
         # setup data
         self.feature_names = features
         self.trials = nwbfile.trials.to_dataframe()
@@ -34,12 +36,10 @@ class BayesianDecoder:
         self.decoder_test_size = params.get('decoder_test_size',
                                             0.25)  # proportion of trials to use for testing on train/test split
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],
-                                                                          correct=[0,
-                                                                                   1]))  # dict of filters to apply to trials table
+                                                                          correct=[0, 1]))  # trial filters
         self.encoder_bin_num = params.get('encoder_bin_num', 30)  # number of bins to build encoder
         self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
-                                                                          correct=[0,
-                                                                                   1]))  # dict of filters to apply to trials table
+                                                                          correct=[0, 1]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
         self.decoder_bin_size = params.get('decoder_bin_size', 0.25)  # time/fraction of theta phase to use for decoder
         self.linearize_feature = params.get('linearize_feature', False)  # whether to linearize y-position/feature
@@ -58,31 +58,33 @@ class BayesianDecoder:
         self.results_tags = f"{'_'.join(self.feature_names)}_regions_{'_'.join(self.units_types['region'])}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
-        self.data_files = dict(preprocess_output=['encoder_times', 'decoder_times', 'spikes', 'features_test',
-                                                  'features_train', 'test_data', 'train_data'],
-                               encode_output=['model', 'bins'],
-                               decode_output=['decoded_values', 'prob_densities'],
-                               aligned_output=['aligned_data', 'aligned_data_window', 'aligned_data_nbins'],
-                               summary_output=['decoding_summary'],
-                               params=['units_threshold', 'speed_threshold', 'firing_threshold', 'units_types',
-                                       'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
-                                       'decoder_bin_type',
-                                       'decoder_bin_size', 'decoder_test_size', 'dim_num', 'feature_names',
-                                       'linearize_feature', 'excluded_session', ])
+        self.data_files = dict(preprocess_output=dict(vars=['encoder_times', 'decoder_times', 'spikes', 'features_test',
+                                                            'features_train', 'train_df', 'test_df'],
+                                                      format='pkl'),
+                               encode_output=dict(vars=['model', 'bins'], format='pkl'),
+                               decode_output=dict(vars=['decoded_values', 'decoded_probs'], format='pkl'),
+                               aligned_output=dict(vars=['aligned_data', 'aligned_data_window', 'aligned_data_nbins'],
+                                                   format='pkl'),
+                               summary_df=dict(vars=['summary_df'], format='pkl'),
+                               params=dict(vars=['units_threshold', 'speed_threshold', 'firing_threshold', 'units_types',
+                                                 'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
+                                                 'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
+                                                 'feature_names', 'linearize_feature', 'excluded_session', ],
+                                           format='npz'))
 
     def run_decoding(self, overwrite=False):
         print(f'Decoding data for session {self.results_io.session_id}...')
 
         if overwrite:
-            self._preprocess()._encode()._decode()  # build model
+            self._preprocess()._encode()._decode()   # build model
             self._align_by_times()                   # align data by times
             self._summarize()                        # generate summary data
             self._export_data()                      # save output data
         else:
-            if self._check_params_match():
-                self._load_data()  # load existing data structure if existing params match
+            if self._data_exists() and self._params_match():
+                self._load_data()  # load data structure if it exists and matches the params
             else:
-                warnings.warn('Saved data did not match input parameters, overwriting existing data')
+                warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
                 self.run_decoding(overwrite=True)
 
         return self
@@ -98,7 +100,7 @@ class BayesianDecoder:
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
                 data = time_series.data[:]
             elif feat in ['choice', 'turn_type']:
-                choice_mapping = {'1': -1, '2': 1}  # convert to negative/non-negative for flipping
+                choice_mapping = {'0': np.nan, '1': -1, '2': 1}  # convert to negative/non-negative for flipping
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
                 data = np.empty(np.shape(time_series.data))
@@ -133,15 +135,51 @@ class BayesianDecoder:
 
         return encoder, decoder
 
-    def _check_params_match(self):
-        if not self.overwrite:  # if loading from cached file, check params match, otherwise set overwrite to true
-            params_path = self.results_io.get_data_filename(f'params', results_type='session', format='npz')
-            params_cached = np.load(params_path, allow_pickle=True)
-            params_matched = []
-            for k, v in params_cached.items():
-                params_matched.append(getattr(self, k) == v)
+    def _params_match(self):
+        params_path = self.results_io.get_data_filename(f'params', results_type='session', format='npz')
+        params_cached = np.load(params_path, allow_pickle=True)
+        params_matched = []
+        for k, v in params_cached.items():
+            params_matched.append(getattr(self, k) == v)
 
         return all(params_matched)
+
+    def _data_exists(self):
+        files_exist = []
+        for name, file_info in self.data_files.items():
+            path = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
+            files_exist.append(path.is_file())
+
+        return all(files_exist)
+
+    def _train_test_split_ok(self, train_data, test_data):
+        train_values = np.sort(train_data[self.feature_names[0]].unique())
+        train_values = np.delete(train_values, train_values == 0)  # remove failed trials bc n/a to train/test check
+        test_values = np.sort(test_data[self.feature_names[0]].unique())
+
+        return all(train_values == test_values)
+
+    def _train_test_split(self, random_state=21):
+        # test data includes update/non-update trials, would focus only on non-update trials for error summary so the
+        # test size refers only to the non-update trials in the decoding vs encoding phase
+
+        # get encoder/training data times
+        mask = pd.concat([self.trials[k].isin(v) for k, v in self.encoder_trial_types.items()], axis=1).all(axis=1)
+        encoder_trials = self.trials[mask]
+        train_data, test_data = train_test_split(encoder_trials, test_size=self.decoder_test_size,
+                                                 random_state=random_state)
+        train_df = train_data.sort_index()
+
+        # get decoder/testing data times (decoder conditions + remove any training data)
+        mask = pd.concat([self.trials[k].isin(v) for k, v in self.decoder_trial_types.items()], axis=1).all(axis=1)
+        decoder_trials = self.trials[mask]
+        test_df = decoder_trials[~decoder_trials.index.isin(train_df.index)]  # remove any training data
+
+        # check that split is ok for binarized data, run different random states until it is
+        if self.convert_to_binary and not self._train_test_split_ok(train_df, test_df):
+            train_df, test_df = self._train_test_split(random_state=random_state+1)  # use new random state
+
+        return train_df, test_df
 
     def _preprocess(self):
         # get spikes
@@ -154,30 +192,20 @@ class BayesianDecoder:
             warnings.warn(f'Session {self.results_io.session_id} does not meet requirements '
                           f'"Number of units >= {self.units_threshold}')
 
-        # get encoder/training data times
-        mask = pd.concat([self.trials[k].isin(v) for k, v in self.encoder_trial_types.items()], axis=1).all(axis=1)
-        encoder_trials = self.trials[mask]
-        train_data, test_data = train_test_split(encoder_trials, test_size=self.decoder_test_size, random_state=21)
-        self.train_data = train_data.sort_index()
-        # test data includes update/non-update trials, would focus only on non-update trials for error summary so the
-        # test size refers only to the non-update trials in the decoding vs encoding phase
-
-        # get decoder/testing data times (decoder conditions + remove any training data)
-        mask = pd.concat([self.trials[k].isin(v) for k, v in self.decoder_trial_types.items()], axis=1).all(axis=1)
-        decoder_trials = self.trials[mask]
-        self.test_data = decoder_trials[~decoder_trials.index.isin(self.train_data.index)]  # remove any training data
+        # split data into training/encoding and testing/decoding trials
+        self.train_df, self.test_df = self._train_test_split()
 
         # apply speed threshold
         if self.speed_threshold > 0:
             get_movement_times()  # TODO - make this function
-        self.encoder_times = nap.IntervalSet(start=self.train_data['start_time'], end=self.train_data['stop_time'],
+        self.encoder_times = nap.IntervalSet(start=self.train_df['start_time'], end=self.train_df['stop_time'],
                                              time_units='s')
-        self.decoder_times = nap.IntervalSet(start=self.test_data['start_time'], end=self.test_data['stop_time'],
+        self.decoder_times = nap.IntervalSet(start=self.test_df['start_time'], end=self.test_df['stop_time'],
                                              time_units='s')
 
         # select feature, TODO - linearize y-position if needed
         if self.linearize_feature:
-            new_position = linearize_y_position()  # TODO - make this function
+            linearize_y_position()  # TODO - make this function
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
 
@@ -210,7 +238,7 @@ class BayesianDecoder:
                 kwargs.update(features=self.features_train)
 
         # run decoding
-        self.decoded_values, self.prob_densities = self.decoder(**kwargs)
+        self.decoded_values, self.decoded_probs = self.decoder(**kwargs)
 
         # convert to binary if needed
         if self.convert_to_binary:
@@ -222,128 +250,130 @@ class BayesianDecoder:
     def _align_by_times(self, trial_types=['switch', 'stay'], times='t_update', nbins=50, window=5, flip=False):
         print(f'Aligning data for session {self.results_io.session_id}...')
 
-        if self.overwrite:
-            trial_type_dict = dict(nonupdate=1, switch=2, stay=3)
-            output = dict()
-            for trial_name in trial_types:
-                trials_to_agg = self.test_data[self.test_data['update_type'] == trial_type_dict[trial_name]]
+        trial_type_dict = dict(nonupdate=1, switch=2, stay=3)
+        output = dict()
+        for trial_name in trial_types:
+            trials_to_agg = self.test_df[self.test_df['update_type'] == trial_type_dict[trial_name]]
 
-                mid_times = trials_to_agg[times]
-                new_times = np.linspace(-window, window, num=nbins)
-                if flip:
-                    trials_to_flip = trials_to_agg[
-                                         'turn_type'] == 1  # left trials, flip values so all face the same way
-                else:
-                    trials_to_flip = trials_to_agg['turn_type'] == 100  # set all to false
+            mid_times = trials_to_agg[times]
+            new_times = np.linspace(-window, window, num=nbins)
+            if flip:
+                trials_to_flip = trials_to_agg[
+                                     'turn_type'] == 1  # left trials, flip values so all face the same way
+            else:
+                trials_to_flip = trials_to_agg['turn_type'] == 100  # set all to false
 
-                feat_start_locs = self.features_test[self.feature_names[0]].index.searchsorted(
-                    mid_times - window - 1)  # a little extra just in case
-                feat_stop_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times + window + 1)
-                decoding_start_locs = self.decoded_values.index.searchsorted(mid_times - window - 1)
-                decoding_stop_locs = self.decoded_values.index.searchsorted(mid_times + window + 1)
+            feat_start_locs = self.features_test[self.feature_names[0]].index.searchsorted(
+                mid_times - window - 1)  # a little extra just in case
+            feat_stop_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times + window + 1)
+            decoding_start_locs = self.decoded_values.index.searchsorted(mid_times - window - 1)
+            decoding_stop_locs = self.decoded_values.index.searchsorted(mid_times + window + 1)
 
-                feat_interp = dict()
-                decoding_interp = dict()
-                decoding_error = dict()
-                probability = dict()
-                for name in self.feature_names:
-                    feat_interp[name] = interp1d_time_intervals(self.features_test[name],
-                                                                feat_start_locs, feat_stop_locs,
+            feat_interp = dict()
+            decoding_interp = dict()
+            decoding_error = dict()
+            probability = dict()
+            for name in self.feature_names:
+                feat_interp[name] = interp1d_time_intervals(self.features_test[name],
+                                                            feat_start_locs, feat_stop_locs,
+                                                            new_times, mid_times, trials_to_flip)
+                decoding_interp[name] = interp1d_time_intervals(self.decoded_values, decoding_start_locs,
+                                                                decoding_stop_locs,
                                                                 new_times, mid_times, trials_to_flip)
-                    decoding_interp[name] = interp1d_time_intervals(self.decoded_values, decoding_start_locs,
-                                                                    decoding_stop_locs,
-                                                                    new_times, mid_times, trials_to_flip)
-                    decoding_error[name] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
-                                            zip(feat_interp[name], decoding_interp[name])]
+                decoding_error[name] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
+                                        zip(feat_interp[name], decoding_interp[name])]
 
-                    if self.dim_num == 1:
-                        probability[name] = griddata_time_intervals(self.prob_densities, decoding_start_locs,
-                                                                    decoding_stop_locs,
-                                                                    nbins, trials_to_flip, mid_times)
-                    elif self.dim_num == 2:
-                        probability[name] = griddata_2d_time_intervals(self.prob_densities, self.bins,
-                                                                       self.decoding_values.index.values,
-                                                                       decoding_start_locs, decoding_stop_locs,
-                                                                       mid_times, nbins,
-                                                                       trials_to_flip)
+                if self.dim_num == 1:
+                    probability[name] = griddata_time_intervals(self.decoded_probs, decoding_start_locs,
+                                                                decoding_stop_locs,
+                                                                nbins, trials_to_flip, mid_times)
+                elif self.dim_num == 2:
+                    probability[name] = griddata_2d_time_intervals(self.decoded_probs, self.bins,
+                                                                   self.decoding_values.index.values,
+                                                                   decoding_start_locs, decoding_stop_locs,
+                                                                   mid_times, nbins,
+                                                                   trials_to_flip)
 
-                # get means and sem
-                data = dict()
-                for name in self.feature_names:
-                    data[name] = dict(feature=np.array(feat_interp[name]).T,
-                                      decoding=np.array(decoding_interp[name]).T,
-                                      error=np.array(decoding_error[name]).T, )
-                    data[name].update(stats={k: get_fig_stats(v, axis=1) for k, v in data[name].items()})
-                    data[name].update(probability=probability[name])
+            # get means and sem
+            data = dict()
+            for name in self.feature_names:
+                data[name] = dict(feature=np.array(feat_interp[name]).T,
+                                  decoding=np.array(decoding_interp[name]).T,
+                                  error=np.array(decoding_error[name]).T, )
+                data[name].update(stats={k: get_fig_stats(v, axis=1) for k, v in data[name].items()})
+                data[name].update(probability=probability[name])
 
-                output.update({trial_name: data})
+            output.update({trial_name: data})
 
-            self.aligned_data = output
-            self.aligned_data_window = window
-            self.aligned_data_nbins = nbins
-
-        else:
-            data_path = self.results_io.get_data_filename('aligned_data', results_type='session', format='npz')
-            aligned_data = np.load(data_path, allow_pickle=True)
-
-            self.aligned_data = aligned_data['aligned_data']
-            self.aligned_data_window = aligned_data['aligned_data_window']
-            self.aligned_data_nbins = aligned_data['aligned_data_nbins']
+        self.aligned_data = output
+        self.aligned_data_window = window
+        self.aligned_data_nbins = nbins
 
     def _summarize(self):
         print(f'Summarizing data for session {self.results_io.session_id}...')
 
-        if self.overwrite:
-            # get decoding error
-            time_index = []
-            feature_mean = []
-            for index, trial in self.decoder_times.iterrows():
-                trial_bins = np.arange(trial['start'], trial['end'] + self.decoder_bin_size, self.decoder_bin_size)
-                bins = pd.cut(self.features_test[self.feature_names[0]].index, trial_bins)
-                feature_mean.append(self.features_test[self.feature_names[0]].groupby(bins).mean())
-                time_index.append(trial_bins[0:-1] + np.diff(trial_bins) / 2)
-            time_index = np.hstack(time_index)
-            feature_means = np.hstack(feature_mean)
+        # get decoding error
+        time_index = []
+        feature_mean = []
+        for index, trial in self.decoder_times.iterrows():
+            trial_bins = np.arange(trial['start'], trial['end'] + self.decoder_bin_size, self.decoder_bin_size)
+            bins = pd.cut(self.features_test[self.feature_names[0]].index, trial_bins)
+            feature_mean.append(self.features_test[self.feature_names[0]].groupby(bins).mean())
+            time_index.append(trial_bins[0:-1] + np.diff(trial_bins) / 2)
+        time_index = np.hstack(time_index)
+        feature_means = np.hstack(feature_mean)
 
-            actual_series = pd.Series(feature_means, index=time_index, name='actual_feature')
-            decoded_series = self.decoded_values.as_series()  # TODO - figure out why decoded and actual series are diff lengths
-            df_decode_results = pd.merge(decoded_series.rename('decoded_feature'), actual_series, how='left',
-                                         left_index=True, right_index=True)
-            df_decode_results['decoding_error'] = abs(
-                df_decode_results['decoded_feature'] - df_decode_results['actual_feature'])
-            df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20,
-                                                                                                      min_periods=20).mean()
-            df_decode_results['prob_dist'] = [x for x in self.prob_densities.as_dataframe().to_numpy()]
+        actual_series = pd.Series(feature_means, index=time_index, name='actual_feature')
+        decoded_series = self.decoded_values.as_series()  # TODO - figure out why decoded/actual series are diff lengths
+        df_decode_results = pd.merge(decoded_series.rename('decoded_feature'), actual_series, how='left',
+                                     left_index=True, right_index=True)
+        df_decode_results['decoding_error'] = abs(
+            df_decode_results['decoded_feature'] - df_decode_results['actual_feature'])
+        df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20,
+                                                                                                  min_periods=20).mean()
+        df_decode_results['prob_dist'] = [x for x in self.decoded_probs.as_dataframe().to_numpy()]
 
-            # add summary data
-            df_positions = df_decode_results[['actual_feature', 'decoded_feature']].dropna(how='any')
-            rmse = sqrt(mean_squared_error(df_positions['actual_feature'], df_positions['decoded_feature']))
-            df_decode_results['session_rmse'] = rmse
-            df_decode_results['animal'] = self.results_io.animal
-            df_decode_results['session'] = self.results_io.session_id
-        else:
-            data_path = self.results_io.get_data_filename('decoding_summary', results_type='session', format='csv')
-            df_decode_results = pd.read_csv(data_path, index_col=0, na_values=['NaN', 'nan'], keep_default_na=True)
+        # add summary data
+        df_positions = df_decode_results[['actual_feature', 'decoded_feature']].dropna(how='any')
+        rmse = sqrt(mean_squared_error(df_positions['actual_feature'], df_positions['decoded_feature']))
+        df_decode_results['session_rmse'] = rmse
+        df_decode_results['animal'] = self.results_io.animal
+        df_decode_results['session'] = self.results_io.session_id
 
         self.summary_df = df_decode_results
 
     def _load_data(self):
         print(f'Loading existing data for session {self.results_io.session_id}...')
 
-        for name, vars in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format='npz')
-            import_data = np.load(fname, allow_pickle=True)
+        # load npz files
+        for name, file_info in self.data_files.items():
+            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
 
-            for v in vars:
-                setattr(self, v, import_data[v])
+            if file_info['format'] == 'npz':
+                import_data = np.load(fname, allow_pickle=True)
+                for v in file_info['vars']:
+                    setattr(self, v, import_data[v])
+            elif file_info['format'] == 'pkl':
+                import_data = load_pickled_data(fname)
+                for v, data in zip(file_info['vars'], import_data):
+                    setattr(self, v, data)
+            else:
+                raise RuntimeError(f'{file_info["format"]} format is not currently supported for loading data')
 
         return self
 
     def _export_data(self):
         print(f'Exporting data for session {self.results_io.session_id}...')
 
-        for name, vars in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format='npz')
-            kwargs = {v: getattr(self, v) for v in vars}
-            np.savez(fname, **kwargs)
+        # save npz files
+        for name, file_info in self.data_files.items():
+            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
 
+            if file_info['format'] == 'npz':
+                kwargs = {v: getattr(self, v) for v in file_info['vars']}
+                np.savez(fname, **kwargs)
+            elif file_info['format'] == 'pkl':
+                with open(fname, 'wb') as f:
+                    [pickle.dump(getattr(self, v), f) for v in file_info['vars']]
+            else:
+                raise RuntimeError(f'{file_info["format"]} format is not currently supported for exporting data')
