@@ -14,6 +14,18 @@ class ResultsIO:
         self.animal = session_id.split('_')[0]
         self.tags = tags
 
+    def get_data_filename(self, filename, results_type='group', results_name='', format='npy'):
+        data_path = self.get_data_path(results_type, results_name)
+        fname = data_path / f'{filename}_{self.tags}_git{self.git_hash}.{format}'
+
+        return fname
+
+    def get_data_path(self, results_type='group', results_name=''):
+        data_path = self.get_results_path(results_type, results_name=results_name) / 'intermediate_data'
+        Path(data_path).mkdir(parents=True, exist_ok=True)
+
+        return data_path
+
     def get_results_path(self, results_type='group', results_name=''):
         if results_type == 'group':
             results_path = self.base_path / 'group_summary' / results_name
@@ -24,12 +36,6 @@ class ResultsIO:
         Path(results_path).mkdir(parents=True, exist_ok=True)
 
         return results_path
-
-    def get_data_path(self, results_type='group', results_name=''):
-        data_path = self.get_results_path(results_type, results_name=results_name) / 'intermediate_data'
-        Path(data_path).mkdir(parents=True, exist_ok=True)
-
-        return data_path
 
     def get_figure_args(self, filename, results_type='group', results_name='', format='pdf'):
         results_path = self.get_results_path(results_type, results_name)
@@ -43,8 +49,3 @@ class ResultsIO:
 
         return kwargs
 
-    def get_data_filename(self, filename, results_type='group', results_name='', format='npy'):
-        data_path = self.get_data_path(results_type, results_name)
-        fname = data_path / f'{filename}_{self.tags}_git{self.git_hash}.{format}'
-
-        return fname
