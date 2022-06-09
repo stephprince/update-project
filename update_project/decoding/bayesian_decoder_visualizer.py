@@ -3,29 +3,35 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from pathlib import Path
-
 from update_project.camera_sync.cam_plot_utils import write_camera_video
-from update_project.general.utils import create_track_boundaries
+from update_project.general.utils import get_track_boundaries, get_cue_locations
 from update_project.decoding.interpolate import griddata_time_intervals
 
 
 class BayesianDecoderVisualizer:
-    def __init__(self, data, type='session'):
+    def __init__(self, data, type='session', features=None, sessions=None):
         self.data = data
+        self.features = features or self.data.feature_names
+        self.sessions = sessions or [self.data.results_io.session_id]
         self.type = type
 
-        # get example times
+        # get session specific fields
         if self.type == 'session':
             times, locs = self._get_example_period()
-            self.start_time = np.min(times)
-            self.end_time = np.max(times)
-            self.start_loc = np.min(locs)
-            self.end_loc = np.max(locs)
+            self.start_time, self.end_time = times
+            self.start_loc, self.end_loc = locs
 
-        # calculate some of the basic input structures to plotting functions
-        self.confusion_matrix = self._get_confusion_matrix()
-        self.prob_density_grid = self._get_prob_density_grid()
+            # calculate some of the basic input structures to plotting functions
+            self.confusion_matrix = self._get_confusion_matrix(data)
+            self.prob_density_grid = self._get_prob_density_grid()
+
+        # get group specific fields
+        if self.type == 'group':
+            self.confusion_matrix = dict()
+            for sess_key, sess_data in data.items():
+                self.confusion_matrix[sess_key] = dict()
+                for feat_key, feat_data in sess_data.items():
+                    self.confusion_matrix[sess_key][feat_key] = self._get_confusion_matrix(feat_data)
 
     def plot(self):
         if self.type == 'session':
@@ -34,17 +40,29 @@ class BayesianDecoderVisualizer:
             self.plot_aligned_data()
         elif self.type == 'group':
             print(f'Plotting data for group')
+            self.plot_group_confusion_matrices()
             self.plot_group_summary()
+            self.plot_group_error()
 
-    def _get_confusion_matrix(self):
+    @staticmethod
+    def _get_mean_prob_dist(probabilities, bins):
+        if probabilities.empty:
+            mean_prob_dist = np.empty(np.shape(bins[1:]))  # remove one bin to match other probabilities shapes
+            mean_prob_dist[:] = np.nan
+        else:
+            mean_prob_dist = np.nanmean(np.vstack(probabilities.values), axis=0)
+
+        return mean_prob_dist
+
+    def _get_confusion_matrix(self, data):
         # get decoding matrices
-        if self.data.convert_to_binary:
+        if data.convert_to_binary:
             bins = [-1, 0, 1]
         else:
-            bins = self.data.bins
-        bins = pd.cut(self.data.summary_df['actual_feature'], bins, include_lowest=True)
-        decoding_matrix = self.data.summary_df['prob_dist'].groupby(bins).apply(
-            lambda x: np.nanmean(np.vstack(x.values), axis=0)).values
+            bins = data.bins
+        df_bins = pd.cut(data.summary_df['actual_feature'], bins, include_lowest=True)
+        decoding_matrix = data.summary_df['prob_dist'].groupby(df_bins).apply(
+            lambda x: self._get_mean_prob_dist(x, bins)).values
 
         confusion_matrix = np.vstack(decoding_matrix).T  # transpose so that true position is on the x-axis
 
@@ -59,13 +77,18 @@ class BayesianDecoderVisualizer:
         else:
             locs.append(self.data.summary_df.index.searchsorted(times[0] - time_window))
         times.append(self.data.summary_df.iloc[locs[1]].name)
+        times.sort()
+        locs.sort()
+
+        if np.max(locs) - np.min(locs) <= 1:
+            times, locs = self._get_example_period(window=1000)
 
         return times, locs
 
     def _get_prob_density_grid(self):
         nbins = int(self.end_loc - self.start_loc)
-        trials_to_flip = self.data.test_data['turn_type'] == 100  # set all to false
-        grid_prob = griddata_time_intervals(self.data.prob_densities, [self.start_loc], [self.end_loc], nbins,
+        trials_to_flip = self.data.test_df['turn_type'] == 100  # set all to false
+        grid_prob = griddata_time_intervals(self.data.decoded_probs, [self.start_loc], [self.end_loc], nbins,
                                             trials_to_flip, method='linear')
 
         return np.squeeze(grid_prob)
@@ -183,23 +206,23 @@ class BayesianDecoderVisualizer:
 
     def plot_1d_around_update(self, data_around_update, nbins, window, title, label, color, axes,
                               ax_dict):
-
-        limits = [np.min(np.min(data_around_update['feature'])), np.max(np.max(data_around_update['feature']))]
-        stats = data_around_update['stats']
-        times = np.linspace(-window, window, num=nbins)
-        time_tick_values = times.astype(int)
-        time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
-        if self.data.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
-            cmap_pos = 'RdGy'
-            cmap_decoding = 'PRGn'
-            scaling_value = 0.5
-        elif self.data.feature_names[0] in ['y_position']:  # sequential color map for seq data
-            cmap_pos = 'Greys'
-            if title == 'switch':
-                cmap_decoding = 'Blues'
-            elif title == 'stay':
-                cmap_decoding = 'RdPu'
-            scaling_value = 1
+        if data_around_update['feature'].any():
+            limits = [np.min(np.min(data_around_update['feature'])), np.max(np.max(data_around_update['feature']))]
+            stats = data_around_update['stats']
+            times = np.linspace(-window, window, num=nbins)
+            time_tick_values = times.astype(int)
+            time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
+            if self.data.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
+                cmap_pos = 'RdGy'
+                cmap_decoding = 'PRGn'
+                scaling_value = 0.5
+            elif self.data.feature_names[0] in ['y_position']:  # sequential color map for seq data
+                cmap_pos = 'Greys'
+                if title == 'switch':
+                    cmap_decoding = 'Blues'
+                elif title == 'stay':
+                    cmap_decoding = 'RdPu'
+                scaling_value = 1
 
         prob_map = np.nanmean(data_around_update['probability'], axis=0)
         if data_around_update['probability']:  # skip if there is no data
@@ -277,7 +300,7 @@ class BayesianDecoderVisualizer:
             correct_multiplier = 1
         xlims = [-30, 30]
         ylims = [5, 285]
-        track_bounds_xs, track_bounds_ys = create_track_boundaries()
+        track_bounds_xs, track_bounds_ys = get_track_boundaries()
 
         if data_around_update['probability']:  # skip if there is no data
             positions_y = stats['feature']['mean'][:time_bin + 1]
@@ -331,13 +354,11 @@ class BayesianDecoderVisualizer:
         """
         axes = plt.figure(figsize=(20, 18)).subplot_mosaic(mosaic)
 
-        locations = {'x': {'left arm': -2, 'home arm': 2, 'right arm': 33},  # actually -1,+1 but add for bins
-                     'y': {'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35, 'delay2 cue': 250.35,
-                           'choice cue': 285}}
-
-        pos_values = position_bins.astype(int)
+        locations = get_cue_locations()
+        pos_values = self.data.bins.astype(int)
         limits = [np.min(pos_values), np.max(pos_values)]
-        matrix = np.vstack(decoding_matrix_prob) * nb_bins
+        matrix = np.vstack(decoding_matrix_prob) * self.data.encoder_bin_num
+
         im = axes[ax_dict[0]].imshow(matrix.T, cmap='YlGnBu', origin='lower',  # aspect='auto',
                                      vmin=0, vmax=0.3 * np.nanmax(matrix),
                                      extent=[limits[0], limits[1], limits[0], limits[1]])
@@ -422,7 +443,57 @@ class BayesianDecoderVisualizer:
         plt.suptitle(f'Group decoding accuracy - non update trials only', fontsize=20)
         plt.tight_layout()
 
-        kwargs = self.data.results_io.get_figure_args(fname='decoding_error_summary_position',
-                                                      session_id=session_id,
-                                                      format='pdf')
-        plt.savefig(filename, dpi=300, metadata={'Creator': this_filename})
+        kwargs = self.data.results_io.get_figure_args(fname='decoding_error_summary_position', format='pdf')
+        plt.savefig(**kwargs)
+        plt.close()
+
+    def plot_group_confusion_matrices(self):
+        for feat in self.features:
+
+            counter = 0
+            ncols, nrows = [6, 9]
+            fig, axes = plt.subplots(nrows=6, ncols=9, figsize=(15, 15))
+            for sess_key, sess_data in self.confusion_matrix.items():
+                col_id = int(np.floor(counter / ncols))
+                row_id = counter - col_id * ncols
+
+                # plot confusion matrix
+                matrix = np.vstack(sess_data[feat]) * self.data.encoder_bin_num  # scale to be probability/chance
+                locations = get_cue_locations()
+                limits = [np.min(self.data.bins.astype(int)), np.max(self.data.bins.astype(int))]
+                text_offset = (limits[1] - limits[0]) / 15
+                im = axes[col_id][row_id].imshow(matrix, cmap='YlGnBu', origin='lower',  # aspect='auto',
+                                                 vmin=0, vmax=0.3 * np.nanmax(matrix),
+                                                 extent=[limits[0], limits[1], limits[0], limits[1]])
+
+                # plot annotation lines
+                previous = limits[0]
+                for key, value in locations.items():
+                    axes[col_id][row_id].plot([value, value], [limits[0], limits[1]], linestyle='dashed',
+                                          color=[0, 0, 0, 0.5])
+                    axes[col_id][row_id].plot([limits[0], limits[1]], [value, value], linestyle='dashed',
+                                          color=[0, 0, 0, 0.5])
+                    annotation_loc = np.mean([previous, value])
+                    axes[col_id][row_id].annotate(f'{key}', (annotation_loc, limits[0]), xycoords='data',
+                                              xytext=(annotation_loc, limits[0] - text_offset),
+                                              textcoords='data', ha='center')
+                    axes[col_id][row_id].annotate(f'{key}', (limits[0], annotation_loc), xycoords='data',
+                                              xytext=(limits[0] - text_offset, annotation_loc),
+                                              textcoords='data', ha='center')
+                    previous = value
+
+                axes[col_id][row_id].set_title(f'{sess_key}', fontsize=12)
+                axes[col_id][row_id].set_xlabel(f'Actual', labelpad=20)
+                axes[col_id][row_id].set_ylabel(f'Decoded', labelpad=20)
+                plt.colorbar(im, ax=axes[col_id][row_id], label='probability / chance', pad=0.04, location='right',
+                             fraction=0.046)
+
+                counter += 1
+
+            fig.suptitle(f'Confusion matrices for {feat} decoding - all sessions', fontsize=14)
+            plt.tight_layout()
+
+            kwargs = self.data.results_io.get_figure_args(fname=f'group_confusion_matrices_{feat}', format='pdf')
+            plt.savefig(**kwargs)
+            plt.close()
+
