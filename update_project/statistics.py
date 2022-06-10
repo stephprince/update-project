@@ -4,7 +4,7 @@ from scipy.stats import sem
 
 
 def get_fig_stats(data, axis=0):
-    if data.any():  # if not empty
+    if len(data):  # if not empty
         mean = np.nanmean(data, axis=axis)
         err = sem(data, axis=axis)
         upper = mean + 2 * err
@@ -14,6 +14,7 @@ def get_fig_stats(data, axis=0):
         err = []
         upper = []
         lower = []
+        # nan_arr = np.empty(np.delete(np.shape(data), axis))
 
     stats_dict = dict(mean=mean,
                       err=err,
