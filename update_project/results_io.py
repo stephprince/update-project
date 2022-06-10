@@ -16,7 +16,7 @@ class ResultsIO:
 
     def get_data_filename(self, filename, results_type='group', results_name='', format='npy'):
         data_path = self.get_data_path(results_type, results_name)
-        fname = data_path / f'{filename}_{self.tags}_git{self.git_hash}.{format}'
+        fname = data_path / f'{filename}_{self.tags}.{format}'  # only use git hash for figs, not for intermediate data
 
         return fname
 
