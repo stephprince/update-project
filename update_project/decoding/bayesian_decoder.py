@@ -46,9 +46,13 @@ class BayesianDecoder:
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
         self.excluded_session = False  # initialize to False, will be set to True if does not pass session requirements
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
-        if self.feature_names[0] in ['choice', 'turn_type']:
+        if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 3
+        if self.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:
+            self.flip_trials_by_turn = True  # flip data by turn type for averaging
+        else:
+            self.flip_trials_by_turn = False  # TODO - make this logic better so it's less confusing
 
         # setup decoding/encoding functions based on dimensions
         self.dim_num = params.get('dim_num', 1)  # 1D decoding default
@@ -154,8 +158,10 @@ class BayesianDecoder:
 
     def _train_test_split_ok(self, train_data, test_data):
         train_values = np.sort(train_data[self.feature_names[0]].unique())
-        train_values = np.delete(train_values, train_values == 0)  # remove failed trials bc n/a to train/test check
         test_values = np.sort(test_data[self.feature_names[0]].unique())
+
+        train_values = np.delete(train_values, train_values == 0)  # remove failed trials bc n/a to train/test check
+        test_values = np.delete(test_values, test_values == 0)
 
         return all(train_values == test_values)
 
@@ -203,7 +209,7 @@ class BayesianDecoder:
         self.decoder_times = nap.IntervalSet(start=self.test_df['start_time'], end=self.test_df['stop_time'],
                                              time_units='s')
 
-        # select feature, TODO - linearize y-position if needed
+        # select feature
         if self.linearize_feature:
             linearize_y_position()  # TODO - make this function
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
@@ -247,7 +253,7 @@ class BayesianDecoder:
 
         return self
 
-    def _align_by_times(self, trial_types=['switch', 'stay'], times='t_update', nbins=50, window=5, flip=False):
+    def _align_by_times(self, trial_types=['switch', 'stay'], times='t_update', nbins=50, window=5):
         print(f'Aligning data for session {self.results_io.session_id}...')
 
         trial_type_dict = dict(nonupdate=1, switch=2, stay=3)
@@ -257,9 +263,8 @@ class BayesianDecoder:
 
             mid_times = trials_to_agg[times]
             new_times = np.linspace(-window, window, num=nbins)
-            if flip:
-                trials_to_flip = trials_to_agg[
-                                     'turn_type'] == 1  # left trials, flip values so all face the same way
+            if self.flip_trials_by_turn:
+                trials_to_flip = trials_to_agg['turn_type'] == 1  # left trials, flip so all values the same way
             else:
                 trials_to_flip = trials_to_agg['turn_type'] == 100  # set all to false
 
