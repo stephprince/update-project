@@ -1,5 +1,5 @@
 import pickle
-
+import numpy as np
 
 def get_track_boundaries():
     # establish track boundaries
@@ -14,7 +14,7 @@ def get_cue_locations():
     locations = dict(x_position={'left arm': -2, 'home arm': 2, 'right arm': 33},  # actually -1,+1 but add for bins
                      y_position={'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35, 'delay2 cue': 250.35,
                         'choice cue': 285},
-                     view_angle={'home left max': -pi/4, 'home right max': pi/4})
+                     view_angle={'home left max': -np.pi/4, 'home right max': np.pi/4})
     return locations
 
 

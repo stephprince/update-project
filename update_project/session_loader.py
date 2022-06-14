@@ -50,3 +50,9 @@ class SessionLoader:
         unique_sessions = all_session_info.groupby(['ID', 'Animal', 'Date'])
 
         return unique_sessions
+
+    def load_session_names(self):
+        unique_sessions = self.load_sessions()
+        names = list(unique_sessions.groups.keys())
+
+        return names
