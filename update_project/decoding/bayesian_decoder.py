@@ -15,7 +15,6 @@ from update_project.results_io import ResultsIO
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.statistics import get_fig_stats
-from update_project.general.utils import load_pickled_data
 
 
 class BayesianDecoder:
@@ -32,6 +31,7 @@ class BayesianDecoder:
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
         self.units_threshold = params.get('units_threshold', 0)  # minimum number of units to use for a session
         self.speed_threshold = params.get('speed_threshold', 0)  # minimum virtual speed to subselect epochs
+        # self.trial_threshold = params.get('trial_threshold', 0)  # minimum number of trials to use for a session
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.decoder_test_size = params.get('decoder_test_size',
                                             0.25)  # proportion of trials to use for testing on train/test split
@@ -48,7 +48,7 @@ class BayesianDecoder:
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
         if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
             self.convert_to_binary = True  # always convert choice to binary
-            self.encoder_bin_num = 3
+            self.encoder_bin_num = 2
         if self.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:
             self.flip_trials_by_turn = True  # flip data by turn type for averaging
         else:
@@ -192,7 +192,10 @@ class BayesianDecoder:
         units_mask = pd.concat([self.units[k].isin(v) for k, v in self.units_types.items()], axis=1).all(axis=1)
         units_subset = self.units[units_mask]
         spikes_dict = {n: nap.Ts(t=units_subset.loc[n, 'spike_times'], time_units='s') for n in units_subset.index}
-        self.spikes = nap.TsGroup(spikes_dict, time_units='s')
+        if spikes_dict:
+            self.spikes = nap.TsGroup(spikes_dict, time_units='s')
+        else:
+            self.spikes = []  # if no units match criteria, leave spikes empty
         if len(units_subset) < self.units_threshold:
             self.excluded_session = True
             warnings.warn(f'Session {self.results_io.session_id} does not meet requirements '
@@ -218,15 +221,19 @@ class BayesianDecoder:
         return self
 
     def _encode(self):
-        if self.dim_num == 1:
-            feat_input = self.features_train[self.feature_names[0]]
-            self.model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
-                                      ep=self.encoder_times)
-            self.bins = np.linspace(np.min(feat_input), np.max(feat_input), self.encoder_bin_num + 1)
-        elif self.dim_num == 2:
-            self.model, self.bins = self.encoder(group=self.spikes, feature=self.features_train,
-                                                 nb_bins=self.encoder_bin_num,
-                                                 ep=self.encoder_times)
+        if self.spikes:  # if there were units and spikes to use for encoding
+            if self.dim_num == 1:
+                feat_input = self.features_train[self.feature_names[0]]
+                self.bins = np.linspace(np.min(feat_input), np.max(feat_input), self.encoder_bin_num + 1)
+                self.model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
+                                          ep=self.encoder_times)
+            elif self.dim_num == 2:
+                self.model, self.bins = self.encoder(group=self.spikes, feature=self.features_train,
+                                                     nb_bins=self.encoder_bin_num,
+                                                     ep=self.encoder_times)
+        else:  # if there were no units/spikes to use for encoding, create empty dataframe
+            self.model = pd.DataFrame()
+            self.bins = []
 
         return self
 
@@ -244,7 +251,11 @@ class BayesianDecoder:
                 kwargs.update(features=self.features_train)
 
         # run decoding
-        self.decoded_values, self.decoded_probs = self.decoder(**kwargs)
+        if self.model.any().any():
+            self.decoded_values, self.decoded_probs = self.decoder(**kwargs)
+        else:
+            self.decoded_values = pd.DataFrame()
+            self.decoded_probs = pd.DataFrame()
 
         # convert to binary if needed
         if self.convert_to_binary:
@@ -279,25 +290,31 @@ class BayesianDecoder:
             decoding_error = dict()
             probability = dict()
             for name in self.feature_names:
-                feat_interp[name] = interp1d_time_intervals(self.features_test[name],
-                                                            feat_start_locs, feat_stop_locs,
-                                                            new_times, mid_times, trials_to_flip)
-                decoding_interp[name] = interp1d_time_intervals(self.decoded_values, decoding_start_locs,
-                                                                decoding_stop_locs,
+                if self.decoded_values.any().any():
+                    feat_interp[name] = interp1d_time_intervals(self.features_test[name],
+                                                                feat_start_locs, feat_stop_locs,
                                                                 new_times, mid_times, trials_to_flip)
-                decoding_error[name] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
-                                        zip(feat_interp[name], decoding_interp[name])]
+                    decoding_interp[name] = interp1d_time_intervals(self.decoded_values, decoding_start_locs,
+                                                                    decoding_stop_locs,
+                                                                    new_times, mid_times, trials_to_flip)
+                    decoding_error[name] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
+                                            zip(feat_interp[name], decoding_interp[name])]
 
-                if self.dim_num == 1:
-                    probability[name] = griddata_time_intervals(self.decoded_probs, decoding_start_locs,
-                                                                decoding_stop_locs,
-                                                                nbins, trials_to_flip, mid_times)
-                elif self.dim_num == 2:
-                    probability[name] = griddata_2d_time_intervals(self.decoded_probs, self.bins,
-                                                                   self.decoding_values.index.values,
-                                                                   decoding_start_locs, decoding_stop_locs,
-                                                                   mid_times, nbins,
-                                                                   trials_to_flip)
+                    if self.dim_num == 1:
+                        probability[name] = griddata_time_intervals(self.decoded_probs, decoding_start_locs,
+                                                                    decoding_stop_locs,
+                                                                    nbins, trials_to_flip, mid_times)
+                    elif self.dim_num == 2:
+                        probability[name] = griddata_2d_time_intervals(self.decoded_probs, self.bins,
+                                                                       self.decoding_values.index.values,
+                                                                       decoding_start_locs, decoding_stop_locs,
+                                                                       mid_times, nbins,
+                                                                       trials_to_flip)
+                else:
+                    feat_interp[name] = []
+                    decoding_interp[name] = []
+                    decoding_error[name] = []
+                    probability[name] = []
 
             # get means and sem
             data = dict()
@@ -329,18 +346,25 @@ class BayesianDecoder:
         feature_means = np.hstack(feature_mean)
 
         actual_series = pd.Series(feature_means, index=time_index, name='actual_feature')
-        decoded_series = self.decoded_values.as_series()  # TODO - figure out why decoded/actual series are diff lengths
+        if self.decoded_values.any().any():
+            decoded_series = self.decoded_values.as_series()  # TODO - figure out why decoded/actual series are diff lengths
+        else:
+            decoded_series = pd.Series()
         df_decode_results = pd.merge(decoded_series.rename('decoded_feature'), actual_series, how='left',
                                      left_index=True, right_index=True)
         df_decode_results['decoding_error'] = abs(
             df_decode_results['decoded_feature'] - df_decode_results['actual_feature'])
         df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20,
                                                                                                   min_periods=20).mean()
-        df_decode_results['prob_dist'] = [x for x in self.decoded_probs.as_dataframe().to_numpy()]
+        if self.decoded_probs.any().any():
+            df_decode_results['prob_dist'] = [x for x in self.decoded_probs.as_dataframe().to_numpy()]
+            df_positions = df_decode_results[['actual_feature', 'decoded_feature']].dropna(how='any')
+            rmse = sqrt(mean_squared_error(df_positions['actual_feature'], df_positions['decoded_feature']))
+        else:
+            df_decode_results['prob_dist'] = [x for x in self.decoded_probs.to_numpy()]
+            rmse = np.nan
 
         # add summary data
-        df_positions = df_decode_results[['actual_feature', 'decoded_feature']].dropna(how='any')
-        rmse = sqrt(mean_squared_error(df_positions['actual_feature'], df_positions['decoded_feature']))
         df_decode_results['session_rmse'] = rmse
         df_decode_results['animal'] = self.results_io.animal
         df_decode_results['session'] = self.results_io.session_id
@@ -359,7 +383,7 @@ class BayesianDecoder:
                 for v in file_info['vars']:
                     setattr(self, v, import_data[v])
             elif file_info['format'] == 'pkl':
-                import_data = load_pickled_data(fname)
+                import_data = self.results_io.load_pickled_data(fname)
                 for v, data in zip(file_info['vars'], import_data):
                     setattr(self, v, data)
             else:
@@ -371,7 +395,7 @@ class BayesianDecoder:
         print(f'Exporting data for session {self.results_io.session_id}...')
 
         # save npz files
-        for name, file_info in self.data_files.items():
+        for name, file_info in self.data_files.items():  # TODO - make all one big file with the little inputs inside? better for parameter searching
             fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
 
             if file_info['format'] == 'npz':
