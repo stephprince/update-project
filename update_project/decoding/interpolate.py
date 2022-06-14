@@ -17,7 +17,8 @@ def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset,
     return interpolated_position
 
 
-def griddata_time_intervals(data, start_locs, stop_locs, nbins, trials_to_flip, time_offset=[0], method='linear'):
+def griddata_time_intervals(data, start_locs, stop_locs, nbins, trials_to_flip, time_offset=[0], method='linear',
+                            time_bins=None):
     grid_prob = []
     for start, stop, offset, flip_bool in zip(start_locs, stop_locs, time_offset, trials_to_flip):
         proby = data.iloc[start:stop].stack().reset_index().values
@@ -26,7 +27,11 @@ def griddata_time_intervals(data, start_locs, stop_locs, nbins, trials_to_flip, 
         if flip_bool:
             proby[:, 1] = -proby[:, 1]  # flip position values so that prob density mapping is flipped
 
-        x1 = np.linspace(min(proby[:, 0]), max(proby[:, 0]), nbins)  # time bins
+        if time_bins is None:
+            x1 = np.linspace(min(proby[:, 0]), max(proby[:, 0]), nbins)  # time bins
+        else:
+            x1 = time_bins  # use user-specified time bins
+
         y1 = np.linspace(min(proby[:, 1]), max(proby[:, 1]), len(data.columns))  # position bins
         grid_x, grid_y = np.meshgrid(x1, y1)
         grid_prob_y = griddata(proby[:, 0:2], proby[:, 2], (grid_x, grid_y), method=method, fill_value=np.nan)
