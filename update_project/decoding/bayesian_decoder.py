@@ -29,12 +29,9 @@ class BayesianDecoder:
         self.units_types = params.get('units_types',
                                       dict(region=['CA1', 'PFC'],  # dict of filters to apply to units table
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
-        self.units_threshold = params.get('units_threshold', 0)  # minimum number of units to use for a session
         self.speed_threshold = params.get('speed_threshold', 0)  # minimum virtual speed to subselect epochs
-        # self.trial_threshold = params.get('trial_threshold', 0)  # minimum number of trials to use for a session
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
-        self.decoder_test_size = params.get('decoder_test_size',
-                                            0.25)  # proportion of trials to use for testing on train/test split
+        self.decoder_test_size = params.get('decoder_test_size', 0.25)  # prop of trials for testing on train/test split
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],
                                                                           correct=[0, 1]))  # trial filters
         self.encoder_bin_num = params.get('encoder_bin_num', 30)  # number of bins to build encoder
@@ -44,36 +41,41 @@ class BayesianDecoder:
         self.decoder_bin_size = params.get('decoder_bin_size', 0.25)  # time/fraction of theta phase to use for decoder
         self.linearize_feature = params.get('linearize_feature', False)  # whether to linearize y-position/feature
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
-        self.excluded_session = False  # initialize to False, will be set to True if does not pass session requirements
+
+        # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
+        self.flip_trials_by_turn = False  # default false
         if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 2
         if self.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:
             self.flip_trials_by_turn = True  # flip data by turn type for averaging
-        else:
-            self.flip_trials_by_turn = False  # TODO - make this logic better so it's less confusing
+
+        # setup session exclusion parameters (don't change decoding but just change whether it gets included or not)
+        self.exclusion_criteria = params.get('exclusion_criteria',
+                                             dict(units_threshold=0, # min num units to include session
+                                                  trials_threshold=0)) # min num trials to include session
+        self.excluded_session = False  # initialize to False, will be set to True if does not pass session requirements
 
         # setup decoding/encoding functions based on dimensions
         self.dim_num = params.get('dim_num', 1)  # 1D decoding default
         self.encoder, self.decoder = self._setup_decoding_functions()
 
         # setup file paths for io
-        self.results_tags = f"{'_'.join(self.feature_names)}_regions_{'_'.join(self.units_types['region'])}"
+        self.results_tags = f"{'_'.join(self.feature_names)}_regions_{'_'.join(self.units_types['region'])}_"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
-        self.data_files = dict(preprocess_output=dict(vars=['encoder_times', 'decoder_times', 'spikes', 'features_test',
-                                                            'features_train', 'train_df', 'test_df'],
-                                                      format='pkl'),
-                               encode_output=dict(vars=['model', 'bins'], format='pkl'),
-                               decode_output=dict(vars=['decoded_values', 'decoded_probs'], format='pkl'),
-                               aligned_output=dict(vars=['aligned_data', 'aligned_data_window', 'aligned_data_nbins'],
-                                                   format='pkl'),
-                               summary_df=dict(vars=['summary_df'], format='pkl'),
-                               params=dict(vars=['units_threshold', 'speed_threshold', 'firing_threshold', 'units_types',
+        self.data_files = dict(bayesian_decoder_output=dict(vars=['encoder_times', 'decoder_times', 'spikes',
+                                                                  'features_test', 'features_train', 'train_df',
+                                                                  'test_df', 'model', 'bins', 'decoded_values',
+                                                                  'decoded_probs', 'aligned_data',
+                                                                  'aligned_data_window', 'aligned_data_nbins',
+                                                                  'summary_df'],
+                                                            format='pkl'),
+                               params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
-                                                 'feature_names', 'linearize_feature', 'excluded_session', ],
+                                                 'feature_names', 'linearize_feature' ],
                                            format='npz'))
 
     def run_decoding(self, overwrite=False):
@@ -144,7 +146,8 @@ class BayesianDecoder:
         params_cached = np.load(params_path, allow_pickle=True)
         params_matched = []
         for k, v in params_cached.items():
-            params_matched.append(getattr(self, k) == v)
+            if k != 'exclusion_criteria':  # exclusion criteria can be applied post-hoc, original data can still be used
+                params_matched.append(getattr(self, k) == v)
 
         return all(params_matched)
 
@@ -155,6 +158,18 @@ class BayesianDecoder:
             files_exist.append(path.is_file())
 
         return all(files_exist)
+
+    def _meets_exclusion_criteria(self):
+        exclude_session = False  # default to include session
+
+        # apply exclusion criteria
+        if len(self.spikes) < self.exclusion_criteria['units_threshold']:
+            exclude_session = True
+
+        if len(self.train_df) < self.exclusion_criteria['trials_threshold']:
+            exclude_session = True
+
+        return exclude_session
 
     def _train_test_split_ok(self, train_data, test_data):
         train_values = np.sort(train_data[self.feature_names[0]].unique())
@@ -196,10 +211,6 @@ class BayesianDecoder:
             self.spikes = nap.TsGroup(spikes_dict, time_units='s')
         else:
             self.spikes = []  # if no units match criteria, leave spikes empty
-        if len(units_subset) < self.units_threshold:
-            self.excluded_session = True
-            warnings.warn(f'Session {self.results_io.session_id} does not meet requirements '
-                          f'"Number of units >= {self.units_threshold}')
 
         # split data into training/encoding and testing/decoding trials
         self.train_df, self.test_df = self._train_test_split()
@@ -217,6 +228,9 @@ class BayesianDecoder:
             linearize_y_position()  # TODO - make this function
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
+
+        # determine if session meets exclusion criteria
+        self.excluded_session = self._meets_exclusion_criteria()
 
         return self
 
@@ -389,13 +403,16 @@ class BayesianDecoder:
             else:
                 raise RuntimeError(f'{file_info["format"]} format is not currently supported for loading data')
 
+        # apply any exclusion criteria if changed
+        self.excluded_session = self._meets_exclusion_criteria()
+
         return self
 
     def _export_data(self):
         print(f'Exporting data for session {self.results_io.session_id}...')
 
         # save npz files
-        for name, file_info in self.data_files.items():  # TODO - make all one big file with the little inputs inside? better for parameter searching
+        for name, file_info in self.data_files.items():
             fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
 
             if file_info['format'] == 'npz':
