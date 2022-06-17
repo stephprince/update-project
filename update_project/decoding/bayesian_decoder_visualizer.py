@@ -1,3 +1,4 @@
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -41,7 +42,10 @@ class BayesianDecoderVisualizer:
                 sess_dict.update(rmse=session_error['rmse'])
                 sess_dict.update(raw_error=session_error['raw_error_median'])
 
-            self.group_df = pd.DataFrame(data)
+                sess_dict.update(excluded_session=sess_dict['decoder'].excluded_session)
+
+            group_df = pd.DataFrame(data)
+            self.group_df = group_df[group_df['excluded_session'] == False]  # only keep non-excluded sessions
             self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self, group_by=None):
@@ -59,10 +63,13 @@ class BayesianDecoderVisualizer:
         self.plot_aligned_data()
 
     def _plot_group_data(self, group_by):
-        # make plots for all groups at once
-        self.plot_all_groups_error(main_group='feature', sub_group='region')   # plot error summary for all groups
-        self.plot_all_groups_error(main_group='region', sub_group='feature')   # plot error summary for all groups
-        # self.compare_parameters(main_group='feature', sub_group='units_threshold')
+        params = ['units_threshold', 'trials_threshold']
+
+        # make plots inspecting errors across all groups
+        self.plot_all_groups_error(main_group='feature', sub_group='units_threshold')
+        self.plot_all_groups_error(main_group='feature', sub_group='trials_threshold')
+        self.plot_all_groups_error(main_group='feature', sub_group='region', thresholds=params)  # thresholds to use
+        self.plot_all_groups_error(main_group='region', sub_group='feature', thresholds=params)
 
         # make plots for each individual subgroup
         self.groups = group_by
@@ -70,9 +77,7 @@ class BayesianDecoderVisualizer:
         for name, data in group_data:
             print(f'Plotting data for group {name}...')
             self.plot_group_confusion_matrices(data)  # plot all the heatmaps for all individual animals
-            # self.plot_group_error(data)  # plot summary of heatmap and error for each group
-
-        test = 1
+            self.plot_parameter_comparison(data, name, params=params)
 
     @staticmethod
     def _get_mean_prob_dist(probabilities, bins):
@@ -149,7 +154,7 @@ class BayesianDecoderVisualizer:
             if i < len(confusion_matrix) - 1:
                 values_to_sum.append(confusion_matrix[i+1, i])  # one above
                 values_to_sum.append(confusion_matrix[i, i+1])  # one to right
-        confusion_matrix_sum = np.sum(values_to_sum)
+        confusion_matrix_sum = np.nansum(values_to_sum)
 
         # get error from
         rmse = data.summary_df['session_rmse'].mean()
@@ -551,8 +556,15 @@ class BayesianDecoderVisualizer:
         for _, row in data.iterrows():
             test = 1
 
-    def plot_all_groups_error(self, main_group, sub_group):
-        group_data = self.group_df.groupby(main_group)  # main group is what gets the different plots
+    def plot_all_groups_error(self, main_group, sub_group, thresholds=None):
+        # select no threshold data to plot if thresholds indicated, otherwise combine
+        if thresholds:
+            thresh_mask = pd.concat([group_df[t] == 0 for t in thresholds], axis=1).all(axis=1)
+            df = group_df[thresh_mask]
+        else:
+            df = group_df
+
+        group_data = df.groupby(main_group)  # main group is what gets the different plots
         for name, data in group_data:
             nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
             ncols = 3  # 1 column for RMSE dist, 1 for error dist, 1 for confusion_matrix dist
@@ -564,41 +576,51 @@ class BayesianDecoderVisualizer:
             self.plot_distributions(data, axes=axes, column_name='raw_error', group=sub_group, row_ids=[0, 1, 2],
                                     col_ids=[0, 0, 0], xlabel=xlabel, title=title)
 
-            # confusion matrix sums
-            title = 'Confusion matrix sum - all sessions'
-            xlabel = 'Probability'
-            self.plot_distributions(data, axes=axes, column_name='confusion_matrix_sum', group=sub_group, row_ids=[0, 1, 2],
-                                    col_ids=[1, 1, 1], xlabel=xlabel, title=title)
-
             # rmse
             title = 'Root mean square error - all sessions'
             xlabel = 'RMSE'
             self.plot_distributions(data, axes=axes, column_name='rmse', group=sub_group, row_ids=[0, 1, 2],
+                                    col_ids=[1, 1, 1], xlabel=xlabel, title=title)
+
+            # confusion matrix sums
+            title = 'Confusion matrix sum - all sessions'
+            xlabel = 'Probability'
+            self.plot_distributions(data, axes=axes, column_name='confusion_matrix_sum', group=sub_group, row_ids=[0, 1, 2],
                                     col_ids=[2, 2, 2], xlabel=xlabel, title=title)
 
             # wrap up and save plot
             fig.suptitle(f'Decoding error - all sessions - {name}', fontsize=14)
             plt.tight_layout()
-            kwargs = self.results_io.get_figure_args(filename=f'group_error', additional_tags=name, format='pdf')
+            kwargs = self.results_io.get_figure_args(filename=f'group_error', additional_tags=f'{name}_{sub_group}', format='pdf')
             plt.savefig(**kwargs)
             plt.close()
 
-    def plot_parameter_comparison(self):
-        # one row per parameter of interest (units threshold, trials_threshold)
-        # one column per metric (RMSE, confusion mat, error)
-        # one subgroup on plot per brain region/feature (violin/box plots with standard error)
-        # one heatmap per every two parameters
+    def plot_parameter_comparison(self, data, name, params):
+        nrows = len(list(itertools.combinations(params, r=2)))  # 1 row for each parameter combo
+        ncols = 3  # 1 column for RMSE dist, 1 for error dist, 1 for confusion_matrix dist
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 5), squeeze=False)
+        error_metrics = dict(raw_error=0, rmse=1, confusion_matrix_sum=2)
+        params_dict = {p:ind for ind, p in enumerate(params)}
 
-        group_data = self.group_df.groupby(main_group)  # main group is what gets the different plots
-        for name, data in group_data:
-            nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
-            ncols = 3  # 1 column for RMSE dist, 1 for error dist, 1 for confusion_matrix dist
-            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 15))
+        # plot heatmaps comparing parameters (1 heatmap/2 parameters)
+        medians = data.groupby(params).median().reset_index()
+        row = 0
+        for thresh1, thresh2 in itertools.combinations(params, r=2):
+            for err, col in error_metrics.items():
+                df = medians.pivot(thresh1, thresh2, err)
+                axes[row][col] = sns.heatmap(df, annot=True, fmt='.2f', ax=axes[row][col], cmap='mako_r', square=True,
+                                             cbar_kws={'pad': 0.01, 'label': err, 'fraction': 0.046},
+                                             annot_kws={'size': 10}, )
+                axes[row][col].set_title(f'Parameter median {err}')
+                axes[row][col].invert_yaxis()
+            row += 1
+
 
         # wrap up and save plot
         fig.suptitle(f'Parameter comparison - median all sessions - {name}', fontsize=14)
         plt.tight_layout()
-        kwargs = self.results_io.get_figure_args(filename=f'group_param_comparison', additional_tags=name, format='pdf')
+        tags = '_'.join([''.join(n) for n in name])
+        kwargs = self.results_io.get_figure_args(filename=f'group_param_comparison', additional_tags=tags, format='pdf')
         plt.savefig(**kwargs)
         plt.close()
 
