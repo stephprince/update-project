@@ -1,9 +1,7 @@
 import itertools
 
-from pathlib import Path
 from pynwb import NWBHDF5IO
 
-from update_project.results_io import ResultsIO
 from update_project.session_loader import SessionLoader
 from update_project.decoding.bayesian_decoder import BayesianDecoder
 from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
@@ -16,17 +14,19 @@ session_db = SessionLoader(animals=animals, dates_included=dates_included, dates
 session_names = session_db.load_session_names()
 
 # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-overwrite = False
-plot = False
-features = ['x_position', 'y_position', 'view_angle', 'choice', 'turn_type']
-regions = [['CA1'], ['PFC'], ['CA1', 'PFC']]
-units_thresh = [0, 25, 50]  # TODO - test these out
-trials_thresh = [0, 25, 50]  # TODO - test these out
-params = dict(speed_threshold=0,
-              firing_threshold=0,
-              units_types=dict(cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
+overwrite = True
+plot = True
+group = False
+features = ['y_position']  # ['x_position', 'y_position', 'view_angle', 'choice', 'turn_type']
+regions = [['CA1'], ['PFC']]  # [['CA1'], ['PFC'], ['CA1', 'PFC']]
+units_thresh = [0]  # [0, 20, 40, 50]
+trials_thresh = [0]  # [0, 25, 50, 100]
+encoder_bin_nums = [30, 50, 70]
+decoder_bin_sizes = [0.025, 0.050, 0.10, 0.25]
+encoder_trial_types = [['correct'], ['correct', 'incorrect']]
+params = dict(units_types=dict(cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
               encoder_trial_types=dict(update_type=[1], correct=[0, 1]),
-              encoder_bin_num=30,
+              encoder_bin_num=40,  # changed from 30
               decoder_trial_types=dict(update_type=[1, 2, 3], correct=[0, 1]),
               decoder_bin_size=0.25,
               decoder_bin_type='time',
@@ -35,9 +35,10 @@ params = dict(speed_threshold=0,
 
 # run decoder for all sessions (itertools equivalent to nested for-loop)
 group_data = []
-for name, reg, feat in itertools.product(session_names, regions, features):
+for name, reg, feat, units, trials in itertools.product(session_names, regions, features, units_thresh, trials_thresh):
     # update params based on loop
     params['units_types'].update(region=reg)
+    params['exclusion_criteria'] = dict(units_threshold=units, trials_threshold=trials)
 
     # load nwb file
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
@@ -54,13 +55,14 @@ for name, reg, feat in itertools.product(session_names, regions, features):
         visualizer.plot()
 
     # save to group output
-    session_decoder_output = dict(session_id=session_db.get_session_id(name),
-                                  region=tuple(reg),  # convert to tuple for later grouping
-                                  feature=feat,
-                                  decoder=decoder)
-                                 #units_threshold=units,
-                                 #trials_threshold=trials)
-    group_data.append(session_decoder_output)  # save for group plotting
+    if group:
+        session_decoder_output = dict(session_id=session_db.get_session_id(name),
+                                      region=tuple(reg),  # convert to tuple for later grouping
+                                      feature=feat,
+                                      decoder=decoder,
+                                      units_threshold=units,
+                                      trials_threshold=trials)
+        group_data.append(session_decoder_output)  # save for group plotting
 
 # get decoder group summary data
 group_visualizer = BayesianDecoderVisualizer(group_data, type='group')
