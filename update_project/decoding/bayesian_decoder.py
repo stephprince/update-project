@@ -15,16 +15,11 @@ from update_project.results_io import ResultsIO
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.statistics import get_fig_stats
+from update_project.virtual_track import UpdateTrack
 
 
 class BayesianDecoder:
     def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params: dict):
-        # setup data
-        self.feature_names = features
-        self.trials = nwbfile.trials.to_dataframe()
-        self.units = nwbfile.units.to_dataframe()
-        self.data = self._setup_data(nwbfile)
-
         # setup parameters
         self.units_types = params.get('units_types',
                                       dict(region=['CA1', 'PFC'],  # dict of filters to apply to units table
@@ -39,8 +34,16 @@ class BayesianDecoder:
                                                                           correct=[0, 1]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
         self.decoder_bin_size = params.get('decoder_bin_size', 0.25)  # time/fraction of theta phase to use for decoder
-        self.linearize_feature = params.get('linearize_feature', False)  # whether to linearize y-position/feature
+        self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
+        self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
+
+        # setup data
+        self.feature_names = features
+        self.trials = nwbfile.trials.to_dataframe()
+        self.units = nwbfile.units.to_dataframe()
+        self.data = self._setup_data(nwbfile)
+        self.velocity = self._get_velocity(nwbfile)
 
         # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
@@ -75,7 +78,7 @@ class BayesianDecoder:
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
-                                                 'feature_names', 'linearize_feature' ],
+                                                 'feature_names', 'linearized_features' ],
                                            format='npz'))
 
     def run_decoding(self, overwrite=False):
@@ -100,8 +103,12 @@ class BayesianDecoder:
         for feat in self.feature_names:
             if feat in ['x_position', 'y_position']:
                 time_series = nwbfile.processing['behavior']['position'].get_spatial_series('position')
-                column = [ind for ind, val in enumerate(['x_position', 'y_position']) if val == feat][0]
-                data = time_series.data[:, column]
+                if feat in self.linearized_features:
+                    raw_data = time_series.data[:]
+                    data = self.virtual_track.linearize_track_position(raw_data)
+                else:
+                    column = [ind for ind, val in enumerate(['x_position', 'y_position']) if val == feat][0]
+                    data = time_series.data[:, column]
             elif feat in ['view_angle']:
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
                 data = time_series.data[:]
@@ -128,6 +135,15 @@ class BayesianDecoder:
             data_dict[feat] = pd.Series(index=time_series.timestamps[:], data=data)
 
         return pd.DataFrame.from_dict(data_dict)
+
+    def _get_velocity(self, nwbfile):
+        rotational_velocity = nwbfile.acquisition['rotational_velocity'].data
+        translational_velocity = nwbfile.acquisition['translational_velocity'].data
+        velocity = np.abs(rotational_velocity[:]) + np.abs(translational_velocity[:])
+        timestamps = nwbfile.acquisition['translational_velocity'].timestamps
+        velocity = pd.Series(index=timestamps[:], data=velocity)
+
+        return velocity
 
     def _setup_decoding_functions(self):
         if self.dim_num == 1:
@@ -224,8 +240,6 @@ class BayesianDecoder:
                                              time_units='s')
 
         # select feature
-        if self.linearize_feature:
-            linearize_y_position()  # TODO - make this function
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
 
