@@ -51,7 +51,10 @@ class ResultsIO:
     def get_figure_args(self, filename, results_type='group', additional_tags='', results_name='', format='pdf'):
         results_path = self.get_results_path(results_type, results_name)
         extra_tags = f'_{additional_tags}'
-        fname = results_path / f'{filename}_{self.tags}{extra_tags}_git{self.git_hash}.{format}'
+        if self.tags == '' and additional_tags == '':
+            fname = results_path / f'{filename}_git{self.git_hash}.{format}'
+        else:
+            fname = results_path / f'{filename}_{self.tags}{extra_tags}_git{self.git_hash}.{format}'
 
         kwargs = dict(fname=fname,
                       dpi=300,
