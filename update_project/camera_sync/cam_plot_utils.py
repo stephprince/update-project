@@ -215,7 +215,7 @@ def plot_update_cam_angle_and_veloc(camera_inds_in_df, output_dir, frame_no, ind
 
     return plot_filename
 
-def write_camera_video(out_dir, fps, plot_filenames, vid_filename):
+def write_camera_video(out_dir, plot_filenames, vid_filename, fps=5.0):
     video_filename = Path(f"{out_dir}/{vid_filename}.mp4")
     frame = cv2.imread(str(plot_filenames[0]))
     height, width, layers = frame.shape

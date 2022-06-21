@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import scipy
 
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
@@ -10,6 +11,39 @@ green = color_wheel[3]
 color_wheel[2] = green
 color_wheel[3] = red  # flip colors bc of how I have correct/incorrect trials coded
 
+
+def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True):
+    # cum fraction plots
+    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]],
+                                                palette='husl')
+    axes[row_ids[0]][col_ids[0]].set_title(title)
+    axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion')
+    axes[row_ids[0]][col_ids[0]].set_aspect(1. / axes[row_ids[0]][col_ids[0]].get_data_ratio(), adjustable='box')
+
+    # add median annotations to the first plot
+    if group and show_median:
+        medians = data.groupby([group])[column_name].median()
+    else:
+        medians = {column_name: data[column_name].median()}
+    new_line = '\n'
+    median_text = [f"{g} median: {m:.2f} {new_line}" for g, m in medians.items()]
+    axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text),
+                                      transform=axes[row_ids[0]][col_ids[0]].transAxes, verticalalignment='top',
+                                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+
+    # histograms
+    axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
+                                                palette='husl', element='step')
+    axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion')
+
+    # violin plots
+    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],
+                                                  palette='husl')
+    plt.setp(axes[row_ids[2]][col_ids[2]].collections, alpha=.25)
+    if stripplot:
+        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],
+                      palette='husl')
+    axes[row_ids[2]][col_ids[2]].set_title(title)
 
 def show_start_aligned_psth(start_aligned, note_times, group_inds, window, labels, axes=None):
     if axes is None:
