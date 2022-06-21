@@ -8,9 +8,9 @@ import warnings
 from pathlib import Path
 
 from update_project.camera_sync.cam_plot_utils import write_camera_video
-from update_project.general.utils import get_track_boundaries, get_cue_locations
 from update_project.decoding.interpolate import griddata_time_intervals
 from update_project.results_io import ResultsIO
+from update_project.general.plots import plot_distributions
 
 class BayesianDecoderVisualizer:
     def __init__(self, data, type='session'):
@@ -372,7 +372,7 @@ class BayesianDecoderVisualizer:
             correct_multiplier = 1
         xlims = [-30, 30]
         ylims = [5, 285]
-        track_bounds_xs, track_bounds_ys = get_track_boundaries()
+        track_bounds_xs, track_bounds_ys = self.data.virtual_track.get_track_boundaries()
 
         if data_around_update['probability']:  # skip if there is no data
             positions_y = stats['feature']['mean'][:time_bin + 1]
@@ -430,7 +430,7 @@ class BayesianDecoderVisualizer:
 
             axes = plt.figure(figsize=(20, 18)).subplot_mosaic(mosaic)
 
-            locations = get_cue_locations()
+            locations = self.data.virtual_track.get_cue_locations()
             pos_values = self.data.bins.astype(int)
             limits = [np.min(pos_values), np.max(pos_values)]
 
@@ -528,7 +528,7 @@ class BayesianDecoderVisualizer:
 
         # plot confusion matrix
         matrix = group_confusion_matrix * data.iloc[0].encoder_bin_num  # scale to be probability/chance
-        locations = get_cue_locations().get(data['feature'], dict())  # don't annotate graph if no locations indicated
+        locations = self.data.virtual_track.get_cue_locations().get(data['feature'], dict())  # don't annotate graph if no locations indicated
         limits = [np.min(sess_data.bins.astype(int)), np.max(sess_data.bins.astype(int))]
         im = axes[col_id][row_id].imshow(matrix, cmap='YlGnBu', origin='lower',  # aspect='auto',
                                          vmin=0, vmax=5,
@@ -559,10 +559,10 @@ class BayesianDecoderVisualizer:
     def plot_all_groups_error(self, main_group, sub_group, thresholds=None):
         # select no threshold data to plot if thresholds indicated, otherwise combine
         if thresholds:
-            thresh_mask = pd.concat([group_df[t] == 0 for t in thresholds], axis=1).all(axis=1)
-            df = group_df[thresh_mask]
+            thresh_mask = pd.concat([self.group_df[t] == 0 for t in thresholds], axis=1).all(axis=1)
+            df = self.group_df[thresh_mask]
         else:
-            df = group_df
+            df = self.group_df
 
         group_data = df.groupby(main_group)  # main group is what gets the different plots
         for name, data in group_data:
@@ -573,19 +573,19 @@ class BayesianDecoderVisualizer:
             # raw decoding errors
             title = 'Median raw error - all sessions'
             xlabel = 'Decoding error (|true - decoded|)'
-            self.plot_distributions(data, axes=axes, column_name='raw_error', group=sub_group, row_ids=[0, 1, 2],
+            plot_distributions(data, axes=axes, column_name='raw_error', group=sub_group, row_ids=[0, 1, 2],
                                     col_ids=[0, 0, 0], xlabel=xlabel, title=title)
 
             # rmse
             title = 'Root mean square error - all sessions'
             xlabel = 'RMSE'
-            self.plot_distributions(data, axes=axes, column_name='rmse', group=sub_group, row_ids=[0, 1, 2],
+            plot_distributions(data, axes=axes, column_name='rmse', group=sub_group, row_ids=[0, 1, 2],
                                     col_ids=[1, 1, 1], xlabel=xlabel, title=title)
 
             # confusion matrix sums
             title = 'Confusion matrix sum - all sessions'
             xlabel = 'Probability'
-            self.plot_distributions(data, axes=axes, column_name='confusion_matrix_sum', group=sub_group, row_ids=[0, 1, 2],
+            plot_distributions(data, axes=axes, column_name='confusion_matrix_sum', group=sub_group, row_ids=[0, 1, 2],
                                     col_ids=[2, 2, 2], xlabel=xlabel, title=title)
 
             # wrap up and save plot
@@ -625,36 +625,6 @@ class BayesianDecoderVisualizer:
         plt.close()
 
     @staticmethod
-    def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title):
-        # cum fraction plots
-        axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]],
-                                                    palette='husl')
-        axes[row_ids[0]][col_ids[0]].set_title(title)
-        axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion')
-        axes[row_ids[0]][col_ids[0]].set_aspect(1. / axes[row_ids[0]][col_ids[0]].get_data_ratio(), adjustable='box')
-
-        # add median annotations to the first plot
-        medians = data.groupby([group])[column_name].median()
-        new_line = '\n'
-        median_text = [f"{g} median: {m:.2f} {new_line}" for g, m in medians.items()]
-        axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text),
-                                          transform=axes[row_ids[0]][col_ids[0]].transAxes, verticalalignment='top',
-                                          bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
-
-        # histograms
-        axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
-                                                    palette='husl', element='step')
-        axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion')
-
-        # violin plots
-        axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],
-                                                      palette='husl')
-        plt.setp(axes[row_ids[2]][col_ids[2]].collections, alpha=.25)
-        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],
-                      palette='husl')
-        axes[row_ids[2]][col_ids[2]].set_title(title)
-
-    @staticmethod
     def plot_group_confusion_matrices(data):
         plot_num = 0
         counter = 0
@@ -686,7 +656,7 @@ class BayesianDecoderVisualizer:
                 # plot confusion matrix
                 if hasattr(sess_data.bins, 'astype'):  # if the matrix exists
                     matrix = np.vstack(sess_matrix) * sess_data.encoder_bin_num  # scale to be probability/chance
-                    locations = get_cue_locations().get(row['feature'], dict())  # don't annotate graph if no locations indicated
+                    locations = sess_data.virtual_track.get_cue_locations().get(row['feature'], dict())  # don't annotate graph if no locations indicated
                     limits = [np.min(sess_data.bins.astype(int)), np.max(sess_data.bins.astype(int))]
                     im = axes[row_id][col_id].imshow(matrix, cmap='YlGnBu', origin='lower',  # aspect='auto',
                                                      vmin=0, vmax=vmax,
