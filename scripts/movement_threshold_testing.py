@@ -22,8 +22,11 @@ def plot_velocity_distributions(velocity_df, thresholds=[], group=None, show_med
     plot_distributions(velocity_df, axes=axes, column_name='rotational', group=group, row_ids=[0, 1, 2],
                        col_ids=[0, 0, 0], xlabel=xlabel, title=title, stripplot=False, show_median=show_median)
     ylims = axes[1][0].get_ylim()
+    xlims = axes[2][0].get_xlim()
     for t in thresholds:
+        axes[0][0].plot([t, t], [0, 1], linestyle='dashed', color=[0, 0, 0, 0.5])
         axes[1][0].plot([t, t], ylims, linestyle='dashed', color=[0, 0, 0, 0.5], label=f'{t} cutoff')
+        axes[2][0].plot(xlims, [t, t], linestyle='dashed', color=[0, 0, 0, 0.5])
     axes[1][0].set_ylim(ylims)
     axes[1][0].legend()
 
@@ -32,8 +35,11 @@ def plot_velocity_distributions(velocity_df, thresholds=[], group=None, show_med
     plot_distributions(velocity_df, axes=axes, column_name='translational', group=group, row_ids=[0, 1, 2],
                        col_ids=[1, 1, 1], xlabel=xlabel, title=title, stripplot=False, show_median=show_median)
     ylims = axes[1][1].get_ylim()
+    xlims = axes[2][1].get_xlim()
     for t in thresholds:
+        axes[0][1].plot([t, t], [0, 1], linestyle='dashed', color=[0, 0, 0, 0.5])
         axes[1][1].plot([t, t], ylims, linestyle='dashed', color=[0, 0, 0, 0.5], label=f'{t} cutoff')
+        axes[2][1].plot(xlims, [t, t], linestyle='dashed', color=[0, 0, 0, 0.5])
     axes[1][1].set_ylim(ylims)
     axes[1][1].legend()
 
@@ -42,8 +48,11 @@ def plot_velocity_distributions(velocity_df, thresholds=[], group=None, show_med
     plot_distributions(velocity_df, axes=axes, column_name='summed', group=group, row_ids=[0, 1, 2],
                        col_ids=[2, 2, 2], xlabel=xlabel, title=title, stripplot=False, show_median=show_median)
     ylims = axes[1][2].get_ylim()
+    xlims = axes[2][2].get_xlim()
     for t in thresholds:
+        axes[0][2].plot([t, t], [0, 1], linestyle='dashed', color=[0, 0, 0, 0.5])
         axes[1][2].plot([t, t], ylims, linestyle='dashed', color=[0, 0, 0, 0.5], label=f'{t} cutoff')
+        axes[2][2].plot(xlims, [t, t], linestyle='dashed', color=[0, 0, 0, 0.5])
     axes[1][2].set_ylim(ylims)
     axes[1][2].legend()
 
@@ -56,8 +65,8 @@ session_db = SessionLoader(animals=animals, dates_included=dates_included, dates
 session_names = session_db.load_session_names()
 
 downsample_factor = 20
-thresholds = [1000, 2500, 5000]
-plot_session_data = False
+thresholds = [1000, 1500, 2000]
+plot_session_data = True
 
 group_data_list = []
 for name in session_names:
@@ -97,6 +106,6 @@ group_data_list = []  # clear variable to save memory
 # plot the distributions
 plot_velocity_distributions(group_df, thresholds=thresholds, group='animal', show_median=False)
 plt.suptitle(f'Velocity distributions  - all sessions', fontsize=14)
-kwargs = results_io.get_figure_args(filename=f'velocity_distributions', additional_tags=g, format='pdf')
+kwargs = results_io.get_figure_args(filename=f'velocity_distributions', additional_tags='animal', format='pdf')
 plt.savefig(**kwargs)
 plt.close()

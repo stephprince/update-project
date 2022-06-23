@@ -54,18 +54,15 @@ class BayesianDecoder:
         if self.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:
             self.flip_trials_by_turn = True  # flip data by turn type for averaging
 
-        # setup session exclusion parameters (don't change decoding but just change whether it gets included or not)
-        self.exclusion_criteria = params.get('exclusion_criteria',
-                                             dict(units_threshold=0, # min num units to include session
-                                                  trials_threshold=0)) # min num trials to include session
-        self.excluded_session = False  # initialize to False, will be set to True if does not pass session requirements
-
         # setup decoding/encoding functions based on dimensions
         self.dim_num = params.get('dim_num', 1)  # 1D decoding default
         self.encoder, self.decoder = self._setup_decoding_functions()
 
         # setup file paths for io
-        self.results_tags = f"{'_'.join(self.feature_names)}_regions_{'_'.join(self.units_types['region'])}_"
+        trial_types = [str(t) for t in self.encoder_trial_types['correct']]
+        self.results_tags = f"{'_'.join(self.feature_names)}_regions_{'_'.join(self.units_types['region'])}_" \
+                            f"enc_bins{self.encoder_bin_num}_dec_bins{self.decoder_bin_size}_speed_thresh" \
+                            f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
         self.data_files = dict(bayesian_decoder_output=dict(vars=['encoder_times', 'decoder_times', 'spikes',
@@ -136,14 +133,42 @@ class BayesianDecoder:
 
         return pd.DataFrame.from_dict(data_dict)
 
-    def _get_velocity(self, nwbfile):
+    @staticmethod
+    def _get_velocity(nwbfile):
         rotational_velocity = nwbfile.acquisition['rotational_velocity'].data
         translational_velocity = nwbfile.acquisition['translational_velocity'].data
         velocity = np.abs(rotational_velocity[:]) + np.abs(translational_velocity[:])
-        timestamps = nwbfile.acquisition['translational_velocity'].timestamps
+        rate = nwbfile.acquisition['translational_velocity'].rate
+        timestamps = np.arange(0, len(velocity)/rate, 1/rate)
         velocity = pd.Series(index=timestamps[:], data=velocity)
 
         return velocity
+
+    def _get_time_intervals(self, trial_starts, trial_stops):
+        movement = self.velocity > self.speed_threshold
+
+        new_starts = []
+        new_stops = []
+        for start, stop in zip(trial_starts, trial_stops):
+            # pull out trial specific time periods
+            start_ind = bisect(movement.index, start)
+            stop_ind = bisect_left(movement.index, stop)
+            movement_by_trial = movement.iloc[start_ind:stop_ind]
+
+            # get intervals where movement crosses speed threshold
+            breaks = np.where(np.hstack((True, np.diff(movement_by_trial), True)))[0]
+            breaks[-1] = breaks[-1] - 1 # subtract one index to get closest to final trial stop time
+            index = pd.IntervalIndex.from_breaks(movement_by_trial.index[breaks])
+            movements_df = pd.DataFrame(movement_by_trial[index.left].to_numpy(), index=index, columns=['moving'])
+
+            # append new start/stop times to data struct
+            new_times = movements_df[movements_df['moving'] == True].index
+            new_starts.append(new_times.left.values)
+            new_stops.append(new_times.right.values)
+
+        times = nap.IntervalSet(start=np.hstack(new_starts), end=np.hstack(new_stops), time_units='s')
+
+        return times
 
     def _setup_decoding_functions(self):
         if self.dim_num == 1:
@@ -162,8 +187,7 @@ class BayesianDecoder:
         params_cached = np.load(params_path, allow_pickle=True)
         params_matched = []
         for k, v in params_cached.items():
-            if k != 'exclusion_criteria':  # exclusion criteria can be applied post-hoc, original data can still be used
-                params_matched.append(getattr(self, k) == v)
+            params_matched.append(getattr(self, k) == v)
 
         return all(params_matched)
 
@@ -174,18 +198,6 @@ class BayesianDecoder:
             files_exist.append(path.is_file())
 
         return all(files_exist)
-
-    def _meets_exclusion_criteria(self):
-        exclude_session = False  # default to include session
-
-        # apply exclusion criteria
-        if len(self.spikes) < self.exclusion_criteria['units_threshold']:
-            exclude_session = True
-
-        if len(self.train_df) < self.exclusion_criteria['trials_threshold']:
-            exclude_session = True
-
-        return exclude_session
 
     def _train_test_split_ok(self, train_data, test_data):
         train_values = np.sort(train_data[self.feature_names[0]].unique())
@@ -231,20 +243,13 @@ class BayesianDecoder:
         # split data into training/encoding and testing/decoding trials
         self.train_df, self.test_df = self._train_test_split()
 
-        # apply speed threshold
-        if self.speed_threshold > 0:
-            get_movement_times()  # TODO - make this function
-        self.encoder_times = nap.IntervalSet(start=self.train_df['start_time'], end=self.train_df['stop_time'],
-                                             time_units='s')
-        self.decoder_times = nap.IntervalSet(start=self.test_df['start_time'], end=self.test_df['stop_time'],
-                                             time_units='s')
+        # get start/stop times of train and test trials
+        self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
+        self.decoder_times = self._get_time_intervals(self.test_df['start_time'], self.test_df['stop_time'])
 
         # select feature
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
-
-        # determine if session meets exclusion criteria
-        self.excluded_session = self._meets_exclusion_criteria()
 
         return self
 
@@ -307,11 +312,11 @@ class BayesianDecoder:
             else:
                 trials_to_flip = trials_to_agg['turn_type'] == 100  # set all to false
 
-            feat_start_locs = self.features_test[self.feature_names[0]].index.searchsorted(
-                mid_times - window - 1)  # a little extra just in case
-            feat_stop_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times + window + 1)
-            decoding_start_locs = self.decoded_values.index.searchsorted(mid_times - window - 1)
-            decoding_stop_locs = self.decoded_values.index.searchsorted(mid_times + window + 1)
+            # add extra index step to stop locs for interpolation and go one index earlier for start locs
+            feat_start_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times - window) - 1
+            decoding_start_locs = self.decoded_values.index.searchsorted(mid_times - window) - 1
+            feat_stop_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times + window) + 1
+            decoding_stop_locs = self.decoded_values.index.searchsorted(mid_times + window) + 1
 
             feat_interp = dict()
             decoding_interp = dict()
@@ -373,7 +378,7 @@ class BayesianDecoder:
         time_index = np.hstack(time_index)
         feature_means = np.hstack(feature_mean)
 
-        actual_series = pd.Series(feature_means, index=time_index, name='actual_feature')
+        actual_series = pd.Series(feature_means, index=np.round(time_index, 4), name='actual_feature')
         if self.decoded_values.any().any():
             decoded_series = self.decoded_values.as_series()  # TODO - figure out why decoded/actual series are diff lengths
         else:
@@ -416,9 +421,6 @@ class BayesianDecoder:
                     setattr(self, v, data)
             else:
                 raise RuntimeError(f'{file_info["format"]} format is not currently supported for loading data')
-
-        # apply any exclusion criteria if changed
-        self.excluded_session = self._meets_exclusion_criteria()
 
         return self
 
