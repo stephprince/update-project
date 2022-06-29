@@ -16,5 +16,6 @@ _pycache_/
 results/*
 data/*
 docs/metadata-summaries/archive/*
+archive/*
 *.DS_Store
 *.png

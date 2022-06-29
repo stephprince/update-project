@@ -1,13 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 from git import Repo
 from pathlib import Path
 
 from update_project.session_loader import get_session_info
-from update_project.decoding.decoding import get_decoding_error_summary, plot_decoding_error_summary
+from archive.decoding import get_decoding_error_summary, plot_decoding_error_summary
 
 # set inputs
 animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
@@ -17,7 +16,7 @@ overwrite_data = False
 
 # load session info
 base_path = Path('Y:/singer/NWBData/UpdateTask/')
-spreadsheet_filename = 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv'
+spreadsheet_filename = '/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv'
 all_session_info = get_session_info(filename=spreadsheet_filename, animals=animals,
                                     dates_included=dates_included, dates_excluded=dates_excluded)
 unique_sessions = all_session_info.groupby(['ID', 'Animal', 'Date'])
