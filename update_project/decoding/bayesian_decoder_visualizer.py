@@ -36,12 +36,13 @@ class BayesianDecoderVisualizer:
 
     @staticmethod
     def _get_confusion_matrix_sum(confusion_matrix):
+        num_bins_to_sum = int((len(confusion_matrix)/10 - 1)/2)  # one tenth of the track minus the identity line bin
         values_to_sum = []
         for i in range(len(confusion_matrix)):
             values_to_sum.append(confusion_matrix[i, i])  # identity line values
-            if i < len(confusion_matrix) - 1:
-                values_to_sum.append(confusion_matrix[i + 1, i])  # one above
-                values_to_sum.append(confusion_matrix[i, i + 1])  # one to right
+            if i < len(confusion_matrix) - num_bins_to_sum:
+                values_to_sum.append(confusion_matrix[i + num_bins_to_sum, i])  # bins above
+                values_to_sum.append(confusion_matrix[i, i + num_bins_to_sum])  # bins to right
         confusion_matrix_sum = np.nansum(values_to_sum)
 
         return confusion_matrix_sum
@@ -470,12 +471,19 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             group_data = self.group_df.groupby(group_names)
             for name, data in group_data:
                 print(f'Plotting data for group {name}...')
+                # plot model metrics
+                self.plot_tuning_curves(data, name, params=self.params)
                 self.plot_group_confusion_matrices(data, name, params=self.params)
                 self.plot_parameter_comparison(data, name, params=self.params)
                 self.plot_all_confusion_matrices(data, name, params=self.params)
+
+                # plot stay vs. switch trials
                 self.plot_group_aligned_data(data, name, params=self.params)
                 self.plot_group_aligned_quantification(data, name, params=self.params)
-                self.plot_tuning_curves(data, name, params=self.params)
+
+                # plot correct vs. incorrect trial types
+                self.plot_group_aligned_data(data, name, params=self.params, outcomes=[0, 1])
+                self.plot_group_aligned_quantification(data, name, params=self.params, outcomes=[0, 1])
         else:
             print(f'No data found to plot')
 
@@ -490,15 +498,20 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         return group_summary_df
 
     @staticmethod
-    def _get_group_aligned_data(param_data, key, feat):
+    def _get_group_aligned_data(param_data, key, feat, outcomes=[0, 1]):
         # compile aligned data (input data structure has to be dict of arrays
         dict_list = []
+        mask_list = []
         for _, sess_data in param_data.iterrows():
             dict_list.append(sess_data['decoder'].aligned_data[key][feat])
+            mask_list.append(sess_data['decoder'].trials['correct'].isin(outcomes))
 
         default = defaultdict(list)
-        for d in dict_list:
-            [default[k].append(v) for k, v in d.items() if k not in ['stats'] and np.size(v)]
+        for d, mask in zip(dict_list, mask_list):
+            for k, v in d.items():
+                if k not in ['stats'] and np.size(v):
+                    assert len(v) == len(mask)
+                    default[k].append(v[mask, :])
 
         group_data = {k: np.hstack(v) for k, v in default.items() if k not in ['stats', 'probability']}
         group_data.update(probability=np.moveaxis(np.vstack(default['probability']), 2, 0))
@@ -584,6 +597,32 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         sorted_data.sort_values('confusion_matrix_sum', ascending=False, inplace=True)
 
         return sorted_data
+
+    def _quantify_aligned_data(self, param_data, key, feat, outcomes=[0, 1]):
+        switch_data = self._get_group_aligned_data(param_data, key, feat, outcomes)
+
+        # get bounds to use to quantify choices
+        bins = param_data['decoder'].values[0].bins
+        virtual_track = param_data['decoder'].values[0].virtual_track
+        bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
+
+        prob_map = switch_data['probability']
+        prob_choice = dict()
+        for bound_name, bound_values in bounds.items():  # loop through left/right bounds
+            start_bin = np.searchsorted(bins, bound_values[0])
+            stop_bin = np.searchsorted(bins, bound_values[1])
+
+            threshold = 0.1  # total probability density to call a left/right choice
+            integrated_prob = np.nansum(prob_map[:, :, start_bin:stop_bin], axis=2)  # (trials, feature bins, window)
+
+            bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
+                                        thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
+            bound_quantification.update(stats={k: get_fig_stats(v, axis=1) for k, v in bound_quantification.items()})
+            bound_quantification.update(bound_values=bound_values,
+                                        threshold=threshold)
+            prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
+
+        return prob_choice
 
     def plot_all_groups_error(self, main_group, sub_group, thresholds=None):
         # select no threshold data to plot if thresholds indicated, otherwise combine
@@ -825,99 +864,76 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         plt.savefig(**kwargs)
         plt.close()
 
-    def plot_group_aligned_data(self, data, name, params):
+    def plot_group_aligned_data(self, data, name, params, trial_types=['switch', 'stay'], outcomes=[[0, 1]]):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
-            switch_data = self._get_group_aligned_data(param_data, 'switch', feat)
-            stay_data = self._get_group_aligned_data(param_data, 'stay', feat)
-
             window = param_data['decoder'].values[0].aligned_data_window
             nbins = param_data['decoder'].values[0].aligned_data_nbins
 
-            # make plots
-            mosaic = """
-            AACC
-            EEGG
-            IIKK
-            MMOO
-            QQSS
-            """
-            axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-            self.plot_1d_around_update(switch_data, nbins, window, 'switch', feat, 'b', axes, ['A', 'E', 'I', 'M', 'Q'],
-                                       feature_name=feat, prob_map_axis=1)
-            self.plot_1d_around_update(stay_data, nbins, window, 'stay', feat, 'm', axes, ['C', 'G', 'K', 'O', 'S'],
-                                       feature_name=feat, prob_map_axis=1)
+            for out in outcomes:
+                # make plots
+                mosaic = """
+                AACC
+                EEGG
+                IIKK
+                MMOO
+                QQSS
+                """
+                axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
+                data_type_1 = self._get_group_aligned_data(param_data, trial_types[0], feat, out)
+                data_type_2 = self._get_group_aligned_data(param_data, trial_types[1], feat, out)
+                self.plot_1d_around_update(data_type_1, nbins, window, trial_types[0], feat, 'b', axes, ['A', 'E', 'I', 'M', 'Q'],
+                                           feature_name=feat, prob_map_axis=1)
+                self.plot_1d_around_update(data_type_2, nbins, window, trial_types[1], feat, 'm', axes, ['C', 'G', 'K', 'O', 'S'],
+                                           feature_name=feat, prob_map_axis=1)
 
-            # save figure
-            plt.tight_layout()
-            tags = f'{"_".join(["".join(n) for n in name])}_{"_".join([f"{p}_{n}" for p, n in zip(params, param_name)])}'
-            kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data', additional_tags=tags,
-                                                     format='pdf')
-            plt.savefig(**kwargs)
-            plt.close('all')
+                # save figure
+                plt.tight_layout()
+                tags = f'{"_".join(["".join(n) for n in name])}_{"_".join(trial_types)}_outcomes{out}' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(params, param_name)])}'
+                kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data', additional_tags=tags,
+                                                         format='pdf')
+                plt.savefig(**kwargs)
+                plt.close('all')
 
-    def plot_group_aligned_quantification(self, data, name, params):
+    def plot_group_aligned_quantification(self, data, name, params, trial_types=['switch', 'stay'], outcomes=[[0, 1]]):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
 
             # get data quantifications
-            switch_data_quant = self._quantify_aligned_data(param_data, 'switch', feat)
-            stay_data_quant = self._quantify_aligned_data(param_data, 'stay', feat)
             window = param_data['decoder'].values[0].aligned_data_window
             nbins = param_data['decoder'].values[0].aligned_data_nbins
 
-            # make plots
-            mosaic = """
-                        AABB
-                        CCDD
-                        EEFF
-                        GGHH
-                        IIJJ
-                        KKLL
-                        MMNN
-                        OOPP
-                        """
-            axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-            self.plot_quantification_around_update(switch_data_quant, nbins, window, 'switch', feat, axes,
-                                                   ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O'])
-            self.plot_quantification_around_update(stay_data_quant, nbins, window, 'stay', feat, axes,
-                                                   ['B', 'D', 'F', 'H', 'J', 'L', 'N', 'P'])
+            for out in outcomes:
+                # make plots
+                mosaic = """
+                            AABB
+                            CCDD
+                            EEFF
+                            GGHH
+                            IIJJ
+                            KKLL
+                            MMNN
+                            OOPP
+                            """
+                axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
+                data_quant_1 = self._quantify_aligned_data(param_data, trial_types[0], feat, out)
+                data_quant_2 = self._quantify_aligned_data(param_data, trial_types[1], feat, out)
+                self.plot_quantification_around_update(data_quant_1, nbins, window, trial_types[0], feat, axes,
+                                                       ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O'])
+                self.plot_quantification_around_update(data_quant_2, nbins, window, trial_types[1], feat, axes,
+                                                       ['B', 'D', 'F', 'H', 'J', 'L', 'N', 'P'])
 
-            # save figure
-            plt.tight_layout()
-            tags = f'{"_".join(["".join(n) for n in name])}{"_".join([f"{p}_{n}" for p, n in zip(params, param_name)])}'
-            kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification', additional_tags=tags,
-                                                     format='pdf')
-            plt.savefig(**kwargs)
-            plt.close('all')
-
-    def _quantify_aligned_data(self, param_data, key, feat):
-        switch_data = self._get_group_aligned_data(param_data, key, feat)
-
-        # get bounds to use to quantify choices
-        bins = param_data['decoder'].values[0].bins
-        virtual_track = param_data['decoder'].values[0].virtual_track
-        bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
-
-        prob_map = switch_data['probability']
-        prob_choice = dict()
-        for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-            start_bin = np.searchsorted(bins, bound_values[0])
-            stop_bin = np.searchsorted(bins, bound_values[1])
-
-            threshold = 0.1  # total probability density to call a left/right choice
-            integrated_prob = np.nansum(prob_map[:, :, start_bin:stop_bin], axis=2)  # (trials, feature bins, window)
-
-            bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
-                                        thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
-            bound_quantification.update(stats={k: get_fig_stats(v, axis=1) for k, v in bound_quantification.items()})
-            bound_quantification.update(bound_values=bound_values,
-                                        threshold=threshold)
-            prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
-
-        return prob_choice
+                # save figure
+                plt.tight_layout()
+                tags = f'{"_".join(["".join(n) for n in name])}_{"_".join(trial_types)}_outcomes{out}_' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(params, param_name)])}'
+                kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification', additional_tags=tags,
+                                                         format='pdf')
+                plt.savefig(**kwargs)
+                plt.close('all')
 
     def plot_tuning_curves(self, data, name, params):
         feat = data['feature'].values[0]
