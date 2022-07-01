@@ -36,7 +36,8 @@ class BayesianDecoderVisualizer:
 
     @staticmethod
     def _get_confusion_matrix_sum(confusion_matrix):
-        num_bins_to_sum = int((len(confusion_matrix)/10 - 1)/2)  # one tenth of the track minus the identity line bin
+        num_bins_to_sum = int(
+            (len(confusion_matrix) / 10 - 1) / 2)  # one tenth of the track minus the identity line bin
         values_to_sum = []
         for i in range(len(confusion_matrix)):
             values_to_sum.append(confusion_matrix[i, i])  # identity line values
@@ -68,7 +69,7 @@ class BayesianDecoderVisualizer:
             time_tick_values = times.astype(int)
             time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
             if feature_name in ['x_position', 'view_angle', 'choice',
-                                              'turn_type']:  # divergent color maps for div data
+                                'turn_type']:  # divergent color maps for div data
                 cmap_pos = 'RdGy'
                 cmap_decoding = 'PRGn'
                 scaling_value = 0.5
@@ -231,36 +232,41 @@ class BayesianDecoderVisualizer:
                 time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
 
                 # line plots
-                limits = [np.min(np.min(value['data'][m])), np.max(np.max(value['data'][m]))]
-                axes[ax_dict[0+ind*4]].plot(times, stats[m]['mean'], color=value['color'], label=key)
-                axes[ax_dict[0+ind*4]].fill_between(times, stats[m]['lower'], stats[m]['upper'], alpha=0.2,
-                                                     color=value['color'], label='95% CI')
-                axes[ax_dict[0+ind*4]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
-                axes[ax_dict[0+ind*4]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)', ylabel=key)
-                axes[ax_dict[0+ind*4]].legend(loc='upper left')
-                axes[ax_dict[0+ind*4]].set_title(f'{title} trials - {label} - {m}', fontsize=14)
+                limits = [np.min(stats[m]['lower']), np.max(stats[m]['upper'])]
+                axes[ax_dict[0 + ind * 4]].plot(times, stats[m]['mean'], color=value['color'], label=key)
+                axes[ax_dict[0 + ind * 4]].fill_between(times, stats[m]['lower'], stats[m]['upper'], alpha=0.2,
+                                                        color=value['color'], label='95% CI')
+                axes[ax_dict[0 + ind * 4]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
+                axes[ax_dict[0 + ind * 4]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)',
+                                               ylabel=key)
+                axes[ax_dict[0 + ind * 4]].legend(loc='upper left')
+                axes[ax_dict[0 + ind * 4]].set_title(f'{title} trials - {label} - {m}', fontsize=14)
 
                 # bar plots
-                axes[ax_dict[1+ind*4]].bar(x=times, height=stats[m]['mean']*value['conversion'],
-                                              yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
-                axes[ax_dict[1+ind*4]].bar(x=times, height=stats[m]['mean']*value['conversion'],
-                                              yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
-                axes[ax_dict[1+ind*4]].set(xlabel='Time around update(s)', ylabel=m)
-                axes[ax_dict[1+ind*4]].legend(loc='upper left')
+                axes[ax_dict[1 + ind * 4]].bar(x=times, height=stats[m]['mean'] * value['conversion'],
+                                               yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
+                axes[ax_dict[1 + ind * 4]].bar(x=times, height=stats[m]['mean'] * value['conversion'],
+                                               yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
+                axes[ax_dict[1 + ind * 4]].set(xlabel='Time around update(s)', ylabel=m)
+                axes[ax_dict[1 + ind * 4]].legend(loc='upper left')
 
                 # heat maps by trial
                 update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
                                       [0, np.shape(value['data'][m])[1]]]
-                axes[ax_dict[2+ind*4+bound_ind]] = sns.heatmap(value['data'][m], cmap=value['cmap'],
-                                                               ax=axes[ax_dict[2+ind*4+bound_ind]],
-                                               vmin=0.25 * np.nanmin(value['data'][m]), vmax=0.75 * np.nanmax(value['data'][m]),
-                                               cbar_kws={'pad': 0.01, 'label': key, 'fraction': 0.046})
-                axes[ax_dict[2+ind*4+bound_ind]].plot(update_time_values[0], update_time_values[1], linestyle='dashed',
-                                      color=[0, 0, 0, 0.5])
-                axes[ax_dict[2+ind*4+bound_ind]].invert_yaxis()
-                axes[ax_dict[2+ind*4+bound_ind]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
-                                           xlabel='Time around update (s)', ylabel=f'{label}')
-                bound_ind =+ 1
+                axes[ax_dict[2 + ind * 4 + bound_ind]] = sns.heatmap(value['data'][m], cmap=value['cmap'],
+                                                                     ax=axes[ax_dict[2 + ind * 4 + bound_ind]],
+                                                                     vmin=0.25 * np.nanmin(value['data'][m]),
+                                                                     vmax=0.75 * np.nanmax(value['data'][m]),
+                                                                     cbar_kws={'pad': 0.01, 'label': key,
+                                                                               'fraction': 0.046})
+                axes[ax_dict[2 + ind * 4 + bound_ind]].plot(update_time_values[0], update_time_values[1],
+                                                            linestyle='dashed',
+                                                            color=[0, 0, 0, 0.5])
+                axes[ax_dict[2 + ind * 4 + bound_ind]].invert_yaxis()
+                axes[ax_dict[2 + ind * 4 + bound_ind]].set(xticks=time_tick_labels,
+                                                           xticklabels=time_tick_values[time_tick_labels],
+                                                           xlabel='Time around update (s)', ylabel=f'{label}')
+                bound_ind = + 1
 
 
 class SessionVisualizer(BayesianDecoderVisualizer):
@@ -299,7 +305,7 @@ class SessionVisualizer(BayesianDecoderVisualizer):
         times.sort()
         locs.sort()
 
-        if np.max(locs) - np.min(locs) <= 1:
+        if np.max(locs) - np.min(locs) <= 1:  # try with a larger window if the bins fall in a weird place
             times, locs = self._get_example_period(window=1000)
 
         return times, locs
@@ -453,7 +459,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             sess_dict.update(excluded_session=self._meets_exclusion_criteria(sess_dict['decoder']))
 
         group_df = pd.DataFrame(data)
-        self.group_df = group_df[group_df['excluded_session'] == False]  # only keep non-excluded sessions
+        self.group_df = group_df[~group_df['excluded_session']]  # only keep non-excluded sessions
         tags = '_'.join([f'{k}_{v}' for k, v in self.exclusion_criteria.items()])
         self.results_io = ResultsIO(creator_file=__file__, tags=tags, folder_name=Path().absolute().stem)
 
@@ -504,14 +510,16 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         mask_list = []
         for _, sess_data in param_data.iterrows():
             dict_list.append(sess_data['decoder'].aligned_data[key][feat])
-            mask_list.append(sess_data['decoder'].trials['correct'].isin(outcomes))
+            #mask_list.append(sess_data['decoder'].trials['correct'].isin(outcomes))
 
         default = defaultdict(list)
-        for d, mask in zip(dict_list, mask_list):
+        #for d, mask in zip(dict_list, mask_list):
+        for d in dict_list:
             for k, v in d.items():
                 if k not in ['stats'] and np.size(v):
-                    assert len(v) == len(mask)
-                    default[k].append(v[mask, :])
+                    #assert len(v) == len(mask)
+                    #default[k].append(v[mask, :])
+                    default[k].append(v)
 
         group_data = {k: np.hstack(v) for k, v in default.items() if k not in ['stats', 'probability']}
         group_data.update(probability=np.moveaxis(np.vstack(default['probability']), 2, 0))
@@ -538,11 +546,11 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         exclude_session = False  # default to include session
 
         # apply exclusion criteria
-        units_threshold = self.exclusion_criteria.get('units_threshold', 0)
+        units_threshold = self.exclusion_criteria.get('units', 0)
         if len(data.spikes) < units_threshold:
             exclude_session = True
 
-        trials_threshold = self.exclusion_criteria.get('trials_threshold', 0)
+        trials_threshold = self.exclusion_criteria.get('trials', 0)
         if len(data.train_df) < trials_threshold:
             exclude_session = True
 
@@ -577,7 +585,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 bins = [-1, 0, 1]
             else:
                 bins = param_data['decoder'].values[0].bins
-            vmax = 5  # default to 5 vmax probability/chance
+            vmax = 2  # default to 5 vmax probability/chance
             if param_data['feature'].values[0] in ['choice', 'turn_type']:
                 vmax = 2
             virtual_track = param_data['decoder'].values[0].virtual_track
@@ -703,7 +711,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 other_keys = [p for p in params if p not in [par]]
                 df = medians.pivot(par, other_keys, err)
                 axes[row][col] = sns.heatmap(df, fmt='.2f', ax=axes[row][col], cmap='mako_r',
-                                             cbar_kws={'pad': 0.01, 'label': err, 'fraction': 0.046},)
+                                             cbar_kws={'pad': 0.01, 'label': err, 'fraction': 0.046}, )
                 axes[row][col].invert_yaxis()
                 axes[row][col].set_xticklabels(axes[row][col].get_xmajorticklabels(), fontsize=8)
                 if row == 0:
@@ -712,7 +720,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         fig.suptitle(f'Parameter comparison - median all sessions - {name}', fontsize=14)
         plt.tight_layout()
         tags = '_'.join([''.join(str(n)) for n in name])
-        kwargs = self.results_io.get_figure_args(filename=f'group_param_comparison_all', additional_tags=tags, format='pdf')
+        kwargs = self.results_io.get_figure_args(filename=f'group_param_comparison_all', additional_tags=tags,
+                                                 format='pdf')
         plt.savefig(**kwargs)
         plt.close()
 
@@ -727,15 +736,16 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 sess_matrix = row['confusion_matrix']
                 sess_data = row['decoder']
                 sess_key = row['session_id']
-                vmax = 5  # default to 5 vmax probability/chance
+                vmax = 4  # default to 5 vmax probability/chance
                 if row['feature'] in ['choice', 'turn_type']:
                     vmax = 2
 
                 if (counter % (ncols * nrows) == 0) and (counter != 0):
                     fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}', fontsize=14)
                     plt.tight_layout()
-                    tags = f'plot{plot_num}_{"_".join(["".join(n) for n in name])}'
-                    kwargs = self.results_io.get_figure_args(filename=f'group_confusion_matrices', additional_tags=tags,
+                    param_tags = '_'.join([f'{p}_{n}' for p, n in zip(params, param_name)])
+                    tags = f'{"_".join(["".join(n) for n in name])}_{param_tags}_plot{plot_num}'
+                    kwargs = self.results_io.get_figure_args(filename=f'all_confusion_matrices', additional_tags=tags,
                                                              format='pdf')
                     plt.savefig(**kwargs)
                     plt.close()
@@ -824,8 +834,12 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 col_id = counter - row_id * ncols
 
                 # plot confusion matrix
-                matrix = np.vstack(sorted_data['confusion_matrix']) * len(sorted_data['bins'])-1  # scale to be probability/chance
-                limits = [np.min(sorted_data['bins'].astype(int)), np.max(sorted_data['bins'].astype(int))]
+                matrix = np.vstack(sorted_data['confusion_matrix']) * len(
+                    sorted_data['bins']) - 1  # scale to be probability/chance
+                if isinstance(sorted_data['bins'],list):
+                    limits = [np.min(np.array(sorted_data['bins'])), np.max(np.array(sorted_data['bins']))]
+                else:
+                    limits = [np.min(sorted_data['bins'].astype(int)), np.max(sorted_data['bins'].astype(int))]
                 im = axes[row_id][col_id].imshow(matrix, cmap='YlGnBu', origin='lower',  # aspect='auto',
                                                  vmin=0, vmax=sorted_data['vmax'],
                                                  extent=[limits[0], limits[1], limits[0], limits[1]])
@@ -864,7 +878,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         plt.savefig(**kwargs)
         plt.close()
 
-    def plot_group_aligned_data(self, data, name, params, trial_types=['switch', 'stay'], outcomes=[[0, 1]]):
+    def plot_group_aligned_data(self, data, name, params, trial_types=['switch', 'stay'], outcomes=[(0, 1)]):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
@@ -883,21 +897,23 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
                 data_type_1 = self._get_group_aligned_data(param_data, trial_types[0], feat, out)
                 data_type_2 = self._get_group_aligned_data(param_data, trial_types[1], feat, out)
-                self.plot_1d_around_update(data_type_1, nbins, window, trial_types[0], feat, 'b', axes, ['A', 'E', 'I', 'M', 'Q'],
+                self.plot_1d_around_update(data_type_1, nbins, window, trial_types[0], feat, 'b', axes,
+                                           ['A', 'E', 'I', 'M', 'Q'],
                                            feature_name=feat, prob_map_axis=1)
-                self.plot_1d_around_update(data_type_2, nbins, window, trial_types[1], feat, 'm', axes, ['C', 'G', 'K', 'O', 'S'],
+                self.plot_1d_around_update(data_type_2, nbins, window, trial_types[1], feat, 'm', axes,
+                                           ['C', 'G', 'K', 'O', 'S'],
                                            feature_name=feat, prob_map_axis=1)
 
                 # save figure
                 plt.tight_layout()
-                tags = f'{"_".join(["".join(n) for n in name])}_{"_".join(trial_types)}_outcomes{out}' \
+                tags = f'{"_".join(["".join(n) for n in name])}_outs{out}' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(params, param_name)])}'
                 kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data', additional_tags=tags,
                                                          format='pdf')
                 plt.savefig(**kwargs)
                 plt.close('all')
 
-    def plot_group_aligned_quantification(self, data, name, params, trial_types=['switch', 'stay'], outcomes=[[0, 1]]):
+    def plot_group_aligned_quantification(self, data, name, params, trial_types=['switch', 'stay'], outcomes=[(0, 1)]):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
@@ -928,9 +944,10 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
                 # save figure
                 plt.tight_layout()
-                tags = f'{"_".join(["".join(n) for n in name])}_{"_".join(trial_types)}_outcomes{out}_' \
+                tags = f'{"_".join(["".join(n) for n in name])}_outs{out}_' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(params, param_name)])}'
-                kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification', additional_tags=tags,
+                kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification',
+                                                         additional_tags=tags,
                                                          format='pdf')
                 plt.savefig(**kwargs)
                 plt.close('all')
@@ -940,7 +957,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         locations = data['decoder'].values[0].virtual_track.get_cue_locations().get(feat, dict())
         tuning_curve_params = [p for p in params if p not in ['decoder_bins']]
         data_const_decoding = data[data['decoder_bins'] == data['decoder_bins'].values[0]]
-        param_group_data = data_const_decoding.groupby(tuning_curve_params)  # main group is what gets the different plots
+        param_group_data = data_const_decoding.groupby(
+            tuning_curve_params)  # main group is what gets the different plots
         plot_num, counter = (0, 0)
         nrows, ncols = (3, 3)
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10), squeeze=False)
@@ -977,7 +995,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 # plot heatmaps
                 y_limits = [0, np.shape(tuning_curve_scaled)[0]]
                 x_limits = [np.min(tuning_curve_bins.astype(int)), np.max(tuning_curve_bins.astype(int))]
-                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap='rocket', origin='lower', vmin=0.1,
+                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap='rocket', origin='lower',
+                                                 vmin=0.1,
                                                  aspect='auto',
                                                  vmax=0.9, extent=[x_limits[0], x_limits[1], y_limits[0], y_limits[1]])
 
@@ -1006,4 +1025,3 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                                                  format='pdf')
         plt.savefig(**kwargs)
         plt.close('all')
-
