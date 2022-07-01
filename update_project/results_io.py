@@ -75,4 +75,10 @@ class ResultsIO:
         with open(fname, 'wb') as f:
             pickle.dump(data, f)
 
+    def data_exists(self, data_files):
+        files_exist = []
+        for name, file_info in data_files.items():
+            path = self.get_data_filename(filename=name, results_type='session', format=file_info['format'])
+            files_exist.append(path.is_file())
 
+        return all(files_exist)
