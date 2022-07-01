@@ -30,6 +30,14 @@ class VirtualTrack:
     def get_choice_locations(self):
         return self.choice_locations
 
+    def get_limits(self, dim='y_position'):
+        limits = dict()
+        xs, ys = self.get_track_boundaries()
+        limits['x_position'] = [np.min(xs), np.max(xs)]
+        limits['y_position'] = [np.min(ys), np.max(ys)]
+
+        return limits[dim]
+
 
 class UpdateTrack(VirtualTrack):
     coords = [[2, 1], [2, 245], [25, 275], [25, 285], [14, 285], [0.5, 265], [-0.5, 265], [-14, 285],
@@ -46,7 +54,10 @@ class UpdateTrack(VirtualTrack):
                          y_position={'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35,
                                      'delay2 cue': 250.35, 'choice cue': 255})
     choice_boundaries = dict(x_position={'left': (-33, -2), 'right': (2, 33)},
-                             y_position={'left': (255, 298), 'right': (298, 341)})  # TODO - check accurate
+                             y_position={'left': (255, 298), 'right': (298, 341)},
+                             view_angle={'left': (-np.pi, -np.pi / 4), 'right': (np.pi/4, np.pi)},
+                             choice={'left': (-2, 0), 'right': (0, 2)},
+                             turn_type={'left': (-2, 0), 'right': (0,2)})  # TODO - check accurate
 
     def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_locations=cue_locations,
                  choice_boundaries=choice_boundaries, linearization=False):
