@@ -1,6 +1,33 @@
 import numpy as np
+
+from bisect import bisect
 from scipy.interpolate import griddata, interp1d
 
+
+def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=0.0, stop_window=0.0,
+                     step=0.01, time_offset=None):
+    start_times_all = trials[start_label][:]  # TODO - may need to change to DF
+    stop_times_all = trials[stop_label][:]
+    start_times = start_times_all[np.logical_and(~np.isnan(stop_times_all), ~np.isnan(start_times_all))]
+    stop_times = stop_times_all[np.logical_and(~np.isnan(stop_times_all), ~np.isnan(start_times_all))]
+
+    timestamps = timeseries.index.values
+    data = timeseries.values
+    interpolated_data = []
+    for start, stop in zip(start_times, stop_times):
+        # extract data interval
+        offset = time_offset or start  # center to start time by default
+        idx_start = bisect(timestamps, start + start_window*2)  # extra time for interpolation's sake
+        idx_stop = bisect(timestamps, stop + stop_window*2, lo=idx_start)
+        data_aligned = np.array(data[idx_start:idx_stop]) - offset
+        time_aligned = np.array(timestamps[idx_start:idx_stop]) - offset
+
+        # interpolate data interval to make even sampling rate
+        fxn = interp1d(time_aligned, data_aligned, kind='linear')
+        new_times = np.arange(start + start_window - offset, stop + stop_window - offset, step)  # resample to constant sampling rate
+        interpolated_data.append(fxn(new_times))
+
+    return interpolated_data, new_times
 
 def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset, trials_to_flip):
     interpolated_position = []
