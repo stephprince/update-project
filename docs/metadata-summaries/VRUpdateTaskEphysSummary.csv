@@ -190,9 +190,9 @@ S,29,211123,3,1,2.6,1.8,1,L,K503,Y777,PFC,CA1,210713,
 S,33,220420,1,1,2.35,1.575,1,L,W190,Y457,PFC,CA1,211123,"FIX HPC CHANNEL MAPPING, accidentally inverted headstages"
 S,33,220420,2,1,2.35,1.575,0,L,W190,Y457,PFC,CA1,211123,"FIX HPC CHANNEL MAPPING, accidentally inverted headstages"
 S,33,220420,3,1,2.35,1.575,1,L,W190,Y457,PFC,CA1,211123,"FIX HPC CHANNEL MAPPING, accidentally inverted headstages"
-S,33,220421,1,1,2.5,1.6,1,L,W190,Y457,PFC,CA1,211123,fixed headstages before this recording
-S,33,220421,2,1,2.5,1.6,0,L,W190,Y457,PFC,CA1,211123,fixed headstages before this recording
-S,33,220421,3,1,2.5,1.6,1,L,W190,Y457,PFC,CA1,211123,fixed headstages before this recording
+S,33,220421,1,1,2.5,1.6,1,L,W190,Y457,PFC,CA1,211123,
+S,33,220421,2,1,2.5,1.6,0,L,W190,Y457,PFC,CA1,211123,
+S,33,220421,3,1,2.5,1.6,1,L,W190,Y457,PFC,CA1,211123,
 S,33,220422,1,1,2.5,1.65,1,L,W190,Y457,PFC,CA1,211123,
 S,33,220422,2,1,2.5,1.65,0,L,W190,Y457,PFC,CA1,211123,
 S,33,220422,3,1,2.5,1.65,1,L,W190,Y457,PFC,CA1,211123,
@@ -216,3 +216,9 @@ S,34,220617,2,1,2.425,1.625,0,R,Y457,Y777,CA1,PFC,211123,
 S,34,220617,3,1,2.425,1.625,1,R,Y457,Y777,CA1,PFC,211123,
 S,34,220620,1,1,2.325,1.7,1,L,Y457,Y777,PFC,CA1,211123,"HPC spikes seemed dampened, weird but location fine otherwise a little on the deeper side, bad connection I think"
 S,34,220620,2,1,2.325,1.7,0,L,Y457,Y777,PFC,CA1,211123,"HPC spikes seemed dampened, weird but location fine otherwise a little on the deeper side, bad connection I think"
+S,34,220621,1,1,2.2,1.55,1,L,W195,Y457,PFC,CA1,211123,"HPC better, still a little small? But could be something else"
+S,34,220621,2,1,2.2,1.55,0,L,W195,Y457,PFC,CA1,211123,"HPC better, still a little small? But could be something else"
+S,34,220621,3,1,2.2,1.55,1,L,W195,Y457,PFC,CA1,211123,"HPC better, still a little small? But could be something else"
+S,34,220623,1,1,2.375,1.575,1,L,W190,Y457,PFC,CA1,211123,
+S,34,220623,2,1,2.375,1.575,0,L,W190,Y457,PFC,CA1,211123,
+S,34,220623,3,1,2.375,1.575,1,L,W190,Y457,PFC,CA1,211123,
