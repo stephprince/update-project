@@ -1,8 +1,8 @@
-#import dill
+import dill
 import itertools
 
-#from pathos.helpers import cpu_count
-#from pathos.pools import ProcessPool as Pool
+from pathos.helpers import cpu_count
+from pathos.pools import ProcessPool as Pool
 from pynwb import NWBHDF5IO
 
 from update_project.session_loader import SessionLoader
@@ -25,40 +25,40 @@ def run_bayesian_decoding():
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['y_position', 'x_position']
-    regions = [['CA1']]  # [['CA1'], ['PFC'], ['CA1', 'PFC']]
-    units_thresh = [0, 20, 40]
-    trials_thresh = [0, 25, 50, 100]
-    testing_params = dict(encoder_trial_types=[[1], [0, 1]],
-                          encoder_bins=[50],  # [30, 50],
-                          decoder_bins=[0.025, 0.050, 0.25],  # [0.025, 0.050, 0.10, 0.25],
-                          speed_thresholds=[1000])  # [1000, 2000, 5000], )
+    features = ['y_position', 'x_position', 'view_angle']
+    regions = [['CA1'], ['PFC']]
+    thresh_params = dict(num_units=[0, 20, 40],  # params that don't change session data just which ones to include
+                         num_trials=[0, 50, 100])
+    testing_params = dict(encoder_trial_types=[[0, 1]],  # correct and incorrect
+                          encoder_bins=[40, 50, 60],  # [30, 50],
+                          decoder_bins=[0.050, 0.25],
+                          speed_thresholds=[0, 1000, 1500])  # [1000, 2000, 5000], )
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
     if parallel:
         pool = Pool(nodes=int(cpu_count() / 2) - 1)
-        pool_results = pool.map(lambda x: bayesian_decoding_parallel(plot, overwrite, session_db, testing_params, *x), args)
+        pool.map(lambda x: bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *x), args)
         pool.close()
         pool.join()
-        group_data = [p.get() for p in pool_results]
-    elif group:
+
+    if group:
         group_data = []
         for name, reg, feat, trial_types, enc_bins, dec_bins, speed in args:
-            group_data.append(bayesian_decoding_parallel(plot, overwrite, session_db, testing_params, name, reg, feat,
-                                                         trial_types, enc_bins, dec_bins, speed))
+            group_data.append(bayesian_decoding(plot, overwrite, session_db, testing_params, name, reg, feat,
+                                                trial_types, enc_bins, dec_bins, speed))
 
-    # get decoder group summary data
-    for units, trials in itertools.product(units_thresh, trials_thresh):
-        if group:
-            group_visualizer = GroupVisualizer(group_data,
-                                               exclusion_criteria=dict(units=units, trials=trials),
-                                               params=list(testing_params.keys()))
-            group_visualizer.plot(group_by=dict(region=regions, feature=features))
+        group_visualizer = GroupVisualizer(group_data,
+                                           exclusion_criteria=dict(units=0, trials=0),
+                                           params=list(testing_params.keys()),
+                                           threshold_params=thresh_params)
+        group_visualizer.plot(group_by=dict(region=regions, feature=features))
+
+    print(f'Finished running {__file__}')
 
 
-def bayesian_decoding_parallel(plot, overwrite, session_db, testing_params, name, reg, feat, trial_types,
-                               enc_bins, dec_bins, speed):
+def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, name, reg, feat, trial_types,
+                      enc_bins, dec_bins, speed):
     # load nwb file
     session_id = session_db.get_session_id(name)
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
@@ -80,14 +80,18 @@ def bayesian_decoding_parallel(plot, overwrite, session_db, testing_params, name
         visualizer.plot()
 
     # save to group output
-    params = {k: v for k, v in zip(testing_params.keys(), [tuple(trial_types), enc_bins, dec_bins, speed])}
-    session_decoder_output = dict(session_id=session_id,
-                                  region=tuple(reg),  # convert to tuple for later grouping
-                                  feature=feat,
-                                  decoder=decoder,
-                                  **params)
+    if parallel:
+        return None  # cannot return output for parallel processing bc contains h5py object which cannot be pickled
+    else:
+        params = {k: v for k, v in zip(testing_params.keys(), [tuple(trial_types), enc_bins, dec_bins, speed])}
+        session_decoder_output = dict(session_id=session_id,
+                                      region=tuple(reg),  # convert to tuple for later grouping
+                                      feature=feat,
+                                      decoder=decoder,
+                                      **params)
+        return session_decoder_output
 
-    return session_decoder_output
+    return None
 
 
 if __name__ == '__main__':
