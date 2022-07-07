@@ -14,6 +14,7 @@ def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=
     timestamps = timeseries.index.values
     data = timeseries.values
     interpolated_data = []
+    new_times = []
     for start, stop in zip(start_times, stop_times):
         # extract data interval
         offset = time_offset or start  # center to start time by default
