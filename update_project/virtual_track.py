@@ -4,12 +4,13 @@ from track_linearization import make_track_graph, get_linearized_position
 
 
 class VirtualTrack:
-    def __init__(self, coords, nodes, edges, cue_locations, choice_boundaries, linearization=False):
+    def __init__(self, coords, nodes, edges, cue_locations, choice_boundaries, mappings=None, linearization=False):
         self.coords = coords
         self.nodes = nodes
         self.edges = edges
         self.cue_locations = cue_locations
         self.choice_boundaries = choice_boundaries
+        self.mappings = mappings
         self.linearization = linearization
 
     def get_track_boundaries(self):
@@ -57,11 +58,13 @@ class UpdateTrack(VirtualTrack):
                              y_position={'left': (255, 298), 'right': (298, 341)},
                              view_angle={'left': (-np.pi, -np.pi / 4), 'right': (np.pi/4, np.pi)},
                              choice={'left': (-2, 0), 'right': (0, 2)},
-                             turn_type={'left': (-2, 0), 'right': (0,2)})  # TODO - check accurate
+                             turn_type={'left': (-2, 0), 'right': (0, 2)})  # TODO - check accurate
+    mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},
+                    turn_type={'1': 'left', '2': 'right'})
 
     def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_locations=cue_locations,
-                 choice_boundaries=choice_boundaries, linearization=False):
-        super().__init__(coords, nodes, edges, cue_locations, choice_boundaries, linearization)
+                 choice_boundaries=choice_boundaries, mappings=mappings, linearization=False):
+        super().__init__(coords, nodes, edges, cue_locations, choice_boundaries, mappings, linearization)
 
         # setup cue locations
         if self.linearization:

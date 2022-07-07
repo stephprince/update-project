@@ -15,6 +15,10 @@ class SessionLoader:
         self.behavior = behavior
 
     @staticmethod
+    def get_animal_id(session_name):
+        return session_name[1]
+
+    @staticmethod
     def get_session_id(session_name):
         session_id = f"{session_name[0]}{session_name[1]}_{session_name[2]}"  # {ID}{Animal}_{Date} e.g. S25_210913
 

@@ -7,7 +7,7 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 def run_behavior_analysis():
     # setup flags
-    overwrite = False  # when False, this will only load data if the parameters match
+    overwrite = True  # when False, this will only load data if the parameters match
     plot = True  # this only plots on a session by session basis
     group = False  # this compiles the data for group plotting
 
@@ -30,13 +30,16 @@ def run_behavior_analysis():
         behavior = BehaviorAnalyzer(nwbfile=nwbfile, session_id=session_id)
         behavior.run_analysis(overwrite=overwrite)  # build decoding model
 
+        # save to group output
+        session_data = dict(session_id=session_id,
+                            animal=session_db.get_animal_id(name),
+                            behavior=behavior)
+        group_data.append(session_data)
+
         # plot data
         if plot:
-            visualizer = BehaviorVisualizer(behavior)
+            visualizer = BehaviorVisualizer([session_data])
             visualizer.plot()
-
-        # save to group output
-        group_data.append(dict(session_id=session_id, behavior=behavior))
 
     # get group summary data
     if group:
