@@ -21,7 +21,8 @@ class BayesianDecoderVisualizer:
         self.data_exists = True
         self.exclusion_criteria = exclusion_criteria
         self.params = params
-        self.threshold_params = threshold_params or dict(num_units=0, num_trials=0)
+        self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
+                                                         num_trials=[self.exclusion_criteria['trials']])
 
     def _get_confusion_matrix(self, data, bins):
         if len(bins):
@@ -233,7 +234,7 @@ class BayesianDecoderVisualizer:
                 time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
 
                 # line plots
-                limits = [np.min(stats[m]['lower']), np.max(stats[m]['upper'])]
+                limits = [np.min(stats[m]['err_lower']), np.max(stats[m]['err_upper'])]
                 axes[ax_dict[0 + ind * 4]].plot(times, stats[m]['mean'], color=value['color'], label=key)
                 axes[ax_dict[0 + ind * 4]].fill_between(times, stats[m]['lower'], stats[m]['upper'], alpha=0.2,
                                                         color=value['color'], label='95% CI')
@@ -254,7 +255,7 @@ class BayesianDecoderVisualizer:
                 # heat maps by trial
                 update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
                                       [0, np.shape(value['data'][m])[1]]]
-                axes[ax_dict[2 + ind * 4 + bound_ind]] = sns.heatmap(value['data'][m], cmap=value['cmap'],
+                axes[ax_dict[2 + ind * 4 + bound_ind]] = sns.heatmap(value['data'][m].T, cmap=value['cmap'],
                                                                      ax=axes[ax_dict[2 + ind * 4 + bound_ind]],
                                                                      vmin=0.25 * np.nanmin(value['data'][m]),
                                                                      vmax=0.75 * np.nanmax(value['data'][m]),
@@ -463,7 +464,6 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         group_df = pd.DataFrame(data)
         self.group_df = group_df[~group_df['excluded_session']]  # only keep non-excluded sessions
-        #tags = '_'.join([f'{k}_{v}' for k, v in self.exclusion_criteria.items()])
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self, group_by=None):
@@ -472,7 +472,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             # make plots inspecting errors across all groups (have to change units/trials loops location if I want this)
             self.groups = group_by
             group_names = list(group_by.keys())
-            self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])  # TODO - see if I can do this by animal instead
+            self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
+            self.plot_all_groups_error(main_group=group_names, sub_group='animal')
             self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
             self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
@@ -483,7 +484,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 # plot model metrics
                 self.plot_tuning_curves(data, name)
                 self.plot_group_confusion_matrices(data, name)
-                self.plot_parameter_comparison(data, name, thresh_params=True)  # TODO - add thresh params here
+                self.plot_parameter_comparison(data, name, thresh_params=True)
 
                 for iter_list in itertools.product(*self.threshold_params.values()):
                     thresh_mask = pd.concat([data[k] >= v for k, v in zip(self.threshold_params.keys(), iter_list)],
@@ -497,8 +498,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 self.plot_group_aligned_quantification(data, name)
 
                 # plot correct vs. incorrect trial types
-                self.plot_group_aligned_data(data, name, plot_groups=dict(turn_types=[1, 2], correct=[0, 1]))
-                self.plot_group_aligned_quantification(data, name, plot_groups=dict(turn_types=[1, 2], correct=[0, 1]))
+                self.plot_group_aligned_data(data, name,  plot_groups=dict(turn_type=[[1], [2], [1, 2]], correct=[[0], [1], [0, 1]]))
+                self.plot_group_aligned_quantification(data, name, plot_groups=dict(turn_type=[[1], [2], [1, 2]], correct=[[0], [1], [0, 1]]))
         else:
             print(f'No data found to plot')
 
@@ -628,8 +629,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         return sorted_data
 
-    def _quantify_aligned_data(self, param_data, key, feat, outcomes=[0, 1]):
-        aligned_data = self._get_group_aligned_data(param_data, key, feat, outcomes)
+    def _quantify_aligned_data(self, param_data, key, feat, group_name, val):
+        aligned_data = self._get_group_aligned_data(param_data, key, feat, group_name, val)
 
         # get bounds to use to quantify choices
         bins = param_data['decoder'].values[0].bins
@@ -924,7 +925,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         plt.savefig(**kwargs)
         plt.close()
 
-    def plot_group_aligned_data(self, data, name, trial_types=['switch', 'stay'], plot_groups=dict(turn_type=[[1], [2]])):
+    def plot_group_aligned_data(self, data, name, trial_types=['switch', 'stay'], plot_groups=dict(turn_type=[[1], [2], [1, 2]])):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
@@ -960,7 +961,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     plt.savefig(**kwargs)
                     plt.close('all')
 
-    def plot_group_aligned_quantification(self, data, name, trial_types=['switch', 'stay'], outcomes=[(0, 1)]):
+    def plot_group_aligned_quantification(self, data, name, trial_types=['switch', 'stay'], plot_groups=dict(turn_type=[[1], [2], [1, 2]])):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
@@ -969,43 +970,43 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             window = param_data['decoder'].values[0].aligned_data_window
             nbins = param_data['decoder'].values[0].aligned_data_nbins
 
-            for out in outcomes:
-                # make plots
-                mosaic = """
-                            AABB
-                            CCDD
-                            EEFF
-                            GGHH
-                            IIJJ
-                            KKLL
-                            MMNN
-                            OOPP
-                            """
-                axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-                data_quant_1 = self._quantify_aligned_data(param_data, trial_types[0], feat, out)
-                data_quant_2 = self._quantify_aligned_data(param_data, trial_types[1], feat, out)
-                self.plot_quantification_around_update(data_quant_1, nbins, window, trial_types[0], feat, axes,
-                                                       ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O'])
-                self.plot_quantification_around_update(data_quant_2, nbins, window, trial_types[1], feat, axes,
-                                                       ['B', 'D', 'F', 'H', 'J', 'L', 'N', 'P'])
+            for group_name, group_value in plot_groups.items():
+                for val in group_value:
+                    # make plots
+                    mosaic = """
+                                AABB
+                                CCDD
+                                EEFF
+                                GGHH
+                                IIJJ
+                                KKLL
+                                MMNN
+                                OOPP
+                                """
+                    axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
+                    data_quant_1 = self._quantify_aligned_data(param_data, trial_types[0], feat, group_name, val)
+                    data_quant_2 = self._quantify_aligned_data(param_data, trial_types[1], feat, group_name, val)
+                    self.plot_quantification_around_update(data_quant_1, nbins, window, trial_types[0], feat, axes,
+                                                           ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O'])
+                    self.plot_quantification_around_update(data_quant_2, nbins, window, trial_types[1], feat, axes,
+                                                           ['B', 'D', 'F', 'H', 'J', 'L', 'N', 'P'])
 
-                # save figure
-                plt.tight_layout()
-                tags = f'{"_".join(["".join(n) for n in name])}_outs{out}_' \
-                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification',
-                                                         additional_tags=tags,
-                                                         format='pdf')
-                plt.savefig(**kwargs)
-                plt.close('all')
+                    # save figure
+                    plt.tight_layout()
+                    tags = f'{"_".join(["".join(n) for n in name])}_{group_name}{val}' \
+                           f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+                    kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification',
+                                                             additional_tags=tags,
+                                                             format='pdf')
+                    plt.savefig(**kwargs)
+                    plt.close('all')
 
     def plot_tuning_curves(self, data, name):
         feat = data['feature'].values[0]
         locations = data['decoder'].values[0].virtual_track.get_cue_locations().get(feat, dict())
         tuning_curve_params = [p for p in self.params if p not in ['decoder_bins']]
         data_const_decoding = data[data['decoder_bins'] == data['decoder_bins'].values[0]]
-        param_group_data = data_const_decoding.groupby(
-            tuning_curve_params)  # main group is what gets the different plots
+        param_group_data = data_const_decoding.groupby(tuning_curve_params)
         plot_num, counter = (0, 0)
         nrows, ncols = (3, 3)
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10), squeeze=False)
@@ -1017,6 +1018,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             sort_index = np.argsort(np.argmax(tuning_curve_scaled, axis=1))
 
             # plotting info
+            param_name = param_name if isinstance(param_name, list) else [param_name]
             new_line = '\n'
             tags = f'{"_".join(["".join(n) for n in name])}' \
                    f'{"_".join([f"{p}_{n}" for p, n in zip(tuning_curve_params, param_name)])}'

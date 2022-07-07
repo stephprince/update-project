@@ -25,13 +25,11 @@ def run_bayesian_decoding():
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['x_position']
+    features = ['x_position', 'y_position', 'view_angle']
     regions = [['PFC']]  # run PFC later
-    thresh_params = dict(num_units=[0, 20, 40],  # params that don't change session data just which ones to include
-                         num_trials=[0, 50, 100])
-    testing_params = dict(encoder_bins=[40, 50, 60],  # [30, 50],
-                          decoder_bins=[0.050, 0.25],
-                          speed_thresholds=[1000])  # [1000, 2000, 5000], )
+    exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
+    testing_params = dict(encoder_bins=[40, 60],
+                          decoder_bins=[0.050, 0.25])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
@@ -47,16 +45,14 @@ def run_bayesian_decoding():
             group_data.append(bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *arg_list))
 
         group_visualizer = GroupVisualizer(group_data,
-                                           exclusion_criteria=dict(units=0, trials=0),
-                                           params=list(testing_params.keys()),
-                                           threshold_params=thresh_params)
+                                           exclusion_criteria=exclusion_criteria,
+                                           params=list(testing_params.keys()))
         group_visualizer.plot(group_by=dict(region=regions, feature=features))
 
     print(f'Finished running {__file__}')
 
 
-def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, name, reg, feat, enc_bins, dec_bins,
-                      speed):
+def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, name, reg, feat, enc_bins, dec_bins):
     # load nwb file
     session_id = session_db.get_session_id(name)
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
@@ -65,8 +61,7 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     # run decoder
     params = dict(units_types=dict(region=reg, cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
                   encoder_bin_num=enc_bins,  # num feature bins
-                  decoder_bin_size=dec_bins,  # time length of decoding bins
-                  speed_threshold=speed)  # cutoff for moving/not-moving times
+                  decoder_bin_size=dec_bins,)  # time length of decoding bins
     decoder = BayesianDecoder(nwbfile=nwbfile, params=params, session_id=session_id,
                               features=[feat])  # initialize decoder class
     decoder.run_decoding(overwrite=overwrite)  # build decoding model
@@ -80,7 +75,7 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     if parallel:
         return None  # cannot return output for parallel processing bc contains h5py object which cannot be pickled
     else:
-        params = {k: v for k, v in zip(testing_params.keys(), [enc_bins, dec_bins, speed])}
+        params = {k: v for k, v in zip(testing_params.keys(), [enc_bins, dec_bins])}
         session_decoder_output = dict(session_id=session_id,
                                       animal=session_db.get_animal_id(name),
                                       region=tuple(reg),  # convert to tuple for later grouping

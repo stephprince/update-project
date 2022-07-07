@@ -24,7 +24,7 @@ class BayesianDecoder:
         self.units_types = params.get('units_types',
                                       dict(region=['CA1', 'PFC'],  # dict of filters to apply to units table
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
-        self.speed_threshold = params.get('speed_threshold', 0)  # minimum virtual speed to subselect epochs
+        self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.decoder_test_size = params.get('decoder_test_size', 0.25)  # prop of trials for testing on train/test split
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],

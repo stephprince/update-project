@@ -9,17 +9,23 @@ def get_fig_stats(data, axis=0):
         err = sem(data, axis=axis)
         upper = mean + 2 * err
         lower = mean - 2 * err
+        err_upper = mean + err
+        err_lower = mean - err
     else:
         mean = []
         err = []
         upper = []
         lower = []
+        err_upper = []
+        err_lower = []
         # nan_arr = np.empty(np.delete(np.shape(data), axis))
 
     stats_dict = dict(mean=mean,
                       err=err,
                       upper=upper,
                       lower=lower,
+                      err_upper=err_upper,
+                      err_lower=err_lower
                       )
 
     return stats_dict
