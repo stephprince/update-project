@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
 import pickle
 
 from git import Repo
@@ -63,6 +65,13 @@ class ResultsIO:
                       )
 
         return kwargs
+
+    def save_fig(self, fig, filename, results_type='group', additional_tags='', results_name='', format='pdf'):
+        kwargs = self.get_figure_args(filename, results_type, additional_tags, results_name, format)
+        sns.despine(fig=fig, offset=5, trim=True)
+        fig.tight_layout()
+        fig.savefig(**kwargs)
+        plt.close(fig)
 
     def load_data(self, filename, results_type='group', format='npy'):
         fname = self.get_data_filename(filename, results_type=results_type, format=format)

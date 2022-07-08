@@ -1,0 +1,45 @@
+# Prince paper context - based on seaborn style sheets
+figure.figsize: 10, 7.5
+figure.facecolor: white
+
+axes.labelsize: 14
+axes.titlesize: 16
+axes.linewidth: 1.25
+axes.spines.top: False
+axes.spines.right: False
+axes.prop_cycle: cycler('color', ['4C72B0', '55A868', 'C44E52', '8172B2', 'CCB974', '64B5CD'])
+
+image.cmap: rocket
+
+legend.fontsize: 12
+legend.frameon: False
+legend.numpoints: 1
+legend.scatterpoints: 1
+
+lines.linewidth: 2
+patch.linewidth: 0.25
+lines.markersize: 9
+lines.markeredgewidth: 0
+lines.solid_capstyle: round
+
+patch.facecolor: 4C72B0
+patch.linewidth: .3
+
+xtick.direction: out
+xtick.labelsize: 12
+xtick.major.pad: 6
+xtick.major.width: 1
+xtick.minor.size: 0
+xtick.minor.width: 0.5
+
+ytick.direction: out
+ytick.labelsize: 12
+ytick.major.pad: 6
+ytick.major.width: 1
+ytick.minor.size: 0
+ytick.minor.width: 0.5
+
+font.family: sans-serif
+font.sans-serif: Arial, Helvetica, DejaVu Sans, Bitstream Vera Sans, Liberation Sans, sans-serif
+pdf.fonttype: 42
+ps.fonttype: 42

@@ -12,10 +12,37 @@ color_wheel[2] = green
 color_wheel[3] = red  # flip colors bc of how I have correct/incorrect trials coded
 
 
+def get_limits_from_data(data, balanced=True):
+    mins = []
+    maxs = []
+    for d in data:
+        mins.append(np.nanmin(np.nanmin(d)))
+        maxs.append(np.nanmax(np.nanmax(d)))
+
+    if balanced:  # if min and max are positive/negative of same value (i.e. -10, 10)
+        lim_abs = np.nanmax([abs(x) for x in [np.nanmin(mins), np.nanmax(maxs)]])
+        limits = [-lim_abs, lim_abs]
+    else:
+        limits = [np.nanmin(mins), np.nanmax(maxs)]
+
+    return limits
+
+def get_color_theme():
+    color_theme_dict = dict()
+    color_theme_dict['cmap'] = sns.color_palette("magma", as_cmap=True)  # rocket is cool too?
+    color_theme_dict['control'] = 'k'
+    color_theme_dict['switch'] = '#5070db'  # 260 in degrees, 75 saturation, 50 light
+    color_theme_dict['stay'] = '#da3b46'  # 10 in degrees, 75 saturation, 50 light
+    color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)
+    color_theme_dict['stay_cmap'] = sns.light_palette(color_theme_dict['stay'], as_cmap=True)
+    color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(260, 10, s=75, l=50, as_cmap=True)
+    color_theme_dict['animals'] = sns.color_palette("husl", 7)
+
+    return color_theme_dict
+
 def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True):
     # cum fraction plots
-    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]],
-                                                palette='husl')
+    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]])
     axes[row_ids[0]][col_ids[0]].set_title(title)
     axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion')
     axes[row_ids[0]][col_ids[0]].set_aspect(1. / axes[row_ids[0]][col_ids[0]].get_data_ratio(), adjustable='box')
@@ -33,16 +60,14 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
 
     # histograms
     axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
-                                                palette='husl', element='step')
+                                                element='step')
     axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion')
 
     # violin plots
-    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],
-                                                  palette='husl')
+    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],)
     plt.setp(axes[row_ids[2]][col_ids[2]].collections, alpha=.25)
     if stripplot:
-        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],
-                      palette='husl')
+        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],)
     axes[row_ids[2]][col_ids[2]].set_title(title)
 
 def show_start_aligned_psth(start_aligned, note_times, group_inds, window, labels, axes=None):
