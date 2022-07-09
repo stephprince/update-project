@@ -6,11 +6,33 @@ import scipy
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
 color_wheel = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-red = color_wheel[2]
-green = color_wheel[3]
-color_wheel[2] = green
-color_wheel[3] = red  # flip colors bc of how I have correct/incorrect trials coded
+# red = color_wheel[2]
+# green = color_wheel[3]
+# color_wheel[2] = green
+# color_wheel[3] = red  # flip colors bc of how I have correct/incorrect trials coded
 
+
+def clean_plot(fig, axes):
+    if hasattr(axes, 'flat'):
+        ax_list = axes.flat
+    else:
+        ax_list = list(axes.values())
+
+    for axi in ax_list:
+        axi.set_xticks(axi.get_xticks())  # fix x-ticks so that despine trimming doesn't move them too much
+        axi.set_yticks(axi.get_yticks())  # fix y-ticks so that despine trimming doesn't move them too much
+        axi.set_xlabel(axi.get_xlabel().replace("_", " "))
+        axi.set_ylabel(axi.get_ylabel().replace("_", " "))
+
+        # tick_labels = [item.get_text() for item in axi.get_xticklabels()]
+        # axi.set_xticklabels([l.replace("_", " ") for l in tick_labels])
+
+        # handles, labels = axi.get_legend_handles_labels()
+        # new_labels = [l.replace("_", " ") for l in labels]
+        # axi.legend(handles, new_labels)
+
+    sns.despine(fig=fig, offset=5, trim=True)
+    fig.tight_layout()
 
 def get_limits_from_data(data, balanced=True):
     mins = []
@@ -29,7 +51,7 @@ def get_limits_from_data(data, balanced=True):
 
 def get_color_theme():
     color_theme_dict = dict()
-    color_theme_dict['cmap'] = sns.color_palette("magma", as_cmap=True)  # rocket is cool too?
+    color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)  # rocket is cool too?
     color_theme_dict['control'] = 'k'
     color_theme_dict['switch'] = '#5070db'  # 260 in degrees, 75 saturation, 50 light
     color_theme_dict['stay'] = '#da3b46'  # 10 in degrees, 75 saturation, 50 light
@@ -41,17 +63,22 @@ def get_color_theme():
     return color_theme_dict
 
 def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True):
+    if group and show_median:
+        medians = data.groupby([group])[column_name].median()
+        limits = [np.nanmin(data.groupby([group])[column_name].min().values),
+                  np.nanmax(data.groupby([group])[column_name].max().values)]
+    else:
+        medians = {column_name: data[column_name].median()}
+        limits = [data[column_name].min(), data[column_name].max()]
+
     # cum fraction plots
-    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]])
+    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]],
+                                                palette=sns.color_palette(n_colors=len(data[group].unique())))
     axes[row_ids[0]][col_ids[0]].set_title(title)
-    axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion')
+    axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
     axes[row_ids[0]][col_ids[0]].set_aspect(1. / axes[row_ids[0]][col_ids[0]].get_data_ratio(), adjustable='box')
 
     # add median annotations to the first plot
-    if group and show_median:
-        medians = data.groupby([group])[column_name].median()
-    else:
-        medians = {column_name: data[column_name].median()}
     new_line = '\n'
     median_text = [f"{g} median: {m:.2f} {new_line}" for g, m in medians.items()]
     axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text),
@@ -60,8 +87,8 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
 
     # histograms
     axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
-                                                element='step')
-    axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion')
+                                                element='step', palette=sns.color_palette(n_colors=len(data[group].unique())))
+    axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
 
     # violin plots
     axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],)

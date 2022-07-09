@@ -1,23 +1,24 @@
 # Prince paper context - based on seaborn style sheets
-figure.figsize: 10, 7.5
+figure.figsize: 11, 8.5
 figure.facecolor: white
+figure.titlesize: 18
 
-axes.labelsize: 14
-axes.titlesize: 16
+axes.labelsize: 12
+axes.titlesize: 14
 axes.linewidth: 1.25
 axes.spines.top: False
 axes.spines.right: False
-axes.prop_cycle: cycler('color', ['4C72B0', '55A868', 'C44E52', '8172B2', 'CCB974', '64B5CD'])
+#axes.prop_cycle: cycler('color', ['4C72B0', '55A868', 'C44E52', '8172B2', 'CCB974', '64B5CD'])
+axes.prop_cycle: cycler('color', ['#f77189', '#bb9832', '#50b131', '#36ada4', '#3ba3ec', '#e866f4'])
 
-image.cmap: rocket
+image.cmap: rocket_r
 
-legend.fontsize: 12
+legend.fontsize: 10
 legend.frameon: False
 legend.numpoints: 1
 legend.scatterpoints: 1
 
 lines.linewidth: 2
-patch.linewidth: 0.25
 lines.markersize: 9
 lines.markeredgewidth: 0
 lines.solid_capstyle: round
@@ -26,14 +27,14 @@ patch.facecolor: 4C72B0
 patch.linewidth: .3
 
 xtick.direction: out
-xtick.labelsize: 12
+xtick.labelsize: 10
 xtick.major.pad: 6
 xtick.major.width: 1
 xtick.minor.size: 0
 xtick.minor.width: 0.5
 
 ytick.direction: out
-ytick.labelsize: 12
+ytick.labelsize: 10
 ytick.major.pad: 6
 ytick.major.width: 1
 ytick.minor.size: 0

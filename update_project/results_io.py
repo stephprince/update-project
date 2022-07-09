@@ -5,6 +5,7 @@ import pickle
 from git import Repo
 from pathlib import Path
 
+from update_project.general.plots import clean_plot
 
 class ResultsIO:
     git_hash = Repo(search_parent_directories=True).head.object.hexsha[:10]
@@ -66,10 +67,12 @@ class ResultsIO:
 
         return kwargs
 
-    def save_fig(self, fig, filename, results_type='group', additional_tags='', results_name='', format='pdf'):
+    def save_fig(self, fig, axes, filename, results_type='group', additional_tags='', results_name='', format='pdf'):
+        # clean up plot
+        clean_plot(fig, axes)
+
+        # save and close
         kwargs = self.get_figure_args(filename, results_type, additional_tags, results_name, format)
-        sns.despine(fig=fig, offset=5, trim=True)
-        fig.tight_layout()
         fig.savefig(**kwargs)
         plt.close(fig)
 
