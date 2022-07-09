@@ -25,7 +25,7 @@ def run_bayesian_decoding():
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['x_position', 'y_position', 'view_angle']
+    features = ['view_angle']
     regions = [['PFC']]  # run PFC later
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bins=[40, 60],

@@ -11,18 +11,23 @@ from pathlib import Path
 from update_project.camera_sync.cam_plot_utils import write_camera_video
 from update_project.decoding.interpolate import griddata_time_intervals
 from update_project.results_io import ResultsIO
-from update_project.general.plots import plot_distributions
+from update_project.general.plots import plot_distributions, get_limits_from_data, get_color_theme
 from update_project.statistics import get_fig_stats
+
+plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
 
 class BayesianDecoderVisualizer:
+
     def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None):
+
         self.data = data
         self.data_exists = True
         self.exclusion_criteria = exclusion_criteria
         self.params = params
         self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
                                                          num_trials=[self.exclusion_criteria['trials']])
+        self.colors = get_color_theme()
 
     def _get_confusion_matrix(self, data, bins):
         if len(bins):
@@ -60,103 +65,93 @@ class BayesianDecoderVisualizer:
 
         return mean_prob_dist
 
-    def plot_1d_around_update(self, data_around_update, nbins, window, title, label, color, axes,
-                              ax_dict, feature_name=None, prob_map_axis=0):
-        if data_around_update['feature'].any():
-            if feature_name is None:
-                feature_name = self.data.feature_names[0]
-            limits = [np.min(np.min(data_around_update['feature'])), np.max(np.max(data_around_update['feature']))]
-            stats = data_around_update['stats']
-            times = np.linspace(-window, window, num=nbins)
-            time_tick_values = times.astype(int)
-            time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
-            if feature_name in ['x_position', 'view_angle', 'choice',
-                                'turn_type']:  # divergent color maps for div data
-                cmap_pos = 'RdGy'
-                cmap_decoding = 'PRGn'
+    @staticmethod
+    def _check_data_exists(data):
+        if isinstance(data, np.ndarray):
+            data_exists = data.any()
+        else:
+            data_exists = bool(data)
+
+        return data_exists
+
+    def plot_1d_around_update(self, data_around_update, nbins, window, title, label, axes,
+                              ax_dict, feature_name=None, prob_map_axis=0, bounds=[]):
+        if self._check_data_exists(data_around_update['probability']):  # skip if there is no data
+            feature_name = feature_name or self.data.feature_names[0]
+            if feature_name in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
+                cmap_pos = self.colors['switch_stay_cmap_div']
                 scaling_value = 0.5
+                balanced = True
             elif feature_name in ['y_position']:  # sequential color map for seq data
                 cmap_pos = 'Greys'
-                if title == 'switch':
-                    cmap_decoding = 'Blues'
-                elif title == 'stay':
-                    cmap_decoding = 'RdPu'
                 scaling_value = 1
+                balanced = False
 
-        prob_map = np.nanmean(data_around_update['probability'], axis=prob_map_axis)
-        if prob_map_axis == 1:
-            prob_map = prob_map.T
+            prob_map = np.nanmean(data_around_update['probability'], axis=prob_map_axis)
+            if prob_map_axis == 1:
+                prob_map = prob_map.T
 
-        if isinstance(data_around_update['probability'], np.ndarray):
-            data_exists = data_around_update['probability'].any()
-        else:
-            data_exists = data_around_update['probability']
-
-        if data_exists:  # skip if there is no data
+            stats = data_around_update['stats']
+            mean_limits = get_limits_from_data([stats['feature']['lower'], stats['feature']['upper'],
+                                                stats['decoding']['lower'], stats['decoding']['upper']],
+                                               balanced=balanced)
+            limits = get_limits_from_data([data_around_update['feature']], balanced=balanced)
+            times = np.linspace(-window, window, num=nbins)
+            time_tick_values = times.astype(int)
             n_position_bins = np.shape(prob_map)[0]
             data_values = np.linspace(np.min(data_around_update['decoding']), np.max(data_around_update['decoding']),
                                       n_position_bins)
-            ytick_values = data_values.astype(int)
-            ytick_labels = np.array([0, int(len(ytick_values) / 2), len(ytick_values) - 1])
-            update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
-                                  [0, np.shape(data_around_update['feature'])[1]]]
+
             pos_values_after_update = np.sum(
-                data_around_update['feature'][time_tick_labels[1]:time_tick_labels[1] + 10],
+                data_around_update['feature'][int(len(time_tick_values) / 2):int(len(time_tick_values) / 2) + 10],
                 axis=0)
             sort_index = np.argsort(pos_values_after_update)
 
-            axes[ax_dict[0]] = sns.heatmap(prob_map, cmap='YlGnBu', ax=axes[ax_dict[0]],
-                                           vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
-                                           cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
-            axes[ax_dict[0]].plot(update_time_values[0], update_time_values[1], linestyle='dashed',
-                                  color=[0, 0, 0, 0.5])
+            im = axes[ax_dict[0]].imshow(prob_map, cmap=self.colors['cmap'], origin='lower', aspect='auto',
+                                         vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
+                                         extent=[-window, window, data_values[0], data_values[-1]])
+            axes[ax_dict[0]].plot([0, 0], [data_values[0], data_values[-1]], linestyle='dashed', color=[0, 0, 0, 0.5])
             axes[ax_dict[0]].invert_yaxis()
-            axes[ax_dict[0]].set(xticks=time_tick_labels, yticks=ytick_labels,
-                                 xticklabels=time_tick_values[time_tick_labels], yticklabels=ytick_values[ytick_labels],
-                                 xlabel='Time around update (s)', ylabel=f'{label}')
+            axes[ax_dict[0]].set(xlabel='Time around update (s)', ylabel=f'{label}', xlim=[-window, window],
+                                 ylim=[data_values[0], data_values[-1]])
             axes[ax_dict[0]].set_title(f'{title} trials - probability density - {label}', fontsize=14)
+            plt.colorbar(im, ax=axes[ax_dict[0]], label='probability density', pad=0.01, location='right',
+                         fraction=0.046)
+            for b in bounds:
+                axes[ax_dict[0]].plot([-window, window], [b[0], b[0]], linestyle='dashed', color=[0, 0, 0, 0.5])
+                axes[ax_dict[0]].plot([-window, window], [b[1], b[1]], linestyle='dashed', color=[0, 0, 0, 0.5])
 
-            axes[ax_dict[1]].plot(times, stats['feature']['mean'], color='k', label='True position')
+            axes[ax_dict[1]].plot(times, stats['feature']['mean'], color=self.colors['control'], label='True position')
             axes[ax_dict[1]].fill_between(times, stats['feature']['lower'], stats['feature']['upper'], alpha=0.2,
                                           color='k', label='95% CI')
-            axes[ax_dict[1]].plot(times, stats['decoding']['mean'], color=color, label='Decoded position')
+            axes[ax_dict[1]].plot(times, stats['decoding']['mean'], color=self.colors[title], label='Decoded position')
             axes[ax_dict[1]].fill_between(times, stats['decoding']['lower'], stats['decoding']['upper'], alpha=0.2,
-                                          color=color, label='95% CI')
-            axes[ax_dict[1]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
-            axes[ax_dict[1]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)',
+                                          color=self.colors[title], label='95% CI')
+            axes[ax_dict[1]].plot([0, 0], mean_limits, linestyle='dashed', color='k', alpha=0.25)
+            axes[ax_dict[1]].set(xlim=[-window, window], ylim=mean_limits, xlabel='Time around update(s)',
                                  ylabel=f'{label}')
             axes[ax_dict[1]].legend(loc='upper left')
             axes[ax_dict[1]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
 
-            axes[ax_dict[2]] = sns.heatmap(data_around_update['feature'][:, sort_index].T, cmap=cmap_pos,
-                                           ax=axes[ax_dict[2]],
-                                           vmin=scaling_value * limits[0], vmax=scaling_value * limits[1],
-                                           cbar_kws={'pad': 0.01, 'label': f'{label}', 'fraction': 0.046})
-            axes[ax_dict[2]].plot(update_time_values[0], update_time_values[1], linestyle='dashed',
-                                  color=[0, 0, 0, 0.5])
-            axes[ax_dict[2]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
-                                 xlabel='Time around update (s)', ylabel='Trials')
-            axes[ax_dict[2]].set_title(f'{title} trials - true {label}', fontsize=14)
-
-            axes[ax_dict[3]] = sns.heatmap(data_around_update['decoding'][:, sort_index].T, cmap=cmap_decoding,
-                                           ax=axes[ax_dict[3]],
-                                           vmin=scaling_value * limits[0], vmax=scaling_value * limits[1],
-                                           cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
-            axes[ax_dict[3]].plot(update_time_values[0], update_time_values[1], linestyle='dashed',
-                                  color=[0, 0, 0, 0.5])
-            axes[ax_dict[3]].set(xticks=time_tick_labels, xticklabels=time_tick_values[time_tick_labels],
-                                 xlabel='Time around update (s)', ylabel='Trials')
-            axes[ax_dict[3]].set_title(f'{title} trials - decoded {label}', fontsize=14)
-
-            axes[ax_dict[4]].plot(times, stats['error']['mean'], color='r', label='|True - decoded|')
-            axes[ax_dict[4]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color='r',
+            axes[ax_dict[2]].plot(times, stats['error']['mean'], color='r', label='|True - decoded|')
+            axes[ax_dict[2]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color='r',
                                           label='95% CI')
-            axes[ax_dict[4]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k',
+            axes[ax_dict[2]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k',
                                   alpha=0.25)
-            axes[ax_dict[4]].set(xlim=[-window, window], ylim=[0, np.max(stats['error']['upper'])],
+            axes[ax_dict[2]].set(xlim=[-window, window], ylim=[0, np.max(stats['error']['upper'])],
                                  xlabel='Time around update(s)', ylabel=label)
-            axes[ax_dict[4]].set_title(f'{title} trials - decoding error {label}', fontsize=14)
-            axes[ax_dict[4]].legend(loc='upper left')
+            axes[ax_dict[2]].set_title(f'{title} trials - decoding error {label}', fontsize=14)
+            axes[ax_dict[2]].legend(loc='upper left')
+
+            im = axes[ax_dict[3]].imshow(data_around_update['feature'][:, sort_index].T, cmap=cmap_pos, origin='lower',
+                                         vmin=scaling_value * limits[0], vmax=scaling_value * limits[1],
+                                         extent=[-window, window, 0, len(sort_index)], aspect='auto')
+            axes[ax_dict[3]].plot([0, 0], [0, len(sort_index)], linestyle='dashed',
+                                  color=[0, 0, 0, 0.5])
+            axes[ax_dict[3]].set(xlabel='Time around update (s)', ylabel='Trials')
+            axes[ax_dict[3]].set_title(f'{title} trials - true {label}', fontsize=14)
+            plt.colorbar(im, ax=axes[ax_dict[3]], label=f'{label} fraction', pad=0.01, location='right',
+                         fraction=0.046)
 
     def plot_2d_around_update(self, data_around_update, time_bin, times, title, color, axes, ax_dict):
         stats = data_around_update['stats']
@@ -211,22 +206,27 @@ class BayesianDecoderVisualizer:
             plt.colorbar(im, ax=axes[ax_dict[1]], label='Probability density', pad=0.04, location='right',
                          fraction=0.046)
 
-    @staticmethod
-    def plot_quantification_around_update(quantification_data, nbins, window, title, label, axes,
+    def plot_quantification_around_update(self, quantification_data, nbins, window, title, label, axes,
                                           ax_dict):
-        data_split = dict(left=dict(data=quantification_data['left'],
-                                    color='b',
-                                    cmap='Blues',
-                                    conversion=1),  # multiplier to use for bar plots
-                          right=dict(data=quantification_data['right'],
-                                     color='r',
-                                     cmap='Reds',
-                                     conversion=-1))
+        data_split = dict(initial=dict(data=quantification_data['left'],
+                                       color=self.colors['switch'],
+                                       cmap=self.colors['switch_cmap'],
+                                       conversion=1),  # multiplier to use for bar plots
+                          switched=dict(data=quantification_data['right'],
+                                        color=self.colors['stay'],
+                                        cmap=self.colors['stay_cmap'],
+                                        conversion=-1))
 
         # add labels for bound_values, threshold
-        metrics = ['prob_sum', 'thresh_crossing']
+        metrics = ['prob_sum']  # thresh-crossing was another option but not plotting that for now
         for ind, m in enumerate(metrics):
             bound_ind = 0
+            err_limits = get_limits_from_data([(v['data']['stats'][m]['err_lower'], v['data']['stats'][m]['err_upper'])
+                                               for k, v in data_split.items()], balanced=False)
+            err_limits_balanced = get_limits_from_data([v['data']['stats'][m]['mean'] for k, v in data_split.items()],
+                                                       balanced=True)
+            all_limits_balanced = get_limits_from_data([v['data'][m] for v in data_split.values()])
+
             for key, value in data_split.items():
                 stats = value['data']['stats']
                 times = np.linspace(-window, window, num=nbins)
@@ -234,12 +234,11 @@ class BayesianDecoderVisualizer:
                 time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
 
                 # line plots
-                limits = [np.min(stats[m]['err_lower']), np.max(stats[m]['err_upper'])]
                 axes[ax_dict[0 + ind * 4]].plot(times, stats[m]['mean'], color=value['color'], label=key)
-                axes[ax_dict[0 + ind * 4]].fill_between(times, stats[m]['lower'], stats[m]['upper'], alpha=0.2,
+                axes[ax_dict[0 + ind * 4]].fill_between(times, stats[m]['err_lower'], stats[m]['err_upper'], alpha=0.2,
                                                         color=value['color'], label='95% CI')
-                axes[ax_dict[0 + ind * 4]].plot([0, 0], limits, linestyle='dashed', color='k', alpha=0.25)
-                axes[ax_dict[0 + ind * 4]].set(xlim=[-window, window], ylim=limits, xlabel='Time around update(s)',
+                axes[ax_dict[0 + ind * 4]].plot([0, 0], err_limits, linestyle='dashed', color='k', alpha=0.25)
+                axes[ax_dict[0 + ind * 4]].set(xlim=[-window, window], ylim=err_limits,
                                                ylabel=key)
                 axes[ax_dict[0 + ind * 4]].legend(loc='upper left')
                 axes[ax_dict[0 + ind * 4]].set_title(f'{title} trials - {label} - {m}', fontsize=14)
@@ -249,7 +248,7 @@ class BayesianDecoderVisualizer:
                                                yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
                 axes[ax_dict[1 + ind * 4]].bar(x=times, height=stats[m]['mean'] * value['conversion'],
                                                yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
-                axes[ax_dict[1 + ind * 4]].set(xlabel='Time around update(s)', ylabel=m)
+                axes[ax_dict[1 + ind * 4]].set(ylim=err_limits_balanced, ylabel=m)
                 axes[ax_dict[1 + ind * 4]].legend(loc='upper left')
 
                 # heat maps by trial
@@ -257,8 +256,8 @@ class BayesianDecoderVisualizer:
                                       [0, np.shape(value['data'][m])[1]]]
                 axes[ax_dict[2 + ind * 4 + bound_ind]] = sns.heatmap(value['data'][m].T, cmap=value['cmap'],
                                                                      ax=axes[ax_dict[2 + ind * 4 + bound_ind]],
-                                                                     vmin=0.25 * np.nanmin(value['data'][m]),
-                                                                     vmax=0.75 * np.nanmax(value['data'][m]),
+                                                                     vmin=0 * all_limits_balanced[0],
+                                                                     vmax=0.5 * all_limits_balanced[1],
                                                                      cbar_kws={'pad': 0.01, 'label': key,
                                                                                'fraction': 0.046})
                 axes[ax_dict[2 + ind * 4 + bound_ind]].plot(update_time_values[0], update_time_values[1],
@@ -267,7 +266,10 @@ class BayesianDecoderVisualizer:
                 axes[ax_dict[2 + ind * 4 + bound_ind]].invert_yaxis()
                 axes[ax_dict[2 + ind * 4 + bound_ind]].set(xticks=time_tick_labels,
                                                            xticklabels=time_tick_values[time_tick_labels],
-                                                           xlabel='Time around update (s)', ylabel=f'trials')
+                                                           ylabel=f'trials')
+                if (2 + ind * 4 + bound_ind) == len(ax_dict):
+                    axes[ax_dict[2 + ind * 4 + bound_ind]].set(xlabel='Time around update (s)')
+
                 bound_ind = + 1
 
 
@@ -332,7 +334,7 @@ class SessionVisualizer(BayesianDecoderVisualizer):
            DDDEEE
            DDDEEE
            """
-        axes = plt.figure(figsize=(15, 15)).subplot_mosaic(mosaic)
+        axes = plt.figure(figsize=(10, 10)).subplot_mosaic(mosaic)
         label = self.data.feature_names[0]
         range = self.data.bins[-1] - self.data.bins[0]
 
@@ -394,13 +396,13 @@ class SessionVisualizer(BayesianDecoderVisualizer):
             MMOO
             QQSS
             """
-            axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
+            axes = plt.figure().subplot_mosaic(mosaic)
             feature_name = self.data.feature_names[0]
             self.plot_1d_around_update(self.data.aligned_data['switch'][feature_name], nbins, window, 'switch',
                                        feature_name, 'b', axes, ['A', 'E', 'I', 'M', 'Q'])
             self.plot_1d_around_update(self.data.aligned_data['stay'][feature_name], nbins, window, 'stay',
                                        feature_name, 'm', axes, ['C', 'G', 'K', 'O', 'S'])
-            plt.suptitle(f'{self.data.results_io.session_id} decoding around update trials', fontsize=20)
+            plt.suptitle(f'{self.data.results_io.session_id} decoding around update trials')
             plt.tight_layout()
 
             kwargs = self.data.results_io.get_figure_args(f'decoding_around_update', results_type='session')
@@ -414,12 +416,12 @@ class SessionVisualizer(BayesianDecoderVisualizer):
                     AB
                     CD
                     """
-                axes = plt.figure(figsize=(16, 8)).subplot_mosaic(mosaic)
+                axes = plt.figure().subplot_mosaic(mosaic)
                 self.plot_2d_around_update(self.data.aligned_data['switch'], time_bin, times, 'switch', 'b', axes,
                                            ['A', 'B'])
                 self.plot_2d_around_update(self.data.aligned_data['stay'], time_bin, times, 'stay', 'm', axes,
                                            ['C', 'D'])
-                plt.suptitle(f'{self.data.results_io.session_id} decoding around update trials', fontsize=20)
+                plt.suptitle(f'{self.data.results_io.session_id} decoding around update trials')
                 plt.tight_layout()
 
                 filename = f'decoding_around_update_frame_no{time_bin}'
@@ -486,20 +488,21 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 self.plot_group_confusion_matrices(data, name)
                 self.plot_parameter_comparison(data, name, thresh_params=True)
 
+                # plot stay vs. switch trials
+                self.plot_group_aligned_data(data, name)
+
+                # plot correct vs. incorrect trial types
+                # self.plot_group_aligned_data(data, name,  plot_groups=dict(turn_type=[[1], [2], [1, 2]],
+                #                                                            correct=[[0], [1], [0, 1]]))
+                # self.plot_group_aligned_quantification(data, name, plot_groups=dict(turn_type=[[1], [2], [1, 2]],
+                #                                                                     correct=[[0], [1], [0, 1]]))
+
                 for iter_list in itertools.product(*self.threshold_params.values()):
                     thresh_mask = pd.concat([data[k] >= v for k, v in zip(self.threshold_params.keys(), iter_list)],
                                             axis=1).all(axis=1)
                     subset_data = data[thresh_mask]
                     tags = '_'.join([f'{k}_{v}' for k, v in zip(self.threshold_params.keys(), iter_list)])
                     self.plot_all_confusion_matrices(subset_data, name, tags=tags)
-
-                # plot stay vs. switch trials
-                self.plot_group_aligned_data(data, name)
-                self.plot_group_aligned_quantification(data, name)
-
-                # plot correct vs. incorrect trial types
-                self.plot_group_aligned_data(data, name,  plot_groups=dict(turn_type=[[1], [2], [1, 2]], correct=[[0], [1], [0, 1]]))
-                self.plot_group_aligned_quantification(data, name, plot_groups=dict(turn_type=[[1], [2], [1, 2]], correct=[[0], [1], [0, 1]]))
         else:
             print(f'No data found to plot')
 
@@ -522,7 +525,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         mask_list = []
         for _, sess_data in param_data.iterrows():
             dict_list.append(sess_data['decoder'].aligned_data[key][feat])
-            update_only_trials = sess_data['decoder'].trials[sess_data['decoder'].trials['update_type'] == trial_type_dict[key]]
+            update_only_trials = sess_data['decoder'].trials[
+                sess_data['decoder'].trials['update_type'] == trial_type_dict[key]]
             mask_list.append(update_only_trials[group_name].isin(group_value))
 
         default = defaultdict(list)
@@ -672,7 +676,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         for name, data in group_data:
             nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
             ncols = 3  # 1 column for RMSE dist, 1 for error dist, 1 for confusion_matrix dist
-            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 15))
+            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10))
 
             # raw decoding errors
             title = 'Median raw error - all sessions'
@@ -693,12 +697,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                                col_ids=[2, 2, 2], xlabel=xlabel, title=title)
 
             # wrap up and save plot
-            fig.suptitle(f'Decoding error - all sessions - {name}', fontsize=14)
-            plt.tight_layout()
-            kwargs = self.results_io.get_figure_args(filename=f'group_error', additional_tags=f'{name}_{sub_group}',
-                                                     format='pdf')
-            plt.savefig(**kwargs)
-            plt.close()
+            fig.suptitle(f'Decoding error - all sessions - {name}')
+            self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_error', additional_tags=f'{name}_{sub_group}')
 
     def plot_parameter_comparison(self, data, name, thresh_params=False):
         # select no threshold data to plot if thresholds indicated, otherwise combine
@@ -719,7 +719,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         nrows = len(list(itertools.combinations(params_to_compare, r=2)))  # 1 row for each parameter combo
         ncols = 3  # 1 column for RMSE dist, 1 for error dist, 1 for confusion_matrix dist
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(8, 16), squeeze=False)
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(7.5, 10), squeeze=False)
         error_metrics = dict(raw_error=0, rmse=1, confusion_matrix_sum=2)
 
         # plot heatmaps comparing parameters (1 heatmap/2 parameters)
@@ -739,17 +739,14 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             row += 1
 
         # wrap up and save plot
-        fig.suptitle(f'Parameter comparison - median all sessions - {name}', fontsize=14)
-        plt.tight_layout()
+        fig.suptitle(f'Parameter comparison - median all sessions - {name}')
         tags = '_'.join([''.join(str(n)) for n in name])
-        kwargs = self.results_io.get_figure_args(filename=f'group_param_comparison', additional_tags=tags, format='pdf')
-        plt.savefig(**kwargs)
-        plt.close()
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_param_comparison', additional_tags=tags)
 
         # plot heatmaps for all parameters
         nrows = len(params_to_compare)  # 1 row for each parameter combo
         ncols = 3  # 1
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 12), squeeze=False)
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False)
         for row, par in enumerate(params_to_compare):
             for err, col in error_metrics.items():
                 other_keys = [p for p in params_to_compare if p not in [par]]
@@ -761,13 +758,9 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 if row == 0:
                     axes[row][col].set_title(f'Parameter median {err}')
 
-        fig.suptitle(f'Parameter comparison - median all sessions - {name}', fontsize=14)
-        plt.tight_layout()
+        fig.suptitle(f'Parameter comparison - median all sessions - {name}')
         tags = '_'.join([''.join(str(n)) for n in name])
-        kwargs = self.results_io.get_figure_args(filename=f'group_param_comparison_all', additional_tags=tags,
-                                                 format='pdf')
-        plt.savefig(**kwargs)
-        plt.close()
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_param_comparison_all', additional_tags=tags)
 
     def plot_all_confusion_matrices(self, data, name, tags=None):
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
@@ -775,7 +768,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             plot_num = 0
             counter = 0
             ncols, nrows = [6, 3]
-            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 8))
+            fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
             for _, row in param_data.iterrows():
                 sess_matrix = row['confusion_matrix']
                 sess_data = row['decoder']
@@ -785,16 +778,12 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     vmax = 2
 
                 if (counter % (ncols * nrows) == 0) and (counter != 0):
-                    fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}', fontsize=14)
-                    plt.tight_layout()
+                    fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}')
                     param_tags = '_'.join([f'{p}_{n}' for p, n in zip(self.params, param_name)])
                     add_tags = f'{tags}_{"_".join(["".join(n) for n in name])}_{param_tags}_plot{plot_num}'
-                    kwargs = self.results_io.get_figure_args(filename=f'all_confusion_matrices', additional_tags=add_tags,
-                                                             format='pdf')
-                    plt.savefig(**kwargs)
-                    plt.close()
+                    self.results_io.save_fig(fig=fig, axes=axes, filename=f'all_confusion_matrices', additional_tags=add_tags)
 
-                    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 8))
+                    fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
                     counter = 0
                     plot_num += 1
                 else:
@@ -838,20 +827,16 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     counter += 1
 
             # wrap up last plot after loop finished
-            fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}', fontsize=14)
-            plt.tight_layout()
+            fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}')
             param_tags = '_'.join([f'{p}_{n}' for p, n in zip(self.params, param_name)])
             add_tags = f'{tags}_{"_".join(["".join(n) for n in name])}_{param_tags}_plot{plot_num}'
-            kwargs = self.results_io.get_figure_args(filename=f'all_confusion_matrices', additional_tags=add_tags,
-                                                     format='pdf')
-            plt.savefig(**kwargs)
-            plt.close()
+            self.results_io.save_fig(fig=fig, axes=axes, filename=f'all_confusion_matrices', additional_tags=add_tags)
 
     def plot_group_confusion_matrices(self, data, name):
         # loop through all the parameters and plot one confusion matrix for all sessions for each
         plot_num, counter = (0, 0)
-        ncols, nrows = (6, 3)
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 8))
+        ncols, nrows = (4, 1)
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False)
         sorted_df = self._sort_group_confusion_matrices(data)
 
         for _, sorted_data in sorted_df.iterrows():
@@ -864,15 +849,11 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
             # plot the data
             if (counter % (ncols * nrows) == 0) and (counter != 0):
-                fig.suptitle(f'Confusion matrices - all parameters - {name}', fontsize=14)
-                plt.tight_layout()
+                fig.suptitle(f'Confusion matrices - all parameters - {name}')
                 tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
-                kwargs = self.results_io.get_figure_args(filename=f'group_confusion_matrices', additional_tags=tags,
-                                                         format='pdf')
-                plt.savefig(**kwargs)
-                plt.close()
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
 
-                fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 8))
+                fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
                 counter = 0
                 plot_num += 1
             else:
@@ -883,7 +864,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 if np.size(sorted_data['confusion_matrix']):
                     matrix = np.vstack(sorted_data['confusion_matrix']) * len(
                         sorted_data['bins']) - 1  # scale to be probability/chance
-                    if isinstance(sorted_data['bins'],list):
+                    if isinstance(sorted_data['bins'], list):
                         limits = [np.min(np.array(sorted_data['bins'])), np.max(np.array(sorted_data['bins']))]
                     else:
                         limits = [np.min(sorted_data['bins'].astype(int)), np.max(sorted_data['bins'].astype(int))]
@@ -917,15 +898,12 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 counter += 1
 
         # wrap up last plot after loop finished
-        fig.suptitle(f'Confusion matrices - all parameters - {name}', fontsize=14)
-        plt.tight_layout()
+        fig.suptitle(f'Confusion matrices - all parameters - {name}')
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
-        kwargs = self.results_io.get_figure_args(filename=f'group_confusion_matrices', additional_tags=tags,
-                                                 format='pdf')
-        plt.savefig(**kwargs)
-        plt.close()
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
 
-    def plot_group_aligned_data(self, data, name, trial_types=['switch', 'stay'], plot_groups=dict(turn_type=[[1], [2], [1, 2]])):
+    def plot_group_aligned_data(self, data, name, trial_types=['switch', 'stay'],
+                                plot_groups=dict(turn_type=[[1], [2], [1, 2]])):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
@@ -934,72 +912,29 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
             for group_name, group_value in plot_groups.items():
                 for val in group_value:
-                    # make plots
-                    mosaic = """
-                    AACC
-                    EEGG
-                    IIKK
-                    MMOO
-                    QQSS
-                    """
-                    axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-                    data_type_1 = self._get_group_aligned_data(param_data, trial_types[0], feat, group_name, val)
-                    data_type_2 = self._get_group_aligned_data(param_data, trial_types[1], feat, group_name, val)
-                    self.plot_1d_around_update(data_type_1, nbins, window, trial_types[0], feat, 'b', axes,
-                                               ['A', 'E', 'I', 'M', 'Q'],
-                                               feature_name=feat, prob_map_axis=1)
-                    self.plot_1d_around_update(data_type_2, nbins, window, trial_types[1], feat, 'm', axes,
-                                               ['C', 'G', 'K', 'O', 'S'],
-                                               feature_name=feat, prob_map_axis=1)
-
-                    # save figure
-                    plt.tight_layout()
-                    tags = f'{"_".join(["".join(n) for n in name])}_{group_name}{val}' \
-                           f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                    kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data', additional_tags=tags,
-                                                             format='pdf')
-                    plt.savefig(**kwargs)
-                    plt.close('all')
-
-    def plot_group_aligned_quantification(self, data, name, trial_types=['switch', 'stay'], plot_groups=dict(turn_type=[[1], [2], [1, 2]])):
-        feat = data['feature'].values[0]
-        param_group_data = data.groupby(self.params)  # main group is what gets the different plots
-        for param_name, param_data in param_group_data:
-
-            # get data quantifications
-            window = param_data['decoder'].values[0].aligned_data_window
-            nbins = param_data['decoder'].values[0].aligned_data_nbins
-
-            for group_name, group_value in plot_groups.items():
-                for val in group_value:
-                    # make plots
-                    mosaic = """
-                                AABB
-                                CCDD
-                                EEFF
-                                GGHH
-                                IIJJ
-                                KKLL
-                                MMNN
-                                OOPP
-                                """
-                    axes = plt.figure(figsize=(20, 15)).subplot_mosaic(mosaic)
-                    data_quant_1 = self._quantify_aligned_data(param_data, trial_types[0], feat, group_name, val)
-                    data_quant_2 = self._quantify_aligned_data(param_data, trial_types[1], feat, group_name, val)
-                    self.plot_quantification_around_update(data_quant_1, nbins, window, trial_types[0], feat, axes,
-                                                           ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O'])
-                    self.plot_quantification_around_update(data_quant_2, nbins, window, trial_types[1], feat, axes,
-                                                           ['B', 'D', 'F', 'H', 'J', 'L', 'N', 'P'])
-
-                    # save figure
-                    plt.tight_layout()
-                    tags = f'{"_".join(["".join(n) for n in name])}_{group_name}{val}' \
-                           f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                    kwargs = self.results_io.get_figure_args(filename=f'group_aligned_data_quantification',
-                                                             additional_tags=tags,
-                                                             format='pdf')
-                    plt.savefig(**kwargs)
-                    plt.close('all')
+                    for trials in trial_types:
+                        # make plots
+                        mosaic = """
+                                    AABB
+                                    CCDD
+                                    EEFF
+                                    GGHH
+                                    """
+                        axes = plt.figure().subplot_mosaic(mosaic)
+                        data_type = self._get_group_aligned_data(param_data, trials, feat, group_name, val)
+                        data_quant = self._quantify_aligned_data(param_data, trials, feat, group_name, val)
+                        bounds = [v['bound_values'] for v in data_quant_1.values()]
+                        self.plot_1d_around_update(data_type, nbins, window, trials, feat, axes,
+                                                   ['A', 'C', 'E', 'G'],
+                                                   feature_name=feat, prob_map_axis=1, bounds=bounds)
+                        self.plot_quantification_around_update(data_quant, nbins, window, trials, feat, axes,
+                                                               ['B', 'D', 'F', 'H'])
+                        # save figure
+                        plt.tight_layout()
+                        tags = f'{"_".join(["".join(n) for n in name])}_{group_name}{val}_{trials}' \
+                               f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+                        fig = axes['A'].get_figure()
+                        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
 
     def plot_tuning_curves(self, data, name):
         feat = data['feature'].values[0]
@@ -1008,8 +943,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         data_const_decoding = data[data['decoder_bins'] == data['decoder_bins'].values[0]]
         param_group_data = data_const_decoding.groupby(tuning_curve_params)
         plot_num, counter = (0, 0)
-        nrows, ncols = (3, 3)
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10), squeeze=False)
+        nrows, ncols = (1, 3)
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False)
         for param_name, param_data in param_group_data:
             group_tuning_curve_df = self._get_group_tuning_curves(param_data)
             tuning_curve_mat = np.stack(group_tuning_curve_df['tuning_curve'].values)
@@ -1026,15 +961,11 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
             # plot the data
             if (counter % (ncols * nrows) == 0) and (counter != 0):
-                fig.suptitle(f'Feature tuning curves - {name}', fontsize=14)
-                plt.tight_layout()
+                fig.suptitle(f'Feature tuning curves - {name}')
                 tags = f'{tags}_plot{plot_num}'
-                kwargs = self.results_io.get_figure_args(filename=f'group_tuning_curves', additional_tags=tags,
-                                                         format='pdf')
-                plt.savefig(**kwargs)
-                plt.close()
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=tags)
 
-                fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10))
+                fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
                 counter = 0
                 plot_num += 1
             else:
@@ -1062,15 +993,11 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     axes[row_id][col_id].set_xlabel(f'{feat}')
                 if col_id == 0:
                     axes[row_id][col_id].set_ylabel(f'Units')
-                if col_id == (ncols - 1):
+                if col_id == (ncols - 1) or counter == len(param_name):
                     plt.colorbar(im, ax=axes[row_id][col_id], pad=0.04, location='right', fraction=0.046,
                                  label='Normalized firing rate')
                 counter += 1
 
         # save figure
-        fig.suptitle(f'Feature tuning curves - {name}', fontsize=14)
-        plt.tight_layout()
-        kwargs = self.results_io.get_figure_args(filename=f'group_tuning_curves', additional_tags=tags,
-                                                 format='pdf')
-        plt.savefig(**kwargs)
-        plt.close('all')
+        fig.suptitle(f'Feature tuning curves - {name}')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=tags)
