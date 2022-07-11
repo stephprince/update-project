@@ -133,8 +133,8 @@ class BayesianDecoderVisualizer:
             axes[ax_dict[1]].legend(loc='upper left')
             axes[ax_dict[1]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
 
-            axes[ax_dict[2]].plot(times, stats['error']['mean'], color='r', label='|True - decoded|')
-            axes[ax_dict[2]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color='r',
+            axes[ax_dict[2]].plot(times, stats['error']['mean'], color=self.colors['error'], label='|True - decoded|')
+            axes[ax_dict[2]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color=self.colors['error'],
                                           label='95% CI')
             axes[ax_dict[2]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k',
                                   alpha=0.25)
@@ -211,11 +211,11 @@ class BayesianDecoderVisualizer:
         data_split = dict(initial=dict(data=quantification_data['left'],
                                        color=self.colors['switch'],
                                        cmap=self.colors['switch_cmap'],
-                                       conversion=1),  # multiplier to use for bar plots
+                                       conversion=-1),  # multiplier to use for bar plots
                           switched=dict(data=quantification_data['right'],
                                         color=self.colors['stay'],
                                         cmap=self.colors['stay_cmap'],
-                                        conversion=-1))
+                                        conversion=1))
 
         # add labels for bound_values, threshold
         metrics = ['prob_sum']  # thresh-crossing was another option but not plotting that for now
@@ -238,7 +238,7 @@ class BayesianDecoderVisualizer:
                 axes[ax_dict[0 + ind * 4]].fill_between(times, stats[m]['err_lower'], stats[m]['err_upper'], alpha=0.2,
                                                         color=value['color'], label='95% CI')
                 axes[ax_dict[0 + ind * 4]].plot([0, 0], err_limits, linestyle='dashed', color='k', alpha=0.25)
-                axes[ax_dict[0 + ind * 4]].set(xlim=[-window, window], ylim=err_limits,
+                axes[ax_dict[0 + ind * 4]].set(xlim=[-window, window], ylim=err_limits, xlabel='Time around update(s)',
                                                ylabel=key)
                 axes[ax_dict[0 + ind * 4]].legend(loc='upper left')
                 axes[ax_dict[0 + ind * 4]].set_title(f'{title} trials - {label} - {m}', fontsize=14)
@@ -248,7 +248,7 @@ class BayesianDecoderVisualizer:
                                                yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
                 axes[ax_dict[1 + ind * 4]].bar(x=times, height=stats[m]['mean'] * value['conversion'],
                                                yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
-                axes[ax_dict[1 + ind * 4]].set(ylim=err_limits_balanced, ylabel=m)
+                axes[ax_dict[1 + ind * 4]].set(ylim=err_limits_balanced, ylabel=m, xlabel='Time around update(s)',)
                 axes[ax_dict[1 + ind * 4]].legend(loc='upper left')
 
                 # heat maps by trial
@@ -257,14 +257,14 @@ class BayesianDecoderVisualizer:
                 axes[ax_dict[2 + ind * 4 + bound_ind]] = sns.heatmap(value['data'][m].T, cmap=value['cmap'],
                                                                      ax=axes[ax_dict[2 + ind * 4 + bound_ind]],
                                                                      vmin=0 * all_limits_balanced[0],
-                                                                     vmax=0.5 * all_limits_balanced[1],
+                                                                     vmax=0.4 * all_limits_balanced[1],
                                                                      cbar_kws={'pad': 0.01, 'label': key,
                                                                                'fraction': 0.046})
                 axes[ax_dict[2 + ind * 4 + bound_ind]].plot(update_time_values[0], update_time_values[1],
                                                             linestyle='dashed',
                                                             color=[0, 0, 0, 0.5])
                 axes[ax_dict[2 + ind * 4 + bound_ind]].invert_yaxis()
-                axes[ax_dict[2 + ind * 4 + bound_ind]].set(xticks=time_tick_labels,
+                axes[ax_dict[2 + ind * 4 + bound_ind]].set(xticks=time_tick_labels, xlabel='Time around update(s)',
                                                            xticklabels=time_tick_values[time_tick_labels],
                                                            ylabel=f'trials')
                 if (2 + ind * 4 + bound_ind) == len(ax_dict):
@@ -492,10 +492,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 self.plot_group_aligned_data(data, name)
 
                 # plot correct vs. incorrect trial types
-                # self.plot_group_aligned_data(data, name,  plot_groups=dict(turn_type=[[1], [2], [1, 2]],
-                #                                                            correct=[[0], [1], [0, 1]]))
-                # self.plot_group_aligned_quantification(data, name, plot_groups=dict(turn_type=[[1], [2], [1, 2]],
-                #                                                                     correct=[[0], [1], [0, 1]]))
+                self.plot_group_aligned_data(data, name,  plot_groups=dict(turn_type=[[1], [2], [1, 2]],
+                                                                           correct=[[0], [1], [0, 1]]))
 
                 for iter_list in itertools.product(*self.threshold_params.values()):
                     thresh_mask = pd.concat([data[k] >= v for k, v in zip(self.threshold_params.keys(), iter_list)],
@@ -923,7 +921,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                         axes = plt.figure().subplot_mosaic(mosaic)
                         data_type = self._get_group_aligned_data(param_data, trials, feat, group_name, val)
                         data_quant = self._quantify_aligned_data(param_data, trials, feat, group_name, val)
-                        bounds = [v['bound_values'] for v in data_quant_1.values()]
+                        bounds = [v['bound_values'] for v in data_quant.values()]
                         self.plot_1d_around_update(data_type, nbins, window, trials, feat, axes,
                                                    ['A', 'C', 'E', 'G'],
                                                    feature_name=feat, prob_map_axis=1, bounds=bounds)
