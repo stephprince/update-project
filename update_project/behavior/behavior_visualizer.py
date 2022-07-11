@@ -132,6 +132,7 @@ class BehaviorVisualizer:
 
             for name, group in group_data:
                 var_data = group[group['var'] == var]
+                row_id = 0
                 #row_id = [ind + 1 for ind, k in enumerate(self.virtual_track.mappings['update_type'].values()) if k == name[0]][0]
                 col_id = [ind for ind, k in enumerate(aligned_df['start_label'].unique()) if k == name[1]][0]
                 cleaned_data = [v for v in var_data['aligned_data'].values if len(np.shape(v)) == 2]
@@ -142,19 +143,19 @@ class BehaviorVisualizer:
                     stats = get_fig_stats(aligned_data, axis=0)
 
                     # plot averages
-                    axes[0][col_id].plot(times, stats['mean'], color=self.colors[name[0]], label=f'{name[0]} mean')
-                    axes[0][col_id].fill_between(times, stats['lower'], stats['upper'], alpha=0.2,
+                    axes[row_id][col_id].plot(times, stats['mean'], color=self.colors[name[0]], label=f'{name[0]} mean')
+                    axes[row_id][col_id].fill_between(times, stats['lower'], stats['upper'], alpha=0.2,
                                                       color=self.colors[name[0]])
 
                     # plot individual traces
-                    axes[row_id][col_id].plot(times, aligned_data.T, color=turn_colors[name[2]], alpha=0.1,
+                    axes[row_id + 1][col_id].plot(times, aligned_data.T, color=self.colors[name[0]], alpha=0.1,
                                                   linewidth=0.5)
 
                     # add dashed lines for time alignment
                     if name[2] == 'right':
-                        axes[0][col_id].plot([0, 0], [np.min(stats['lower']), np.max(stats['upper'])], color='k',
+                        axes[row_id][col_id].plot([0, 0], [np.min(stats['lower']), np.max(stats['upper'])], color='k',
                                                   linestyle='dashed')
-                        axes[row_id][col_id].plot([0, 0], [np.min(aligned_data), np.max(aligned_data)], color='k',
+                        axes[row_id + 1][col_id].plot([0, 0], [np.min(aligned_data), np.max(aligned_data)], color='k',
                                                        linestyle='dashed')
 
                 # add plot labels and row/col specific info
@@ -164,8 +165,8 @@ class BehaviorVisualizer:
                 if col_id == 0:
                     axes[row_id][col_id].set_ylabel(name[0])
                 else:
-                    sns.despine(ax=axes[0][col_id], left=True)
-                    sns.despine(ax=axes[row_id][col_id], left=True)  # need to set time to be the same then
+                    sns.despine(ax=axes[row_id][col_id], left=True)
+                    sns.despine(ax=axes[row_id + 1][col_id], left=True)  # need to set time to be the same then
 
             # save figure
             # axes[0][ncols - 1].legend(loc='upper right')  # TODO - set x and y lim

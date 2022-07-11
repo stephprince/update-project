@@ -19,19 +19,18 @@ def clean_plot(fig, axes):
         ax_list = list(axes.values())
 
     for axi in ax_list:
-        axi.set_xticks(axi.get_xticks())  # fix x-ticks so that despine trimming doesn't move them too much
-        axi.set_yticks(axi.get_yticks())  # fix y-ticks so that despine trimming doesn't move them too much
+        xlim = axi.get_xlim()
+        ylim = axi.get_ylim()
+
         axi.set_xlabel(axi.get_xlabel().replace("_", " "))
         axi.set_ylabel(axi.get_ylabel().replace("_", " "))
+        axi.set_title(axi.get_title().replace("_", " "))
 
-        # tick_labels = [item.get_text() for item in axi.get_xticklabels()]
-        # axi.set_xticklabels([l.replace("_", " ") for l in tick_labels])
+        axi.spines['left'].set_bounds(ylim)
+        axi.spines['bottom'].set_bounds(xlim)
 
-        # handles, labels = axi.get_legend_handles_labels()
-        # new_labels = [l.replace("_", " ") for l in labels]
-        # axi.legend(handles, new_labels)
+    sns.despine(fig=fig, offset=5)
 
-    sns.despine(fig=fig, offset=5, trim=True)
     fig.tight_layout()
 
 def get_limits_from_data(data, balanced=True):
@@ -50,14 +49,22 @@ def get_limits_from_data(data, balanced=True):
     return limits
 
 def get_color_theme():
+    # found perceptually uniform brightness colors with: https://www.hsluv.org
     color_theme_dict = dict()
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)  # rocket is cool too?
-    color_theme_dict['control'] = 'k'
-    color_theme_dict['switch'] = '#5070db'  # 260 in degrees, 75 saturation, 50 light
-    color_theme_dict['stay'] = '#da3b46'  # 10 in degrees, 75 saturation, 50 light
+    color_theme_dict['control'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
+    color_theme_dict['left'] = '#2594f6'  # 250 in degrees, 95 saturation, 60 light
+    color_theme_dict['right'] = '#da3b46'  # 12 in degrees, 95 saturation, 60 light
+    color_theme_dict['stay'] = '#1ea477'  # 152 in degrees, 95 saturation, 60 light
+    color_theme_dict['switch'] = '#927ff9'  # 270 in degrees, 95 saturation, 60 light
+    color_theme_dict['stay_update'] = color_theme_dict['stay']
+    color_theme_dict['switch_update'] = color_theme_dict['switch']
+    color_theme_dict['non_update'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
+    color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
     color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)
     color_theme_dict['stay_cmap'] = sns.light_palette(color_theme_dict['stay'], as_cmap=True)
-    color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(260, 10, s=75, l=50, as_cmap=True)
+    color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(270, 152, s=95, l=60, as_cmap=True)
+    color_theme_dict['left_right_cmap_div'] = sns.diverging_palette(250, 12, s=95, l=60, as_cmap=True)
     color_theme_dict['animals'] = sns.color_palette("husl", 7)
 
     return color_theme_dict

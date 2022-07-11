@@ -9,11 +9,11 @@ axes.linewidth: 1.25
 axes.spines.top: False
 axes.spines.right: False
 #axes.prop_cycle: cycler('color', ['4C72B0', '55A868', 'C44E52', '8172B2', 'CCB974', '64B5CD'])
-axes.prop_cycle: cycler('color', ['#f77189', '#bb9832', '#50b131', '#36ada4', '#3ba3ec', '#e866f4'])
+axes.prop_cycle: cycler('color', ['f77189', 'bb9832', '50b131', '36ada4', '3ba3ec', 'e866f4'])
 
 image.cmap: rocket_r
 
-legend.fontsize: 10
+legend.fontsize: 8
 legend.frameon: False
 legend.numpoints: 1
 legend.scatterpoints: 1
