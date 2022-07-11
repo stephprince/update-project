@@ -5,7 +5,7 @@ from scipy.interpolate import griddata, interp1d
 
 
 def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=0.0, stop_window=0.0,
-                     step=0.01, time_offset=None):
+                      step=0.01, time_offset=None):
     start_times_all = trials[start_label][:]  # TODO - may need to change to DF
     stop_times_all = trials[stop_label][:]
     start_times = start_times_all[np.logical_and(~np.isnan(stop_times_all), ~np.isnan(start_times_all))]
@@ -20,7 +20,7 @@ def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=
         offset = time_offset or start  # center to start time by default
         idx_start = bisect(timestamps, start + start_window*2)  # extra time for interpolation's sake
         idx_stop = bisect(timestamps, stop + stop_window*2, lo=idx_start)
-        data_aligned = np.array(data[idx_start:idx_stop]) - offset
+        data_aligned = np.array(data[idx_start:idx_stop])
         time_aligned = np.array(timestamps[idx_start:idx_stop]) - offset
 
         # interpolate data interval to make even sampling rate

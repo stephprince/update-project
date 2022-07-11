@@ -21,9 +21,9 @@ class BehaviorAnalyzer:
         self.analog_vars = params.get('analog_vars', ['rotational_velocity', 'translational_velocity', 'licks'])
         self.maze_ids = params.get('maze_ids', [4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
-        self.trial_window = params.get('trial_window', 30)  # number of trials to use for rolling calculations
-        self.align_window_start = params.get('align_window_start', -1.0)  # seconds to add before/after aligning window
-        self.align_window_stop = params.get('align_window_stop', 1.0)  # seconds to add before/after aligning window
+        self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
+        self.align_window_start = params.get('align_window_start', -2.0)  # seconds to add before/after aligning window
+        self.align_window_stop = params.get('align_window_stop', 2.0)  # seconds to add before/after aligning window
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',
                                                       'stop_time'])
 
@@ -77,6 +77,8 @@ class BehaviorAnalyzer:
             data = group_data.reset_index(drop=True)  # TODO - determine if I want to have min bin length to use data
             rolling = data['correct'].rolling(self.trial_window, min_periods=self.trial_window).mean()
             binned = data['correct'].groupby(data['correct'].index // self.trial_window).mean()
+            if len(data['correct']) % self.trial_window:  # if any leftover trials getting included in last bin
+                binned = binned[:-1]
 
             proportion_correct.append(dict(prop_correct=rolling.values,
                                            type='rolling',
@@ -129,19 +131,23 @@ class BehaviorAnalyzer:
         for key, value in self.data.items():
             for ind, label in enumerate(self.align_times[:-1]):  # skip last align times so only until stop of trial
                 start_label = label
-                stop_label = self.align_times[ind + 1]
+                # stop_label = self.align_times[ind + 1]
                 series_list = get_series_from_timeseries(value)
                 for s in series_list:
-                    groups = self.trials.groupby(['update_type'])
+                    groups = self.trials.groupby(['update_type', 'turn_type'])
                     for name, group_data in groups:
-                        data, times = interp_timeseries(s, group_data, start_label=start_label, stop_label=stop_label,
-                                                        start_window=self.align_window_start, stop_window=self.align_window_stop)
+                        align_window_stop = self.align_window_stop
+                        if start_label == 't_choice_made':
+                            align_window_stop = 0  # if choice made, don't grab data past bc could be end of trial
+                        data, times = interp_timeseries(s, group_data, start_label=start_label, stop_label=start_label,
+                                                        start_window=self.align_window_start, stop_window=align_window_stop)
                         aligned_data.append(dict(var=s.name,
                                                  start_label=start_label,
-                                                 stop_label=stop_label,
+                                                 stop_label=start_label,
                                                  aligned_data=data,
                                                  aligned_times=times,
-                                                 update_type=self.virtual_track.mappings['update_type'][str(name)]))
+                                                 update_type=self.virtual_track.mappings['update_type'][str(name[0])],
+                                                 turn_type=self.virtual_track.mappings['turn_type'][str(name[1])]))
 
         self.aligned_data = aligned_data
 

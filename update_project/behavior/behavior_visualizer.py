@@ -7,7 +7,7 @@ import warnings
 from pathlib import Path
 
 from update_project.results_io import ResultsIO
-from update_project.general.plots import plot_distributions
+from update_project.general.plots import plot_distributions, get_color_theme
 from update_project.statistics import get_fig_stats
 from update_project.virtual_track import UpdateTrack
 
@@ -17,11 +17,13 @@ class BehaviorVisualizer:
         self.data = data
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
         self.virtual_track = UpdateTrack()
+        self.colors = get_color_theme()
 
         # get session visualization info
         for sess_dict in self.data:
             sess_dict.update(proportion_correct=sess_dict['behavior'].proportion_correct)
             sess_dict.update(trajectories=sess_dict['behavior'].trajectories)
+            sess_dict.update(aligned_data=sess_dict['behavior'].aligned_data)
 
             #sess_dict.update(example_period=self._get_example_period(sess_dict['behavior']))
 
@@ -30,10 +32,7 @@ class BehaviorVisualizer:
     def plot(self):
         self.plot_proportion_correct()
         self.plot_trajectories()
-        self.plot_data_around_update()
-
-    def _get_example_period(self, behavioral_data):
-        test = 1
+        self.plot_aligned_data()
 
     def plot_proportion_correct(self):
         # explode df so each prop correct value has one row (duplicates for each session/animal
@@ -66,30 +65,30 @@ class BehaviorVisualizer:
 
         # wrap up and save plot
         for col in range(ncols):
-            axes[0][col].set_xlim((0,1))
-            axes[1][col].set_xlim((0,1))
-            axes[2][col].set_ylim((0,1))
-        fig.suptitle(f'Behavioral performance - all animals', fontsize=14)
-        plt.tight_layout()
-        kwargs = self.results_io.get_figure_args(filename=f'performance', format='pdf')
-        plt.savefig(**kwargs)
-        plt.close()
+            axes[1][col].set_xlim((0, 1))
+            axes[2][col].set_ylim((0, 1))
+            axes[1][col].plot([0.5, 0.5], axes[1][col].get_ylim(), linestyle='dashed', color=[0, 0, 0, 0.5])
+            axes[2][col].plot(axes[2][col].get_xlim(), [0.5, 0.5], linestyle='dashed', color=[0, 0, 0, 0.5])
+
+        # save figure
+        fig.suptitle(f'Behavioral performance - all animals')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance')
 
     def plot_trajectories(self):
         temp_df = self.group_df[['animal', 'trajectories']].explode('trajectories').reset_index(drop=True)
         trajectory_df = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['trajectories']))], axis=1)
 
         vars_to_plot = ['x_position', 'view_angle', *self.data[0]['behavior'].analog_vars]
-        turn_colors = dict(left='b', right='r')
-        ncols = len(vars_to_plot)  # 1 col for each var
-        nrows = 3*2  # 1 column for each update type (non, switch, stay) * indiv + averages
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 15))
+        turn_colors = dict(left=self.colors['left'], right=self.colors['right'])
+        ncols = 3*2  # 1 column for each update type (non, switch, stay) * indiv + averages
+        nrows = len(vars_to_plot)  # 1 col for each var
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(22, 17))
 
         group_data = trajectory_df.groupby(['update_type', 'turn_type'])
         for name, group in group_data:
-            row_id = [ind*2 for ind, k in enumerate(self.virtual_track.mappings['update_type'].values()) if k == name[0]][0]
+            col_id = [ind*2 for ind, k in enumerate(self.virtual_track.mappings['update_type'].values()) if k == name[0]][0]
 
-            for col_id, var in enumerate(vars_to_plot):
+            for row_id, var in enumerate(vars_to_plot):
                 y_position = pd.DataFrame(list(group[var]))  # TODO - check bins match for all animals
                 y_labels = y_position.columns.mid.values
                 stats = get_fig_stats(np.array(y_position), axis=0)
@@ -97,50 +96,78 @@ class BehaviorVisualizer:
                 # plot averages
                 axes[row_id][col_id].plot(y_labels, stats['mean'], color=turn_colors[name[1]], label=f'{name[1]} mean')
                 axes[row_id][col_id].fill_between(y_labels, stats['lower'], stats['upper'], alpha=0.2,
-                                                color=turn_colors[name[1]], label=f'{name[1]} 95% CI')
+                                                    color=turn_colors[name[1]], label=f'{name[1]} 95% CI')
                 axes[row_id][col_id].set_ylabel(name[0])
                 axes[row_id][col_id].set_title(var, fontsize=14)
 
                 # plot individual traces
-                axes[row_id + 1][col_id].plot(y_labels, np.array(y_position).T, color=turn_colors[name[1]], alpha=0.1)
+                axes[row_id][col_id + 1].plot(y_labels, np.array(y_position).T, color=turn_colors[name[1]], alpha=0.1)
 
                 if row_id + 1 == nrows - 1:
-                    axes[row_id + 1][col_id].set_xlabel('y_position')
+                    axes[row_id][col_id].set_xlabel('y_position')
+                    axes[row_id][col_id + 1].set_xlabel('y_position')
 
         axes[0][col_id].legend(loc='upper right')
 
         # save figure
-        fig.suptitle(f'Trajectories', fontsize=14)
-        plt.tight_layout()
-        kwargs = self.results_io.get_figure_args(filename=f'trajectories', format='pdf')
-        plt.savefig(**kwargs)
-        plt.close()
+        fig.suptitle(f'Trajectories')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'trajectories')
 
-    def plot_data_around_update(self):
-        # TODO - this code is from Grace's project, need to adapt
-        # fig = plt.figure(constrained_layout=True, figsize=(20, 10))
-        # ax = fig.add_subplot(111)
-        fig_1, ax_1 = plt.subplots(nrows=1, ncols=1)
-        for idx, trace in enumerate(view_angle_around_update):
-            print("idx = {}, len = {}".format(idx, len(trace)))  # the length of the traces are not uniform - ERROR
-            time_from_aligned = time_around_update[idx] - time_around_update[idx][0] - 5
-            if trace[-1] > 0.0:
-                ax_1.plot(time_from_aligned, trace, color='red', alpha=0.4)  # alpha controls transparency, 1.0 = opaque
-            else:
-                ax_1.plot(time_from_aligned, trace, color='blue', alpha=0.4)
+    def plot_aligned_data(self):
+        temp_df = self.group_df[['animal', 'aligned_data']].explode('aligned_data').reset_index(drop=True)
+        aligned_df = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['aligned_data']))], axis=1)
+        vars_to_plot = ['x_position', 'view_angle', *self.data[0]['behavior'].analog_vars]
+        turn_colors = dict(left=self.colors['left'], right=self.colors['right'])
 
-        # plot vertical dashed line down the middle
-        vertical_dashed_line_x = np.zeros(100)
-        vertical_dashed_line_y = np.linspace(start=-0.8, stop=0.8, num=100)
-        ax_1.plot(vertical_dashed_line_x, vertical_dashed_line_y, color='black', linestyle='dashed', alpha=0.5)
+        # plot just the data around the update cue (1 plot for all variables)
+        # ncols = 3  # 1 column for each update type (non, switch, stay)
+        # nrows = len(vars_to_plot) * 2  # 1 row for each variable * 2 (1 indiv, 1 for averages)
 
-        ax_1.set_title("View Angle Line Plot")
-        ax_1.set_xlabel("Position Around Update")  # units? is this time? where does update happen?
-        ax_1.set_ylabel("View Angle (rad)")
-        ax_1.set_xlim([-5.0, 5.0])
-        ax_1.set_ylim([-0.8, 0.8])
+        # plot of all aligned timepoints in the tasks (1 plot for each variable)
+        group_data = aligned_df.groupby(['update_type', 'start_label', 'turn_type'])
+        for var in vars_to_plot:
+            ncols = len(aligned_df['start_label'].unique())  # 1 col for each aligned time
+            nrows = 2  # 1 row for each update type (non, switch, stay) indiv + 1 row for averages
+            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharey='row')
 
-        plt.show()
+            for name, group in group_data:
+                var_data = group[group['var'] == var]
+                #row_id = [ind + 1 for ind, k in enumerate(self.virtual_track.mappings['update_type'].values()) if k == name[0]][0]
+                col_id = [ind for ind, k in enumerate(aligned_df['start_label'].unique()) if k == name[1]][0]
+                cleaned_data = [v for v in var_data['aligned_data'].values if len(np.shape(v)) == 2]
 
-    def plot_example_period(self):
-        test = 1
+                if np.size(cleaned_data):
+                    aligned_data = np.vstack(cleaned_data)
+                    times = var_data['aligned_times'].values[0]
+                    stats = get_fig_stats(aligned_data, axis=0)
+
+                    # plot averages
+                    axes[0][col_id].plot(times, stats['mean'], color=self.colors[name[0]], label=f'{name[0]} mean')
+                    axes[0][col_id].fill_between(times, stats['lower'], stats['upper'], alpha=0.2,
+                                                      color=self.colors[name[0]])
+
+                    # plot individual traces
+                    axes[row_id][col_id].plot(times, aligned_data.T, color=turn_colors[name[2]], alpha=0.1,
+                                                  linewidth=0.5)
+
+                    # add dashed lines for time alignment
+                    if name[2] == 'right':
+                        axes[0][col_id].plot([0, 0], [np.min(stats['lower']), np.max(stats['upper'])], color='k',
+                                                  linestyle='dashed')
+                        axes[row_id][col_id].plot([0, 0], [np.min(aligned_data), np.max(aligned_data)], color='k',
+                                                       linestyle='dashed')
+
+                # add plot labels and row/col specific info
+                axes[0][col_id].set_title(name[1])
+                if row_id + 1 == nrows - 1:
+                    axes[row_id + 1][col_id].set_xlabel('Time  (s)')
+                if col_id == 0:
+                    axes[row_id][col_id].set_ylabel(name[0])
+                else:
+                    sns.despine(ax=axes[0][col_id], left=True)
+                    sns.despine(ax=axes[row_id][col_id], left=True)  # need to set time to be the same then
+
+            # save figure
+            # axes[0][ncols - 1].legend(loc='upper right')  # TODO - set x and y lim
+            fig.suptitle(f'Aligned data')
+            self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', format='pdf')
