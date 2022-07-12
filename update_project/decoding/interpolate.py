@@ -39,7 +39,7 @@ def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset,
         if flip_bool:
             values = -values
 
-        fxn = interp1d(times, values, kind='linear')
+        fxn = interp1d(times, values, kind='linear', bounds_error=False)
         interpolated_position.append(fxn(new_times))
 
     return interpolated_position

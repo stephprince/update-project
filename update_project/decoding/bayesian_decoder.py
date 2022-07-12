@@ -37,7 +37,8 @@ class BayesianDecoder:
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
-
+        self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',
+                                                      'stop_time'])
         # setup data
         self.feature_names = features
         self.trials = nwbfile.trials.to_dataframe()
@@ -47,11 +48,12 @@ class BayesianDecoder:
 
         # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
+        self.features_to_flip = []
         self.flip_trials_by_turn = False  # default false
         if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 2
-        if self.feature_names[0] in ['x_position', 'view_angle', 'choice', 'turn_type']:
+        if self.feature_names[0] in self.features_to_flip:
             self.flip_trials_by_turn = True  # flip data by turn type for averaging
 
         # setup decoding/encoding functions based on dimensions
@@ -75,17 +77,17 @@ class BayesianDecoder:
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
-                                                 'feature_names', 'linearized_features' ],
+                                                 'feature_names', 'linearized_features', 'flip_trials_by_turn', ],
                                            format='npz'))
 
     def run_decoding(self, overwrite=False):
         print(f'Decoding data for session {self.results_io.session_id}...')
 
         if overwrite:
-            self._preprocess()._encode()._decode()   # build model
-            self._align_by_times()                   # align data by times
-            self._summarize()                        # generate summary data
-            self._export_data()                      # save output data
+            self._preprocess()._encode()._decode()  # build model
+            self._align_by_times()  # align data by times
+            self._summarize()  # generate summary data
+            self._export_data()  # save output data
         else:
             if self._data_exists() and self._params_match():
                 self._load_data()  # load data structure if it exists and matches the params
@@ -139,7 +141,7 @@ class BayesianDecoder:
         translational_velocity = nwbfile.acquisition['translational_velocity'].data
         velocity = np.abs(rotational_velocity[:]) + np.abs(translational_velocity[:])
         rate = nwbfile.acquisition['translational_velocity'].rate
-        timestamps = np.arange(0, len(velocity)/rate, 1/rate)
+        timestamps = np.arange(0, len(velocity) / rate, 1 / rate)
         velocity = pd.Series(index=timestamps[:], data=velocity)
 
         return velocity
@@ -157,7 +159,7 @@ class BayesianDecoder:
 
             # get intervals where movement crosses speed threshold
             breaks = np.where(np.hstack((True, np.diff(movement_by_trial), True)))[0]
-            breaks[-1] = breaks[-1] - 1 # subtract one index to get closest to final trial stop time
+            breaks[-1] = breaks[-1] - 1  # subtract one index to get closest to final trial stop time
             index = pd.IntervalIndex.from_breaks(movement_by_trial.index[breaks])
             movements_df = pd.DataFrame(movement_by_trial[index.left].to_numpy(), index=index, columns=['moving'])
 
@@ -226,7 +228,7 @@ class BayesianDecoder:
 
         # check that split is ok for binarized data, run different random states until it is
         if self.convert_to_binary and not self._train_test_split_ok(train_df, test_df):
-            train_df, test_df = self._train_test_split(random_state=random_state+1)  # use new random state
+            train_df, test_df = self._train_test_split(random_state=random_state + 1)  # use new random state
 
         return train_df, test_df
 
@@ -297,68 +299,92 @@ class BayesianDecoder:
 
         return self
 
-    def _align_by_times(self, trial_types=['switch', 'stay'], times='t_update', nbins=50, window=5):
+    def _align_by_times(self, trial_types=['non_update', 'switch', 'stay'], nbins=50, window=5):
         print(f'Aligning data for session {self.results_io.session_id}...')
 
-        trial_type_dict = dict(nonupdate=1, switch=2, stay=3)
-        output = dict()
+        trial_type_dict = dict(non_update=1, switch=2, stay=3)
+        output = []
         for trial_name in trial_types:
             trials_to_agg = self.test_df[self.test_df['update_type'] == trial_type_dict[trial_name]]
 
-            mid_times = trials_to_agg[times]
-            new_times = np.linspace(-window, window, num=nbins)
-            if self.flip_trials_by_turn:
-                trials_to_flip = trials_to_agg['turn_type'] == 1  # left trials, flip so all values the same way
-            else:
-                trials_to_flip = trials_to_agg['turn_type'] == 100  # set all to false
+            for time_label in self.align_times[:-1]:  # skip last align times so only until stop of trial
+                window_start, window_stop = window, window
+                if time_label == 't_choice_made':
+                    window_stop = 0  # if choice made, don't grab data past bc could be end of trial
+                elif time_label == 'start_time':
+                    window_start = 0
+                new_times = np.linspace(-window_start, window_stop, num=nbins)
 
-            # add extra index step to stop locs for interpolation and go one index earlier for start locs
-            feat_start_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times - window) - 1
-            decoding_start_locs = self.decoded_values.index.searchsorted(mid_times - window) - 1
-            feat_stop_locs = self.features_test[self.feature_names[0]].index.searchsorted(mid_times + window) + 1
-            decoding_stop_locs = self.decoded_values.index.searchsorted(mid_times + window) + 1
-
-            feat_interp = dict()
-            decoding_interp = dict()
-            decoding_error = dict()
-            probability = dict()
-            for name in self.feature_names:
-                if self.decoded_values.any().any():
-                    feat_interp[name] = interp1d_time_intervals(self.features_test[name],
-                                                                feat_start_locs, feat_stop_locs,
-                                                                new_times, mid_times, trials_to_flip)
-                    decoding_interp[name] = interp1d_time_intervals(self.decoded_values, decoding_start_locs,
-                                                                    decoding_stop_locs,
-                                                                    new_times, mid_times, trials_to_flip)
-                    decoding_error[name] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
-                                            zip(feat_interp[name], decoding_interp[name])]
-
-                    if self.dim_num == 1:
-                        probability[name] = griddata_time_intervals(self.decoded_probs, decoding_start_locs,
-                                                                    decoding_stop_locs,
-                                                                    nbins, trials_to_flip, mid_times)
-                    elif self.dim_num == 2:
-                        probability[name] = griddata_2d_time_intervals(self.decoded_probs, self.bins,
-                                                                       self.decoding_values.index.values,
-                                                                       decoding_start_locs, decoding_stop_locs,
-                                                                       mid_times, nbins,
-                                                                       trials_to_flip)
+                mid_times = trials_to_agg[time_label]
+                turns = trials_to_agg['turn_type'][~mid_times.isna()].values
+                outcomes = trials_to_agg['correct'][~mid_times.isna()].values
+                if self.flip_trials_by_turn:
+                    trials_to_flip = trials_to_agg['turn_type'][~mid_times.isna()] == 1  # left trials, flip so all values the same way
                 else:
-                    feat_interp[name] = []
-                    decoding_interp[name] = []
-                    decoding_error[name] = []
-                    probability[name] = []
+                    trials_to_flip = trials_to_agg['turn_type'][~mid_times.isna()] == 100  # set all to false
+                mid_times.dropna(inplace=True)
 
-            # get means and sem
-            data = dict()
-            for name in self.feature_names:
-                data[name] = dict(feature=np.array(feat_interp[name]).T,
-                                  decoding=np.array(decoding_interp[name]).T,
-                                  error=np.array(decoding_error[name]).T, )
-                data[name].update(stats={k: get_fig_stats(v, axis=1) for k, v in data[name].items()})
-                data[name].update(probability=probability[name])
+                # add extra index step to stop locs for interpolation and go one index earlier for start locs
+                feat_start_locs = self.features_test[self.feature_names[0]].index.searchsorted(
+                    mid_times - window_start) - 1
+                decoding_start_locs = self.decoded_values.index.searchsorted(mid_times - window_start) - 1
+                feat_start_locs[feat_start_locs < 0] = 0  # catch for cases too close to start of trial
+                decoding_start_locs[decoding_start_locs < 0] = 0  # catch for cases too close to start of trial
+                feat_stop_locs = self.features_test[self.feature_names[0]].index.searchsorted(
+                    mid_times + window_stop) + 1
+                decoding_stop_locs = self.decoded_values.index.searchsorted(mid_times + window_stop) + 1
 
-            output.update({trial_name: data})
+                feat_interp = dict()
+                decoding_interp = dict()
+                decoding_error = dict()
+                probability = dict()
+                for name in self.feature_names:
+                    if self.decoded_values.any().any() and mid_times.any():
+                        feat_interp[name] = interp1d_time_intervals(self.features_test[name],
+                                                                    feat_start_locs, feat_stop_locs,
+                                                                    new_times, mid_times, trials_to_flip)
+                        decoding_interp[name] = interp1d_time_intervals(self.decoded_values, decoding_start_locs,
+                                                                        decoding_stop_locs,
+                                                                        new_times, mid_times, trials_to_flip)
+                        decoding_error[name] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
+                                                zip(feat_interp[name], decoding_interp[name])]
+
+                        if self.dim_num == 1:
+                            probability[name] = griddata_time_intervals(self.decoded_probs, decoding_start_locs,
+                                                                        decoding_stop_locs,
+                                                                        nbins, trials_to_flip, mid_times)
+                        elif self.dim_num == 2:
+                            probability[name] = griddata_2d_time_intervals(self.decoded_probs, self.bins,
+                                                                           self.decoding_values.index.values,
+                                                                           decoding_start_locs, decoding_stop_locs,
+                                                                           mid_times, nbins,
+                                                                           trials_to_flip)
+                    else:
+                        feat_interp[name] = []
+                        decoding_interp[name] = []
+                        decoding_error[name] = []
+                        probability[name] = []
+                        turns = []
+                        outcomes = []
+
+                # get means and sem
+                data = dict()
+                for name in self.feature_names:
+                    assert np.shape(np.array(feat_interp[name]))[0] == np.shape(turns)[0]
+                    data = dict(feature_name=name,
+                                update_type=trial_name,
+                                time_label=time_label,
+                                feature=np.array(feat_interp[name]),
+                                decoding=np.array(decoding_interp[name]),
+                                error=np.array(decoding_error[name]),
+                                probability=probability[name],
+                                turn_type=turns,
+                                correct=outcomes,
+                                window_start=window,
+                                window_stop=window_stop)
+                    data.update(stats={k: get_fig_stats(v, axis=1) for k, v in data.items()
+                                       if k in ['feature', 'decoding', 'error']})
+                output.append(data)
 
         self.aligned_data = output
         self.aligned_data_window = window
