@@ -54,9 +54,9 @@ class UpdateTrack(VirtualTrack):
                          view_angle={'home left max': -np.pi / 4, 'home right max': np.pi / 4},
                          y_position={'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35,
                                      'delay2 cue': 250.35, 'choice cue': 255})
-    choice_boundaries = dict(x_position={'left': (-33, -2), 'right': (2, 33)},
+    choice_boundaries = dict(x_position={'left': (-33, -1), 'right': (1, 33)},
                              y_position={'left': (255, 298), 'right': (298, 341)},
-                             view_angle={'left': (-np.pi, -np.pi / 4), 'right': (np.pi/4, np.pi)},
+                             view_angle={'left': (-np.pi,  2 * -np.pi / 9), 'right': (2 * np.pi/9, np.pi)},  # 40 deg
                              choice={'left': (-2, 0), 'right': (0, 2)},
                              turn_type={'left': (-2, 0), 'right': (0, 2)})  # TODO - check accurate
     mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},
