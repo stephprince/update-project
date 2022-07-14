@@ -74,32 +74,41 @@ class BayesianDecoderVisualizer:
 
         return data_exists
 
-    def plot_1d_around_update(self, data_around_update, nbins, window, title, label, axes,
-                              ax_dict, feature_name=None, prob_map_axis=0, bounds=[]):
-        if self._check_data_exists(data_around_update['probability']):  # skip if there is no data
-            feature_name = feature_name or self.data.feature_names[0]
-            if feature_name in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
-                cmap_pos = self.colors['switch_stay_cmap_div']
-                scaling_value = 0.5
-                balanced = True
-            elif feature_name in ['y_position']:  # sequential color map for seq data
-                cmap_pos = 'Greys'
-                scaling_value = 1
-                balanced = False
+    def plot_1d_around_update(self, data_around_update, quantification_data, nbins, window, title, label, axes,
+                              row_id, col_id, feature_name=None, prob_map_axis=0, bounds=[]):
+        # get color mappings
+        data_split = dict(left=dict(data=quantification_data['left'],
+                                       color=self.colors['left'],
+                                       cmap=self.colors['left_cmap']),
+                          right=dict(data=quantification_data['right'],
+                                        color=self.colors['right'],
+                                        cmap=self.colors['right_cmap']))
 
+        feature_name = feature_name or self.data.feature_names[0]
+        if feature_name in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
+            cmap_pos = self.colors['left_right_cmap_div']
+            scaling_value = 0.5
+            balanced = True
+        elif feature_name in ['y_position']:  # sequential color map for seq data
+            cmap_pos = 'Greys'
+            scaling_value = 1
+            balanced = False
+
+        if self._check_data_exists(data_around_update['probability']):  # skip if there is no data
             prob_map = np.nanmean(data_around_update['probability'], axis=prob_map_axis)
             if prob_map_axis == 1:
                 prob_map = prob_map.T
 
             stats = data_around_update['stats']
-            mean_limits = get_limits_from_data([stats['feature']['lower'], stats['feature']['upper'],
-                                                stats['decoding']['lower'], stats['decoding']['upper']],
-                                               balanced=balanced)
             limits = get_limits_from_data([data_around_update['feature']], balanced=balanced)
+            err_limits = get_limits_from_data(
+                [(v['data']['stats']['prob_sum']['err_lower'], v['data']['stats']['prob_sum']['err_upper'])
+                 for k, v in data_split.items()], balanced=False)
+            all_limits_balanced = get_limits_from_data([v['data']['prob_sum'] for v in data_split.values()])
             times = np.linspace(-window, window, num=nbins)
             time_tick_values = times.astype(int)
             n_position_bins = np.shape(prob_map)[0]
-            data_values = np.linspace(np.min(data_around_update['decoding']), np.max(data_around_update['decoding']),
+            data_values = np.linspace(np.nanmin(data_around_update['decoding']), np.nanmax(data_around_update['decoding']),
                                       n_position_bins)
 
             pos_values_after_update = np.sum(
@@ -107,51 +116,75 @@ class BayesianDecoderVisualizer:
                 axis=0)
             sort_index = np.argsort(pos_values_after_update)
 
-            im = axes[ax_dict[0]].imshow(prob_map, cmap=self.colors['cmap'], origin='lower', aspect='auto',
+            im = axes[row_id[0]][col_id[0]].imshow(prob_map, cmap=self.colors['cmap'], origin='lower', aspect='auto',
                                          vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
                                          extent=[-window, window, data_values[0], data_values[-1]])
-            axes[ax_dict[0]].plot([0, 0], [data_values[0], data_values[-1]], linestyle='dashed', color=[0, 0, 0, 0.5])
-            axes[ax_dict[0]].invert_yaxis()
-            axes[ax_dict[0]].set(xlabel='Time around update (s)', ylabel=f'{label}', xlim=[-window, window],
+            axes[row_id[0]][col_id[0]].plot([0, 0], [data_values[0], data_values[-1]], linestyle='dashed', color=[0, 0, 0, 0.5])
+            axes[row_id[0]][col_id[0]].invert_yaxis()
+            axes[row_id[0]][col_id[0]].set(xlabel='Time around update (s)', ylabel=f'{label}', xlim=[-window, window],
                                  ylim=[data_values[0], data_values[-1]])
-            axes[ax_dict[0]].set_title(f'{title} trials - probability density - {label}', fontsize=14)
-            plt.colorbar(im, ax=axes[ax_dict[0]], label='probability density', pad=0.01, location='right',
+            axes[row_id[0]][col_id[0]].set_title(f'{title} trials - probability density - {label}', fontsize=14)
+            plt.colorbar(im, ax=axes[row_id[0]][col_id[0]], label='probability density', pad=0.01, location='right',
                          fraction=0.046)
             for b in bounds:
-                axes[ax_dict[0]].plot([-window, window], [b[0], b[0]], linestyle='dashed', color=[0, 0, 0, 0.5])
-                axes[ax_dict[0]].plot([-window, window], [b[1], b[1]], linestyle='dashed', color=[0, 0, 0, 0.5])
+                axes[row_id[0]][col_id[0]].plot([-window, window], [b[0], b[0]], linestyle='dashed', color=[0, 0, 0, 0.5],
+                                                linewidth=0.5)
+                axes[row_id[0]][col_id[0]].plot([-window, window], [b[1], b[1]], linestyle='dashed', color=[0, 0, 0, 0.5],
+                                                linewidth=0.5)
 
-            axes[ax_dict[1]].plot(times, stats['feature']['mean'], color=self.colors['control'], label='True position')
-            axes[ax_dict[1]].fill_between(times, stats['feature']['lower'], stats['feature']['upper'], alpha=0.2,
-                                          color='k', label='95% CI')
-            axes[ax_dict[1]].plot(times, stats['decoding']['mean'], color=self.colors[title], label='Decoded position')
-            axes[ax_dict[1]].fill_between(times, stats['decoding']['lower'], stats['decoding']['upper'], alpha=0.2,
-                                          color=self.colors[title], label='95% CI')
-            axes[ax_dict[1]].plot([0, 0], mean_limits, linestyle='dashed', color='k', alpha=0.25)
-            axes[ax_dict[1]].set(xlim=[-window, window], ylim=mean_limits, xlabel='Time around update(s)',
-                                 ylabel=f'{label}')
-            axes[ax_dict[1]].legend(loc='upper left')
-            axes[ax_dict[1]].set_title(f'{title} trials - decoded {label} position', fontsize=14)
-
-            axes[ax_dict[2]].plot(times, stats['error']['mean'], color=self.colors['error'], label='|True - decoded|')
-            axes[ax_dict[2]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color=self.colors['error'],
+            axes[row_id[1]][col_id[1]].plot(times, stats['error']['mean'], color=self.colors['error'], label='|True - decoded|')
+            axes[row_id[1]][col_id[1]].fill_between(times, stats['error']['lower'], stats['error']['upper'], alpha=0.2, color=self.colors['error'],
                                           label='95% CI')
-            axes[ax_dict[2]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k',
+            axes[row_id[1]][col_id[1]].plot([0, 0], [0, np.max(stats['error']['upper'])], linestyle='dashed', color='k',
                                   alpha=0.25)
-            axes[ax_dict[2]].set(xlim=[-window, window], ylim=[0, np.max(stats['error']['upper'])],
+            axes[row_id[1]][col_id[1]].set(xlim=[-window, window], ylim=[0, np.nanmax(stats['error']['upper'])],
                                  xlabel='Time around update(s)', ylabel=label)
-            axes[ax_dict[2]].set_title(f'{title} trials - decoding error {label}', fontsize=14)
-            axes[ax_dict[2]].legend(loc='upper left')
+            axes[row_id[1]][col_id[1]].set_title(f'{title} trials - decoding error {label}', fontsize=14)
+            axes[row_id[1]][col_id[1]].legend(loc='upper left')
 
-            im = axes[ax_dict[3]].imshow(data_around_update['feature'][:, sort_index].T, cmap=cmap_pos, origin='lower',
+            im = axes[row_id[2]][col_id[2]].imshow(data_around_update['feature'][:, sort_index], cmap=cmap_pos, origin='lower',
                                          vmin=scaling_value * limits[0], vmax=scaling_value * limits[1],
                                          extent=[-window, window, 0, len(sort_index)], aspect='auto')
-            axes[ax_dict[3]].plot([0, 0], [0, len(sort_index)], linestyle='dashed',
+            axes[row_id[2]][col_id[2]].plot([0, 0], [0, len(sort_index)], linestyle='dashed',
                                   color=[0, 0, 0, 0.5])
-            axes[ax_dict[3]].set(xlabel='Time around update (s)', ylabel='Trials')
-            axes[ax_dict[3]].set_title(f'{title} trials - true {label}', fontsize=14)
-            plt.colorbar(im, ax=axes[ax_dict[3]], label=f'{label} fraction', pad=0.01, location='right',
+            axes[row_id[2]][col_id[2]].set(xlabel='Time around update (s)', ylabel='Trials')
+            axes[row_id[2]][col_id[2]].set_title(f'{title} trials - true {label}', fontsize=14)
+            plt.colorbar(im, ax=axes[row_id[2]][col_id[2]], label=f'{label} fraction', pad=0.01, location='right',
                          fraction=0.046)
+
+            # add labels for bound_values, threshold
+            bound_ind = 0
+            for key, value in data_split.items():
+                stats = value['data']['stats']
+                times = np.linspace(-window, window, num=nbins)
+                time_tick_values = times.astype(int)
+
+                # line plots
+                axes[row_id[3]][col_id[3]].plot(times, stats['prob_sum']['mean'], color=value['color'], label=key)
+                axes[row_id[3]][col_id[3]].fill_between(times, stats['prob_sum']['err_lower'], stats['prob_sum']['err_upper'],
+                                             alpha=0.2, color=value['color'], label='95% CI')
+                axes[row_id[3]][col_id[3]].plot([0, 0], err_limits, linestyle='dashed', color='k', alpha=0.25)
+                axes[row_id[3]][col_id[3]].set(xlim=[-window, window], ylim=err_limits, xlabel='Time around update (s)', ylabel=key)
+                axes[row_id[3]][col_id[3]].legend(loc='upper left')
+                axes[row_id[3]][col_id[3]].set_title(f'{title} trials - {label} - prob_sum', fontsize=14)
+
+                # heat maps by trial
+                update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
+                                      [0, np.shape(value['data']['prob_sum'])[1]]]
+                im = axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].imshow(value['data']['prob_sum'], cmap=value['cmap'], origin='lower',
+                                             aspect='auto', extent=[-window, window, 0, len(value['data']['prob_sum'].T)],
+                                             vmin=0 * all_limits_balanced[0], vmax=0.4 * all_limits_balanced[1])
+                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].invert_yaxis()
+                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].plot(update_time_values[0], update_time_values[1], linestyle='dashed', color=[0, 0, 0, 0.5])
+                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].set(xlabel='Time around update(s)', xlim=[-window, window], ylabel=f'trials')
+                plt.colorbar(im, ax=axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]], label='probability', pad=0.01, location='right',
+                             fraction=0.046)
+
+                if (4 + bound_ind) == len(row_id):
+                    axes[row_id[4 + bound_ind][col_id[4 + bound_ind]]].set(xlabel='Time around update (s)')
+
+                bound_ind = + 1
+
 
     def plot_2d_around_update(self, data_around_update, time_bin, times, title, color, axes, ax_dict):
         stats = data_around_update['stats']
@@ -205,72 +238,6 @@ class BayesianDecoderVisualizer:
             axes[ax_dict[1]].set_title(f'{title} trials - probability density', fontsize=14)
             plt.colorbar(im, ax=axes[ax_dict[1]], label='Probability density', pad=0.04, location='right',
                          fraction=0.046)
-
-    def plot_quantification_around_update(self, quantification_data, nbins, window, title, label, axes,
-                                          ax_dict):
-        data_split = dict(initial=dict(data=quantification_data['left'],
-                                       color=self.colors['switch'],
-                                       cmap=self.colors['switch_cmap'],
-                                       conversion=-1),  # multiplier to use for bar plots
-                          switched=dict(data=quantification_data['right'],
-                                        color=self.colors['stay'],
-                                        cmap=self.colors['stay_cmap'],
-                                        conversion=1))
-
-        # add labels for bound_values, threshold
-        metrics = ['prob_sum']  # thresh-crossing was another option but not plotting that for now
-        for ind, m in enumerate(metrics):
-            bound_ind = 0
-            err_limits = get_limits_from_data([(v['data']['stats'][m]['err_lower'], v['data']['stats'][m]['err_upper'])
-                                               for k, v in data_split.items()], balanced=False)
-            err_limits_balanced = get_limits_from_data([v['data']['stats'][m]['mean'] for k, v in data_split.items()],
-                                                       balanced=True)
-            all_limits_balanced = get_limits_from_data([v['data'][m] for v in data_split.values()])
-
-            for key, value in data_split.items():
-                stats = value['data']['stats']
-                times = np.linspace(-window, window, num=nbins)
-                time_tick_values = times.astype(int)
-                time_tick_labels = np.array([0, int(len(time_tick_values) / 2), len(time_tick_values) - 1])
-
-                # line plots
-                axes[ax_dict[0 + ind * 4]].plot(times, stats[m]['mean'], color=value['color'], label=key)
-                axes[ax_dict[0 + ind * 4]].fill_between(times, stats[m]['err_lower'], stats[m]['err_upper'], alpha=0.2,
-                                                        color=value['color'], label='95% CI')
-                axes[ax_dict[0 + ind * 4]].plot([0, 0], err_limits, linestyle='dashed', color='k', alpha=0.25)
-                axes[ax_dict[0 + ind * 4]].set(xlim=[-window, window], ylim=err_limits, xlabel='Time around update(s)',
-                                               ylabel=key)
-                axes[ax_dict[0 + ind * 4]].legend(loc='upper left')
-                axes[ax_dict[0 + ind * 4]].set_title(f'{title} trials - {label} - {m}', fontsize=14)
-
-                # bar plots
-                axes[ax_dict[1 + ind * 4]].bar(x=times, height=stats[m]['mean'] * value['conversion'],
-                                               yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
-                axes[ax_dict[1 + ind * 4]].bar(x=times, height=stats[m]['mean'] * value['conversion'],
-                                               yerr=stats[m]['err'], fill=False, edgecolor=value['color'], label=key)
-                axes[ax_dict[1 + ind * 4]].set(ylim=err_limits_balanced, ylabel=m, xlabel='Time around update(s)',)
-                axes[ax_dict[1 + ind * 4]].legend(loc='upper left')
-
-                # heat maps by trial
-                update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
-                                      [0, np.shape(value['data'][m])[1]]]
-                axes[ax_dict[2 + ind * 4 + bound_ind]] = sns.heatmap(value['data'][m].T, cmap=value['cmap'],
-                                                                     ax=axes[ax_dict[2 + ind * 4 + bound_ind]],
-                                                                     vmin=0 * all_limits_balanced[0],
-                                                                     vmax=0.4 * all_limits_balanced[1],
-                                                                     cbar_kws={'pad': 0.01, 'label': key,
-                                                                               'fraction': 0.046})
-                axes[ax_dict[2 + ind * 4 + bound_ind]].plot(update_time_values[0], update_time_values[1],
-                                                            linestyle='dashed',
-                                                            color=[0, 0, 0, 0.5])
-                axes[ax_dict[2 + ind * 4 + bound_ind]].invert_yaxis()
-                axes[ax_dict[2 + ind * 4 + bound_ind]].set(xticks=time_tick_labels, xlabel='Time around update(s)',
-                                                           xticklabels=time_tick_values[time_tick_labels],
-                                                           ylabel=f'trials')
-                if (2 + ind * 4 + bound_ind) == len(ax_dict):
-                    axes[ax_dict[2 + ind * 4 + bound_ind]].set(xlabel='Time around update (s)')
-
-                bound_ind = + 1
 
 
 class SessionVisualizer(BayesianDecoderVisualizer):
@@ -488,12 +455,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 self.plot_group_confusion_matrices(data, name)
                 self.plot_parameter_comparison(data, name, thresh_params=True)
 
-                # plot stay vs. switch trials
-                self.plot_group_aligned_data(data, name)
-
                 # plot correct vs. incorrect trial types
-                self.plot_group_aligned_data(data, name,  plot_groups=dict(turn_type=[[1], [2], [1, 2]],
-                                                                           correct=[[0], [1], [0, 1]]))
+                self.plot_group_aligned_data(data, name)
 
                 for iter_list in itertools.product(*self.threshold_params.values()):
                     thresh_mask = pd.concat([data[k] >= v for k, v in zip(self.threshold_params.keys(), iter_list)],
@@ -515,35 +478,28 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         return group_summary_df
 
     @staticmethod
-    def _get_group_aligned_data(param_data, key, feat, group_name, group_value):
-        trial_type_dict = dict(switch=2, stay=3)
-
-        # compile aligned data (input data structure has to be dict of arrays
-        dict_list = []
-        mask_list = []
+    def _get_group_aligned_data(param_data):
+        # compile aligned data
+        num_trials = 0
+        aligned_data_list = []
         for _, sess_data in param_data.iterrows():
-            dict_list.append(sess_data['decoder'].aligned_data[key][feat])
-            update_only_trials = sess_data['decoder'].trials[
-                sess_data['decoder'].trials['update_type'] == trial_type_dict[key]]
-            mask_list.append(update_only_trials[group_name].isin(group_value))
+            for item in sess_data['decoder'].aligned_data:
+                aligned_data_list.append(dict(session_id=sess_data['session_id'],
+                                              animal=sess_data['animal'],
+                                              region=sess_data['region'],
+                                              **item))
+                num_trials = num_trials + len(item['turn_type'])
+        aligned_data_df = pd.DataFrame(aligned_data_list)
+        aligned_data_df.drop(['stats'], axis='columns', inplace=True)  # get rid of stats dict bc for session
+        data_to_explode = ['feature', 'decoding', 'error', 'probability', 'turn_type', 'correct']
+        other_cols = [col for col in aligned_data_df.columns.values if col not in data_to_explode]
+        exploded_df = pd.concat([aligned_data_df.explode(d).reset_index()[d] if d != 'feature'
+                                 else aligned_data_df[[*other_cols, 'feature']].explode(d).reset_index(drop=True)
+                                 for d in data_to_explode], axis=1)
+        exploded_df.dropna(axis='rows', inplace=True)
+        assert len(exploded_df) == num_trials, 'Number of expected trials does not match dataframe'
 
-        default = defaultdict(list)
-        for d, mask in zip(dict_list, mask_list):
-            for k, v in d.items():
-                if k not in ['stats', 'probability'] and np.size(v):
-                    assert np.shape(v)[1] == len(mask)
-                    default[k].append(v[:, mask])
-                elif k in ['probability'] and np.size(v):
-                    assert len(v) == len(mask)
-                    filtered_list = [item for (item, bool) in zip(v, mask) if bool]
-                    if filtered_list:
-                        default[k].append(filtered_list)
-
-        group_data = {k: np.hstack(v) for k, v in default.items() if k not in ['stats', 'probability']}
-        group_data.update(probability=np.moveaxis(np.vstack(default['probability']), 2, 0))
-        group_data.update(stats={k: get_fig_stats(v, axis=1) for k, v in group_data.items()})
-
-        return group_data
+        return exploded_df
 
     @staticmethod
     def _get_group_tuning_curves(param_data):
@@ -631,9 +587,24 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         return sorted_data
 
-    def _quantify_aligned_data(self, param_data, key, feat, group_name, val):
-        aligned_data = self._get_group_aligned_data(param_data, key, feat, group_name, val)
+    def _select_group_aligned_data(self, param_data, filter_dict):
+        group_aligned_df = self._get_group_aligned_data(param_data)
 
+        # filter for specific features
+        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
+        data_subset = group_aligned_df[mask]
+
+        if np.size(data_subset):
+            field_names = ['feature', 'decoding', 'error']
+            group_data = {n: np.vstack(data_subset[n]) for n in field_names}
+            group_data.update(probability=np.stack(data_subset['probability']))
+            group_data.update(stats={k: get_fig_stats(v, axis=0) for k, v in group_data.items()})
+        else:
+            group_data = None
+
+        return group_data
+
+    def _quantify_aligned_data(self, param_data, aligned_data):
         # get bounds to use to quantify choices
         bins = param_data['decoder'].values[0].bins
         virtual_track = param_data['decoder'].values[0].virtual_track
@@ -641,19 +612,25 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         prob_map = aligned_data['probability']
         prob_choice = dict()
+        num_bins = dict()
         for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-            start_bin = np.searchsorted(bins, bound_values[0])
-            stop_bin = np.searchsorted(bins, bound_values[1])
+            prob_map_bins = (bins[1:] + bins[:-1]) / 2
+            start_bin = np.searchsorted(prob_map_bins, bound_values[0])
+            stop_bin = np.searchsorted(prob_map_bins, bound_values[1])
 
             threshold = 0.1  # total probability density to call a left/right choice
-            integrated_prob = np.nansum(prob_map[:, :, start_bin:stop_bin], axis=2)  # (trials, feature bins, window)
+            integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
+            num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
+            assert len(bins) - 1 == np.shape(prob_map)[1], 'Bound bins not being sorted on right dimension'
 
             bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
                                         thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
-            bound_quantification.update(stats={k: get_fig_stats(v, axis=1) for k, v in bound_quantification.items()})
+            bound_quantification.update(stats={k: get_fig_stats(v, axis=0) for k, v in bound_quantification.items()})
             bound_quantification.update(bound_values=bound_values,
                                         threshold=threshold)
             prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
+
+        assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
 
         return prob_choice
 
@@ -900,39 +877,38 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
 
-    def plot_group_aligned_data(self, data, name, trial_types=['switch', 'stay'],
-                                plot_groups=dict(turn_type=[[1], [2], [1, 2]])):
+    def plot_group_aligned_data(self, data, name, plot_groups=dict(update_type=[['non_update'], ['switch'], ['stay']],
+                                                                   turn_type=[[1], [2], [1, 2]],
+                                                                   correct=[[0], [1], [0, 1]])):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
             window = param_data['decoder'].values[0].aligned_data_window
             nbins = param_data['decoder'].values[0].aligned_data_nbins
+            align_times = param_data['decoder'].values[0].align_times
 
-            for group_name, group_value in plot_groups.items():
-                for val in group_value:
-                    for trials in trial_types:
-                        # make plots
-                        mosaic = """
-                                    AABB
-                                    CCDD
-                                    EEFF
-                                    GGHH
-                                    """
-                        axes = plt.figure().subplot_mosaic(mosaic)
-                        data_type = self._get_group_aligned_data(param_data, trials, feat, group_name, val)
-                        data_quant = self._quantify_aligned_data(param_data, trials, feat, group_name, val)
-                        bounds = [v['bound_values'] for v in data_quant.values()]
-                        self.plot_1d_around_update(data_type, nbins, window, trials, feat, axes,
-                                                   ['A', 'C', 'E', 'G'],
-                                                   feature_name=feat, prob_map_axis=1, bounds=bounds)
-                        self.plot_quantification_around_update(data_quant, nbins, window, trials, feat, axes,
-                                                               ['B', 'D', 'F', 'H'])
-                        # save figure
-                        plt.tight_layout()
-                        tags = f'{"_".join(["".join(n) for n in name])}_{group_name}{val}_{trials}' \
-                               f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                        fig = axes['A'].get_figure()
-                        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
+            # TODO - make plots with sub window times, make plots combining L/R trials
+            for plot_types in list(itertools.product(*plot_groups.values())):
+                plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
+                title = '_'.join([''.join([k, str(v)]) for k, v in zip(plot_groups.keys(), plot_types)])
+
+                # make plots (1 row for each plot, 1 col for each align time)
+                ncols, nrows = (len(align_times[:-1]), 6)
+                fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
+                for ind, time_label in enumerate(align_times[:-1]):
+                    filter_dict = dict(time_label=[time_label], **plot_group_dict)
+                    group_aligned_data = self._select_group_aligned_data(param_data, filter_dict)
+                    if np.size(group_aligned_data) and group_aligned_data is not None:
+                        quant_aligned_data = self._quantify_aligned_data(param_data, group_aligned_data)
+                        bounds = [v['bound_values'] for v in quant_aligned_data.values()]
+                        self.plot_1d_around_update(group_aligned_data, quant_aligned_data, nbins, window, time_label, feat, axes,
+                                               row_id=np.arange(nrows), col_id=[ind] * nrows,
+                                               feature_name=feat, prob_map_axis=0, bounds=bounds)
+                # save figure
+                fig.suptitle(title)
+                tags = f'{"_".join(["".join(n) for n in name])}_{title}' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
 
     def plot_tuning_curves(self, data, name):
         feat = data['feature'].values[0]
