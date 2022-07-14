@@ -7,7 +7,7 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 def run_behavior_analysis():
     # setup flags
-    overwrite = False  # when False, this will only load data if the parameters match
+    overwrite = True  # when False, this will only load data if the parameters match
     plot = False  # this only plots on a session by session basis
     group = True  # this compiles the data for group plotting
 
