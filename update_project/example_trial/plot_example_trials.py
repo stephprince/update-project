@@ -20,7 +20,7 @@ def plot_example_trials():
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
 
-    n_trials = 1  # number of trials to plot from each trial type
+    n_trials = 2  # number of trials to plot from each trial type
     # loop through individual sessions
     for name in session_names:
         # load nwb file
@@ -102,33 +102,38 @@ def plot_example_trials():
             A
             A
             A
-            A
             B
-            C
             C
             C
             D
             E
             """
-            axes = plt.figure(figsize=(17, 22)).subplot_mosaic(mosaic, sharex=True)
             for plot_id, ind in enumerate(trial_type_inds):
+                axes = plt.figure(figsize=(17, 22)).subplot_mosaic(mosaic, sharex=True)
+
                 # plot raw ephys channels
-                channels_to_plot = channel_regions[np.r_[0:32, 96:128]]  # only plot first and last shank
-                for ch, reg in enumerate(channels_to_plot[::2]):  # skip every other channel to visualize
-                    axes['A'].plot(raw_times[ind]-raw_times[ind][0], raw_data[ind][:, ch] + 0.25 * ch, color=colors[reg], linewidth=0.5)
-                    axes['A'].plot(raw_times[ind]-raw_times[ind][0], raw_data[ind][:, ch] + 0.25 * ch, color=colors[reg], linewidth=0.5)
+                channel_inds = np.r_[0:32, 96:128]  # only plot first and last shank
+                for ch, reg, offset in zip(channel_inds, channel_regions[channel_inds], range(len(channel_inds))):
+                    if not ch % 4:  # skip every couple channels to visualize
+                        axes['A'].plot(raw_times[ind]-raw_times[ind][0], raw_data[ind][:, ch] - 1 *offset/4, color=colors[reg],
+                                    linewidth=0.5)
 
                 # plot filtered ephys from hippocampal ripple channel (to show theta)
-                axes['B'].plot(lfp_times[ind]-lfp_times[ind][0], lfp_data[ind][:, ripple_channel], linewidth=0.5)
-                axes['B'].plot(lfp_times[ind]-lfp_times[ind][0], theta_data[ind] + 1)
+                # axes['B'].plot(lfp_times[ind]-lfp_times[ind][0],
+                #                lfp_data[ind][:, ripple_channel]/np.max(lfp_data[ind][:, ripple_channel]),
+                #                linewidth=0.5, color=colors['CA1'], label='LFP from ripple ch')
+                axes['B'].plot(lfp_times[ind]-lfp_times[ind][0], theta_data[ind]/np.max(theta_data[ind]) + 2,
+                               color=colors['CA1'], label='theta band from ripple ch')
+                axes['B'].legend(loc='upper right')
 
                 # plot single unit activity
                 trial_spikes = [s[ind] for s in spikes_aligned]
                 note_times = {k: [v.iloc[ind]] for k, v in annotation_times.items()}
-                group_mapping = {'CA1': 1, 'PFC': 2}
+                group_mapping = {'CA1': 0, 'PFC': 1}
                 group_ids = [group_mapping[u] for u in unit_group]
                 show_start_aligned_psth(trial_spikes, note_times, group_ids, end=np.ptp(lfp_times[ind]),
-                                        axes=[axes['C']])
+                                        labels=np.array(list(group_mapping.keys())), axes=[axes['C']])
+                axes['C'].set(ylabel='Units')
 
                 # plot analog and digital channels
                 times = lfp_times[ind]-lfp_times[ind][0]
@@ -137,16 +142,19 @@ def plot_example_trials():
                 axes['D'].plot(times, dig_data[ind]['update'] + 3, color=colors['general'][2], label='update')
                 axes['D'].plot(times, lick_data[ind] / np.max(lick_data[ind]) + 4.5,
                                color=colors['general'][3], label='licks')
+                axes['D'].legend(loc='upper right')
 
                 # plot position
-                axes['E'].plot(vr_times[ind]-vr_times[ind][0], position_data[ind][:, 0], color=colors['general'][4])
-                axes['E'].plot(vr_times[ind]-vr_times[ind][0], position_data[ind][:, 1], color=colors['general'][5])
+                axes['E'].plot(vr_times[ind]-vr_times[ind][0], position_data[ind][:, 0], color=colors['general'][4], label='x_osition')
+                axes['E'].plot(vr_times[ind]-vr_times[ind][0], position_data[ind][:, 1], color=colors['general'][5], label='y_position')
+                axes['E'].legend()
+                axes['E'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
 
-            axes['A'].set_xlim([0, np.max(times)])
             axes['A'].set_title(f'Example trial with ephys - {trial_type_name} - {session_db.get_session_id(name)}')
             tags = f'{trial_type_name}_plot{plot_id}'
             fig = axes['A'].get_figure()
-            results_io.save_fig(fig=fig, axes=axes, filename=f'example-trial-with-ephys', additional_tags=tags)
+            results_io.save_fig(fig=fig, axes=axes, filename=f'example-trial-with-ephys', additional_tags=tags,
+                                results_type='session')
 
 
 if __name__ == '__main__':

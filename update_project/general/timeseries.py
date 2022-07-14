@@ -5,17 +5,30 @@ from bisect import bisect
 
 
 def align_by_time_intervals(time_series, time_intervals, start_label='start_time', stop_label='stop_time',
-                            start_window=0.0, stop_window=0.0):
-    start_times = time_intervals[start_label][:]  # TODO - may need to change to DF
+                            start_window=0.0, stop_window=0.0, return_timestamps=False):
+    start_times = time_intervals[start_label][:]
     stop_times = time_intervals[stop_label][:]
 
-    ts_by_trial = []
-    for start, stop in zip(start_times, stop_times):
-        idx_start = bisect(time_series.timestamps, start+start_window)
-        idx_stop = bisect(time_series.timestamps, stop_window, lo=idx_start)
-        ts_by_trial.append(time_series.data[idx_start:idx_stop, :])
+    if time_series.timestamps:
+        timestamps = time_series.timestamps
+    elif time_series.rate:
+        timestamps = np.arange(0, len(time_series.data) / time_series.rate, 1 / time_series.rate)
 
-    return ts_by_trial
+    ts_by_trial = []
+    timestamps_by_trial = []
+    for start, stop in zip(start_times, stop_times):
+        idx_start = bisect(timestamps, start+start_window)
+        idx_stop = bisect(timestamps, stop+stop_window, lo=idx_start)
+        if np.ndim(time_series.data) == 1:
+            ts_by_trial.append(time_series.data[idx_start:idx_stop] * time_series.conversion)
+        else:
+            ts_by_trial.append(time_series.data[idx_start:idx_stop, :] * time_series.conversion)
+        timestamps_by_trial.append(timestamps[idx_start:idx_stop])
+
+    if return_timestamps:
+        return ts_by_trial, timestamps_by_trial
+    else:
+        return ts_by_trial
 
 
 def get_series_from_timeseries(timeseries):

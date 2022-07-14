@@ -12,21 +12,21 @@ from update_project.decoding.bayesian_decoder_visualizer import SessionVisualize
 
 def run_bayesian_decoding():
     # setup flags
-    overwrite = False  # when False, this will only load data if the parameters match
+    overwrite = True  # when False, this will only load data if the parameters match
     plot = False  # this only plots on a session by session basis
     group = True  # this compiles the data for group plotting
-    parallel = False  # cannot use in conjunction with group currently
+    parallel = True 
 
     # setup sessions
     animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-    dates_included = []  # 210913
+    dates_included = []  # 210913  ran 210511
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['view_angle']
-    regions = [['PFC']]  # run PFC later
+    features = ['view_angle', 'y_position']
+    regions = [['PFC'], ['HPC']]  # run PFC later
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bins=[40, 60],
                           decoder_bins=[0.050, 0.25])
