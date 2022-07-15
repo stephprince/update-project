@@ -15,7 +15,7 @@ from update_project.general.timeseries import align_by_time_intervals as align_b
 def plot_example_trials():
     # setup sessions
     animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-    dates_included = [210913]  # 210913
+    dates_included = [210520]  # 210913
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
@@ -32,9 +32,10 @@ def plot_example_trials():
         # get example trials
         trials_df = nwbfile.trials.to_dataframe()
         mask = pd.concat([trials_df['update_type'] == 1, trials_df['maze_id'] == 4], axis=1).all(axis=1)
-        trial_inds_dict = dict(non_update=np.array(trials_df.index[mask][:n_trials]),
+        trial_inds_raw = dict(non_update=np.array(trials_df.index[mask][:n_trials]),
                                switch=np.array(trials_df.index[trials_df['update_type'] == 2][:n_trials]),
                                stay=np.array(trials_df.index[trials_df['update_type'] == 3][:n_trials]))
+        trial_inds_dict = {k: v for k, v in trial_inds_raw.items() if np.size(v)}
         trial_inds_df = pd.DataFrame(trial_inds_dict).melt()
         trial_inds_df.sort_values('value', inplace=True, ignore_index=True)
         trial_inds = trial_inds_df['value'].values
@@ -47,9 +48,9 @@ def plot_example_trials():
 
         # get acquisition data
         print(f'Loading acquisition data for {session_db.get_session_id(name)}...')
-        raw_data, raw_times = align_by_time_intervals_ts(nwbfile.acquisition['raw_ecephys'],
-                                                         nwbfile.intervals['trials'][trial_inds],
-                                                         return_timestamps=True)
+        # raw_data, raw_times = align_by_time_intervals_ts(nwbfile.acquisition['raw_ecephys'],
+        #                                                  nwbfile.intervals['trials'][trial_inds],
+        #                                                  return_timestamps=True)
         lfp_data, lfp_times = align_by_time_intervals_ts(nwbfile.processing['ecephys']['LFP']['LFP'],
                                                          nwbfile.intervals['trials'][trial_inds],
                                                          return_timestamps=True)
@@ -84,7 +85,10 @@ def plot_example_trials():
             cue_ts, delay_ts, update_ts = np.zeros(len(lfp_times[ind])), np.zeros(len(lfp_times[ind])), np.zeros(
                 len(lfp_times[ind]))
             cue_on = np.logical_and(lfp_times[ind] >= df['start_time'], lfp_times[ind] <= df['t_delay'])
-            delay_on = np.logical_and(lfp_times[ind] >= df['t_delay'], lfp_times[ind] <= df['t_update'])
+            if row['variable'] == 'non_update':
+                delay_on = np.logical_and(lfp_times[ind] >= df['t_delay'], lfp_times[ind] <= df['t_choice_made'])
+            else:
+                delay_on = np.logical_and(lfp_times[ind] >= df['t_delay'], lfp_times[ind] <= df['t_update'])
             update_on = np.logical_and(lfp_times[ind] >= df['t_update'], lfp_times[ind] <= df['t_delay2'])
             delay_2_on = np.logical_and(lfp_times[ind] >= df['t_delay2'], lfp_times[ind] <= df['t_choice_made'])
             cue_ts[cue_on] = 1
@@ -95,7 +99,7 @@ def plot_example_trials():
         # plot example trials
         print(f'Plotting example data for {session_db.get_session_id(name)}...')
         colors = get_color_theme()
-        for trial_type_name in ['non_update', 'switch', 'stay']:
+        for trial_type_name in list(trial_inds_dict.keys()):
             trial_type_inds = np.array(trial_inds_df.index[trial_inds_df['variable'] == trial_type_name])
             mosaic = """
             A
@@ -115,13 +119,12 @@ def plot_example_trials():
                 channel_inds = np.r_[0:32, 96:128]  # only plot first and last shank
                 for ch, reg, offset in zip(channel_inds, channel_regions[channel_inds], range(len(channel_inds))):
                     if not ch % 4:  # skip every couple channels to visualize
-                        axes['A'].plot(raw_times[ind]-raw_times[ind][0], raw_data[ind][:, ch] - 1 *offset/4, color=colors[reg],
-                                    linewidth=0.5)
+                        axes['A'].plot(lfp_times[ind]-lfp_times[ind][0], lfp_data[ind][:, ch] - 1 *offset/4, color=colors[reg],
+                                       linewidth=0.5)
+                        # axes['A'].plot(raw_times[ind]-raw_times[ind][0], raw_data[ind][:, ch] - 1 *offset/4, color=colors[reg],
+                        #             linewidth=0.5)
 
                 # plot filtered ephys from hippocampal ripple channel (to show theta)
-                # axes['B'].plot(lfp_times[ind]-lfp_times[ind][0],
-                #                lfp_data[ind][:, ripple_channel]/np.max(lfp_data[ind][:, ripple_channel]),
-                #                linewidth=0.5, color=colors['CA1'], label='LFP from ripple ch')
                 axes['B'].plot(lfp_times[ind]-lfp_times[ind][0], theta_data[ind]/np.max(theta_data[ind]) + 2,
                                color=colors['CA1'], label='theta band from ripple ch')
                 axes['B'].legend(loc='upper right')
@@ -150,11 +153,11 @@ def plot_example_trials():
                 axes['E'].legend()
                 axes['E'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
 
-            axes['A'].set_title(f'Example trial with ephys - {trial_type_name} - {session_db.get_session_id(name)}')
-            tags = f'{trial_type_name}_plot{plot_id}'
-            fig = axes['A'].get_figure()
-            results_io.save_fig(fig=fig, axes=axes, filename=f'example-trial-with-ephys', additional_tags=tags,
-                                results_type='session')
+                axes['A'].set_title(f'Example trial with ephys - {trial_type_name} - {session_db.get_session_id(name)}')
+                tags = f'{trial_type_name}_plot{plot_id}'
+                fig = axes['A'].get_figure()
+                results_io.save_fig(fig=fig, axes=axes, filename=f'example-trial-with-ephys', additional_tags=tags,
+                                    results_type='session')
 
 
 if __name__ == '__main__':
