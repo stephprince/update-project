@@ -380,8 +380,9 @@ class BayesianDecoder:
                                 probability=probability[name],
                                 turn_type=turns,
                                 correct=outcomes,
-                                window_start=window,
-                                window_stop=window_stop)
+                                window_start=-window_start,
+                                window_stop=window_stop,
+                                times=new_times)
                     data.update(stats={k: get_fig_stats(v, axis=1) for k, v in data.items()
                                        if k in ['feature', 'decoding', 'error']})
                 output.append(data)
@@ -406,7 +407,7 @@ class BayesianDecoder:
 
         actual_series = pd.Series(feature_means, index=np.round(time_index, 4), name='actual_feature')
         if self.decoded_values.any().any():
-            decoded_series = self.decoded_values.as_series()  # TODO - figure out why decoded/actual series are diff lengths
+            decoded_series = self.decoded_values.as_series()
         else:
             decoded_series = pd.Series()
         df_decode_results = pd.merge(decoded_series.rename('decoded_feature'), actual_series, how='left',

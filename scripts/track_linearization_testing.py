@@ -75,6 +75,3 @@ for name in session_names:
     kwargs = results_io.get_figure_args(filename=f'linearized-position', results_type='session', format='pdf')
     plt.savefig(**kwargs)
     plt.close()
-
-
-from update_project.virtual_track import UpdateTrack
