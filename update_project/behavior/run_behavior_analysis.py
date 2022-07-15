@@ -7,9 +7,9 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 def run_behavior_analysis():
     # setup flags
-    overwrite = True  # when False, this will only load data if the parameters match
-    plot = False  # this only plots on a session by session basis
-    group = True  # this compiles the data for group plotting
+    overwrite = False  # when False, this will only load data if the parameters match
+    plot = True  # this only plots on a session by session basis
+    group = False  # this compiles the data for group plotting
 
     # setup sessions
     animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
@@ -38,7 +38,7 @@ def run_behavior_analysis():
 
         # plot data
         if plot:
-            visualizer = BehaviorVisualizer([session_data])
+            visualizer = BehaviorVisualizer([session_data], session_id=session_id)
             visualizer.plot()
 
     # get group summary data

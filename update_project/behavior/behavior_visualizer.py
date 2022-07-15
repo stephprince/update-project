@@ -13,19 +13,23 @@ from update_project.virtual_track import UpdateTrack
 
 
 class BehaviorVisualizer:
-    def __init__(self, data):
+    def __init__(self, data, session_id=None):
         self.data = data
-        self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
         self.virtual_track = UpdateTrack()
         self.colors = get_color_theme()
+
+        if session_id:
+            self.results_type = 'session'
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem, session_id=session_id)
+        else:
+            self.results_type = 'group'
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
         # get session visualization info
         for sess_dict in self.data:
             sess_dict.update(proportion_correct=sess_dict['behavior'].proportion_correct)
             sess_dict.update(trajectories=sess_dict['behavior'].trajectories)
             sess_dict.update(aligned_data=sess_dict['behavior'].aligned_data)
-
-            #sess_dict.update(example_period=self._get_example_period(sess_dict['behavior']))
 
         self.group_df = pd.DataFrame(data)
 
@@ -50,7 +54,7 @@ class BehaviorVisualizer:
         xlabel = 'proportion correct'
         rolling_df = df_by_bin[df_by_bin["type"] == 'rolling']
         plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='update_type', row_ids=[0, 1, 2],
-                           col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title)
+                           col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title, palette=self.colors['trials'])
         plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
                            col_ids=[1, 1, 1, 1], xlabel=xlabel, title=title)
 
@@ -59,7 +63,7 @@ class BehaviorVisualizer:
         xlabel = 'proportion correct'
         binned_df = df_by_bin[df_by_bin["type"] == 'binned']
         plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='update_type', row_ids=[0, 1, 2],
-                           col_ids=[2, 2, 2, 2], xlabel=xlabel, title=title)
+                           col_ids=[2, 2, 2, 2], xlabel=xlabel, title=title, palette=self.colors['trials'])
         plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
                            col_ids=[3, 3, 3, 3], xlabel=xlabel, title=title)
 
@@ -72,7 +76,7 @@ class BehaviorVisualizer:
 
         # save figure
         fig.suptitle(f'Behavioral performance - all animals')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance', results_type=self.results_type)
 
     def plot_trajectories(self):
         temp_df = self.group_df[['animal', 'trajectories']].explode('trajectories').reset_index(drop=True)
@@ -82,7 +86,7 @@ class BehaviorVisualizer:
         turn_colors = dict(left=self.colors['left'], right=self.colors['right'])
         ncols = 3*2  # 1 column for each update type (non, switch, stay) * indiv + averages
         nrows = len(vars_to_plot)  # 1 col for each var
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(22, 17))
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(22, 17), sharey='row')
 
         group_data = trajectory_df.groupby(['update_type', 'turn_type'])
         for name, group in group_data:
@@ -111,17 +115,12 @@ class BehaviorVisualizer:
 
         # save figure
         fig.suptitle(f'Trajectories')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'trajectories')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'trajectories', results_type=self.results_type)
 
     def plot_aligned_data(self):
         temp_df = self.group_df[['animal', 'aligned_data']].explode('aligned_data').reset_index(drop=True)
         aligned_df = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['aligned_data']))], axis=1)
         vars_to_plot = ['x_position', 'view_angle', *self.data[0]['behavior'].analog_vars]
-        turn_colors = dict(left=self.colors['left'], right=self.colors['right'])
-
-        # plot just the data around the update cue (1 plot for all variables)
-        # ncols = 3  # 1 column for each update type (non, switch, stay)
-        # nrows = len(vars_to_plot) * 2  # 1 row for each variable * 2 (1 indiv, 1 for averages)
 
         # plot of all aligned timepoints in the tasks (1 plot for each variable)
         group_data = aligned_df.groupby(['update_type', 'start_label', 'turn_type'])
@@ -133,7 +132,6 @@ class BehaviorVisualizer:
             for name, group in group_data:
                 var_data = group[group['var'] == var]
                 row_id = 0
-                #row_id = [ind + 1 for ind, k in enumerate(self.virtual_track.mappings['update_type'].values()) if k == name[0]][0]
                 col_id = [ind for ind, k in enumerate(aligned_df['start_label'].unique()) if k == name[1]][0]
                 cleaned_data = [v for v in var_data['aligned_data'].values if len(np.shape(v)) == 2]
 
@@ -169,6 +167,5 @@ class BehaviorVisualizer:
                     sns.despine(ax=axes[row_id + 1][col_id], left=True)  # need to set time to be the same then
 
             # save figure
-            # axes[0][ncols - 1].legend(loc='upper right')  # TODO - set x and y lim
             fig.suptitle(f'Aligned data')
-            self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', format='pdf')
+            self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', results_type=self.results_type)
