@@ -46,7 +46,7 @@ def get_color_theme():
     color_theme_dict = dict()
     color_theme_dict['CA1'] = '#4897D8'
     color_theme_dict['PFC'] = '#F77669'
-    color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)  # rocket is cool too?
+
     color_theme_dict['control'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['left'] = '#2594f6'  # 250 in degrees, 95 saturation, 60 light
     color_theme_dict['right'] = '#da3b46'  # 12 in degrees, 95 saturation, 60 light
@@ -56,19 +56,29 @@ def get_color_theme():
     color_theme_dict['switch_update'] = color_theme_dict['switch']
     color_theme_dict['non_update'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
+
+    color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
+    color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
     color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)
     color_theme_dict['stay_cmap'] = sns.light_palette(color_theme_dict['stay'], as_cmap=True)
     color_theme_dict['left_cmap'] = sns.light_palette(color_theme_dict['left'], as_cmap=True)
     color_theme_dict['right_cmap'] = sns.light_palette(color_theme_dict['right'], as_cmap=True)
     color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(270, 152, s=95, l=60, as_cmap=True)
     color_theme_dict['left_right_cmap_div'] = sns.diverging_palette(250, 12, s=95, l=60, as_cmap=True)
+
     color_theme_dict['animals'] = sns.color_palette("husl", 7)
     color_theme_dict['general'] = sns.color_palette("husl", 10)
+    color_theme_dict['trials'] = [color_theme_dict['non_update'], color_theme_dict['switch'], color_theme_dict['stay']]
 
     return color_theme_dict
 
 
-def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True):
+def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True,
+                       palette=None):
+    palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
+    if len(palette) > len(data[group].unique()):
+        palette = palette[:len(data[group].unique())]
+
     if group and show_median:
         medians = data.groupby([group])[column_name].median()
         limits = [np.nanmin(data.groupby([group])[column_name].min().values),
@@ -79,7 +89,7 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
 
     # cum fraction plots
     axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]],
-                                                palette=sns.color_palette(n_colors=len(data[group].unique())))
+                                                palette=palette)
     axes[row_ids[0]][col_ids[0]].set_title(title)
     axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
     axes[row_ids[0]][col_ids[0]].set_aspect(1. / axes[row_ids[0]][col_ids[0]].get_data_ratio(), adjustable='box')
@@ -93,13 +103,14 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
 
     # histograms
     axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
-                                                element='step', palette=sns.color_palette(n_colors=len(data[group].unique())))
+                                                element='step', palette=palette)
     axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
 
     # violin plots
-    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],)
+    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],
+                                                  palette=palette)
     plt.setp(axes[row_ids[2]][col_ids[2]].collections, alpha=.25)
     if stripplot:
-        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],)
+        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]], palette=palette)
     axes[row_ids[2]][col_ids[2]].set_title(title)
 
