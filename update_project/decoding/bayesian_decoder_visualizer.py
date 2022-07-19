@@ -85,6 +85,7 @@ class BayesianDecoderVisualizer:
                                         cmap=self.colors['switch_cmap']))
 
         feature_name = feature_name or self.data.feature_names[0]
+        error_bars = ''
         if feature_name in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
             cmap_pos = self.colors['left_right_cmap_div']
             scaling_value = 0.5
@@ -102,7 +103,7 @@ class BayesianDecoderVisualizer:
             stats = data_around_update['stats']
             limits = get_limits_from_data([data_around_update['feature']], balanced=balanced)
             err_limits = get_limits_from_data(
-                [(v['data']['stats']['prob_sum']['err_lower'], v['data']['stats']['prob_sum']['err_upper'])
+                [(v['data']['stats']['prob_sum'][f'{error_bars}lower'], v['data']['stats']['prob_sum'][f'{error_bars}upper'])
                  for k, v in data_split.items()], balanced=False)
             err_limits[0] = 0
             all_limits_balanced = get_limits_from_data([v['data']['prob_sum'] for v in data_split.values()])
@@ -118,8 +119,9 @@ class BayesianDecoderVisualizer:
             sort_index = np.argsort(pos_values_after_update)
 
             im = axes[row_id[0]][col_id[0]].imshow(prob_map, cmap=self.colors['cmap'], origin='lower', aspect='auto',
-                                         vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
-                                         extent=[times[0], times[-1], data_values[0], data_values[-1]])
+                                         #vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
+                                                   vmin=0.015, vmax=0.07,  # other options are (0.01, 0.25 to 0.1()
+                                                   extent=[times[0], times[-1], data_values[0], data_values[-1]])
             axes[row_id[0]][col_id[0]].plot([0, 0], [data_values[0], data_values[-1]], linestyle='dashed', color=[0, 0, 0, 0.5])
             axes[row_id[0]][col_id[0]].invert_yaxis()
             axes[row_id[0]][col_id[0]].set(xlabel='Time around update (s)', ylabel=f'{label}', xlim=[times[0], times[-1]],
@@ -160,7 +162,7 @@ class BayesianDecoderVisualizer:
 
                 # line plots
                 axes[row_id[3]][col_id[3]].plot(times, stats['prob_sum']['mean'], color=value['color'], label=key)
-                axes[row_id[3]][col_id[3]].fill_between(times, stats['prob_sum']['err_lower'], stats['prob_sum']['err_upper'],
+                axes[row_id[3]][col_id[3]].fill_between(times, stats['prob_sum'][f'{error_bars}lower'], stats['prob_sum'][f'{error_bars}upper'],
                                              alpha=0.2, color=value['color'], label='95% CI')
                 axes[row_id[3]][col_id[3]].plot([0, 0], err_limits, linestyle='dashed', color='k', alpha=0.25)
                 axes[row_id[3]][col_id[3]].set(xlim=[times[0], times[-1]], ylim=err_limits, ylabel=key)
@@ -168,13 +170,11 @@ class BayesianDecoderVisualizer:
                 axes[row_id[3]][col_id[3]].set_title(f'{title} trials - {label} - prob_sum', fontsize=14)
 
                 # heat maps by trial
-                update_time_values = [[len(time_tick_values) / 2, len(time_tick_values) / 2],
-                                      [0, np.shape(value['data']['prob_sum'])[1]]]
                 im = axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].imshow(value['data']['prob_sum'], cmap=value['cmap'], origin='lower',
-                                             aspect='auto', extent=[times[0], times[-1], 0, len(value['data']['prob_sum'].T)],
+                                             aspect='auto', extent=[times[0], times[-1], 0, len(value['data']['prob_sum'])],
                                              vmin=0 * all_limits_balanced[0], vmax=0.4 * all_limits_balanced[1])
                 axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].invert_yaxis()
-                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].plot(update_time_values[0], update_time_values[1], linestyle='dashed', color=[0, 0, 0, 0.5])
+                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].plot([0, 0], [0, len(value['data']['prob_sum'])], linestyle='dashed', color=[0, 0, 0, 0.5])
                 axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].set(xlim=[times[0], times[-1]], ylabel=f'trials')
                 plt.colorbar(im, ax=axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]], label='probability', pad=0.01, location='right',
                              fraction=0.046)
@@ -221,7 +221,7 @@ class BayesianDecoderVisualizer:
             axes[ax_dict[0]].annotate('correct side', (18 * correct_multiplier, 250), textcoords='data', va='center')
             axes[ax_dict[0]].set_title(f'{title} trials - decoded vs. true position', fontsize=14)
 
-            im = axes[ax_dict[1]].imshow(prob_map[:, :, time_bin], cmap='YlGnBu', origin='lower', aspect='auto',
+            im = axes[ax_dict[1]].imshow(prob_map[:, :, time_bin], cmap=self.colors['cmap'], origin='lower', aspect='auto',
                                          vmin=0, vmax=0.6 * np.nanmax(prob_map),
                                          extent=[xlims[0], xlims[1], ylims[0], ylims[1]])
             axes[ax_dict[1]].plot(positions_x, positions_y, color='k', label='True position')
@@ -304,7 +304,7 @@ class SessionVisualizer(BayesianDecoderVisualizer):
         label = self.data.feature_names[0]
         range = self.data.bins[-1] - self.data.bins[0]
 
-        im = axes['A'].imshow(self.prob_density_grid, aspect='auto', origin='lower', cmap='YlGnBu', vmin=0, vmax=0.75,
+        im = axes['A'].imshow(self.prob_density_grid, aspect='auto', origin='lower', cmap=self.colors['cmap'], vmin=0, vmax=0.75,
                               extent=[self.start_time, self.end_time, self.data.bins[0], self.data.bins[-1]], )
         axes['A'].plot(self.data.features_test.loc[self.start_time:self.end_time], label='True', color=[0, 0, 0, 0.5],
                        linestyle='dashed')
@@ -326,7 +326,7 @@ class SessionVisualizer(BayesianDecoderVisualizer):
 
         tick_values = self.data.model.index.values.astype(int)
         tick_labels = np.array([0, int(len(tick_values) / 2), len(tick_values) - 1])
-        axes['D'] = sns.heatmap(self.confusion_matrix, cmap='YlGnBu', ax=axes['D'], square=True,
+        axes['D'] = sns.heatmap(self.confusion_matrix, cmap=self.colors['cmap'], ax=axes['D'], square=True,
                                 vmin=0, vmax=0.5 * np.nanmax(self.confusion_matrix),
                                 cbar_kws={'pad': 0.01, 'label': 'proportion decoded', 'fraction': 0.046})
         axes['D'].plot([0, 285], [0, 285], linestyle='dashed', color=[0, 0, 0, 0.5])
@@ -829,7 +829,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                         locations = sess_data.virtual_track.get_cue_locations().get(row['feature'],
                                                                                     dict())  # don't annotate graph if no locations indicated
                         limits = [np.min(sess_data.bins.astype(int)), np.max(sess_data.bins.astype(int))]
-                        im = axes[row_id][col_id].imshow(matrix, cmap='YlGnBu', origin='lower',  # aspect='auto',
+                        im = axes[row_id][col_id].imshow(matrix, cmap=self.colors['cmap'], origin='lower',  # aspect='auto',
                                                          vmin=0, vmax=vmax,
                                                          extent=[limits[0], limits[1], limits[0], limits[1]])
 
@@ -901,7 +901,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                         limits = [np.min(np.array(sorted_data['bins'])), np.max(np.array(sorted_data['bins']))]
                     else:
                         limits = [np.min(sorted_data['bins'].astype(int)), np.max(sorted_data['bins'].astype(int))]
-                    im = axes[row_id][col_id].imshow(matrix, cmap='YlGnBu', origin='lower',  # aspect='auto',
+                    im = axes[row_id][col_id].imshow(matrix, cmap=self.colors['cmap'], origin='lower',  # aspect='auto',
                                                      vmin=0, vmax=sorted_data['vmax'],
                                                      extent=[limits[0], limits[1], limits[0], limits[1]])
 
@@ -924,8 +924,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     axes[row_id][col_id].set_xlabel(f'Actual')
                 if col_id == 0:
                     axes[row_id][col_id].set_ylabel(f'Decoded')
-                if col_id == (ncols - 1):
-                    plt.colorbar(im, ax=axes[row_id][col_id], pad=0.04, location='right', fraction=0.046,
+                plt.colorbar(im, ax=axes[row_id][col_id], pad=0.04, location='right', fraction=0.046,
                                  label='probability / chance')
 
                 counter += 1
@@ -935,9 +934,10 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
 
-    def plot_group_aligned_data(self, data, name, plot_groups=dict(update_type=[['non_update'], ['switch'], ['stay']],
-                                                                   turn_type=[[1], [2], [1, 2]],
-                                                                   correct=[[0], [1], [0, 1]])):
+    def plot_group_aligned_data(self, data, name, plot_groups=None):
+
+        plot_groups = plot_groups or dict(update_type=[['non_update'], ['switch'], ['stay']],
+                                          turn_type=[[1], [2], [1, 2]], correct=[[0], [1], [0, 1]])
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
@@ -949,7 +949,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 title = '_'.join([''.join([k, str(v)]) for k, v in zip(plot_groups.keys(), plot_types)])
 
                 for window in windows:  # TODO - fix for multiple windows bc right now flips back and forth
-                    # make plots (1 row for each plot, 1 col for each align time)
+                    # make plots for aligned data (1 row for each plot, 1 col for each align time)
                     ncols, nrows = (len(align_times[:-1]), 6)
                     fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
                     for ind, time_label in enumerate(align_times[:-1]):
@@ -966,6 +966,63 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     tags = f'{"_".join(["".join(n) for n in name])}_{title}_win{window}_' \
                            f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
                     self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
+
+            # # make plots for direct comparisons
+            comparisons = [dict(update_type=[['switch'], ['stay']]), dict(correct=[[1], [0]])]
+            data_for_stats = []
+            for comp in comparisons:
+                ncols, nrows = (2, 6)
+                fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
+                filter_dict = dict(time_label=['t_update'], update_type=['switch'], turn_type=[1, 2], correct=[1])
+                comp_key = list(comp.keys())[0]
+                for ind, v in enumerate(comp[comp_key]):
+                    filter_dict[comp_key] = v  # replace filter dict with value comparing
+                    title = f'{comp_key}_{v}_{filter_dict["time_label"]}_{filter_dict["update_type"]}'
+                    group_aligned_data = self._select_group_aligned_data(param_data, filter_dict, window)
+                    quant_aligned_data = self._quantify_aligned_data(param_data, group_aligned_data)
+                    bounds = [v['bound_values'] for v in quant_aligned_data.values()]
+                    self.plot_1d_around_update(group_aligned_data, quant_aligned_data, title, feat, axes,
+                                           row_id=np.arange(nrows), col_id=[ind] * nrows,
+                                           feature_name=feat, prob_map_axis=0, bounds=bounds)
+                    data_for_stats.append(dict(prob_sum=quant_aligned_data['left']['prob_sum'], bound='initial',
+                                               comparison=comp_key, group=v[0]))
+                    data_for_stats.append(dict(prob_sum=quant_aligned_data['right']['prob_sum'], bound='switch',
+                                               comparison=comp_key, group=v[0]))
+                tags = f'{"_".join(["".join(n) for n in name])}' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare{comp_key}_aligned_data', additional_tags=tags)
+
+            add_tags = f'{"_".join(["".join(n) for n in name])}' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+            self._plot_group_aligned_stats(data_for_stats, tags=add_tags)
+
+    def _plot_group_aligned_stats(self, data_for_stats, tags=''):
+        # grab data from the first second after the update occurs  TODO - make this more generalized
+        prob_sum_df = pd.DataFrame(data_for_stats)
+        prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
+        bins_to_grab = np.floor([len(prob_sum_df['prob_sum'].values[0])/2,
+                                 3 * len(prob_sum_df['prob_sum'].values[0])/4]).astype(int)
+        prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[bins_to_grab[0]:bins_to_grab[1]]))
+        temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(drop=True)
+        df = pd.DataFrame(temp_df.to_dict())  # fix weird object error for violin plots
+
+        # plot figure
+        nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
+        ncols = 4  # 1 column for switch vs. stay, correct vs. incorrect switch * 3 for left, right
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10))
+        count = 0
+        for name, group in df.groupby(['comparison', 'bound']):
+            plot_distributions(group, axes=axes, column_name='data', group='group', row_ids=[0, 1, 2],
+                               col_ids=[count] * 3, xlabel='probability sum', title=name, stripplot=False)
+            count += 1
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'prob_sum_dist', additional_tags=tags)
+
+        # get stats
+        for name, group in df.groupby(['comparison', 'bound']):
+            data_to_compare = {'_'.join((*name, str(v))): group[group['group'] == v]['data'].values for v in
+                               list(group['group'].unique())}
+            self.results_io.export_statistics(data_to_compare, f'aligned_data_{"_".join(name)}_stats_{tags}')
+
 
     def plot_tuning_curves(self, data, name):
         feat = data['feature'].values[0]
@@ -1006,7 +1063,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 # plot heatmaps
                 y_limits = [0, np.shape(tuning_curve_scaled)[0]]
                 x_limits = [np.min(tuning_curve_bins.astype(int)), np.max(tuning_curve_bins.astype(int))]
-                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['cmap'], origin='lower',
+                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['plain_cmap'], origin='lower',
                                                  vmin=0.1,
                                                  aspect='auto',
                                                  vmax=0.9, extent=[x_limits[0], x_limits[1], y_limits[0], y_limits[1]])
@@ -1020,12 +1077,12 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 axes[row_id][col_id].set_title(f'{title}', fontsize=10)
                 axes[row_id][col_id].set_xlim(x_limits)
                 axes[row_id][col_id].set_ylim(y_limits)
+                axes[row_id][col_id].set_ylim(y_limits)
                 if row_id == (nrows - 1):
                     axes[row_id][col_id].set_xlabel(f'{feat}')
                 if col_id == 0:
                     axes[row_id][col_id].set_ylabel(f'Units')
-                if col_id == (ncols - 1) or counter == len(param_name):
-                    plt.colorbar(im, ax=axes[row_id][col_id], pad=0.04, location='right', fraction=0.046,
+                plt.colorbar(im, ax=axes[row_id][col_id], pad=0.04, location='right', fraction=0.046,
                                  label='Normalized firing rate')
                 counter += 1
 
