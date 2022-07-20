@@ -6,6 +6,7 @@ from git import Repo
 from pathlib import Path
 
 from update_project.general.plots import clean_plot
+from update_project.statistics import get_stats_summary
 
 class ResultsIO:
     git_hash = Repo(search_parent_directories=True).head.object.hexsha[:10]
@@ -39,6 +40,13 @@ class ResultsIO:
         Path(data_path).mkdir(parents=True, exist_ok=True)
 
         return data_path
+
+    def get_stats_filename(self, filename, results_type='group', results_name='', format='txt'):
+        stats_path = self.get_results_path(results_type, results_name=results_name) / 'statistics'
+        Path(stats_path).mkdir(parents=True, exist_ok=True)
+        fname = stats_path / f'{filename}_{self.tags}_git{self.git_hash}.{format}'
+
+        return fname
 
     def get_results_path(self, results_type='group', results_name=''):
         if results_type == 'group':
@@ -87,6 +95,12 @@ class ResultsIO:
         with open(fname, 'wb') as f:
             pickle.dump(data, f)
 
+    def export_statistics(self, data_dict, filename, axis=0, results_type='group', format='txt'):
+        fname = self.get_stats_filename(filename, results_type=results_type, format=format)
+        summary = get_stats_summary(data_dict, axis)
+        with open(fname, 'w') as f:
+            f.write(summary)
+
     def data_exists(self, data_files):
         files_exist = []
         for name, file_info in data_files.items():
@@ -94,3 +108,4 @@ class ResultsIO:
             files_exist.append(path.is_file())
 
         return all(files_exist)
+
