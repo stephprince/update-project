@@ -12,7 +12,7 @@ from update_project.camera_sync.cam_plot_utils import write_camera_video
 from update_project.decoding.interpolate import griddata_time_intervals
 from update_project.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, get_limits_from_data, get_color_theme
-from update_project.statistics import get_fig_stats
+from update_project.statistics import get_fig_stats, get_comparative_stats
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
@@ -476,8 +476,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         return group_summary_df
 
-    @staticmethod
-    def _get_group_aligned_data(param_data):
+    def _get_group_aligned_data(self, param_data):
         # compile aligned data
         num_trials = 0
         aligned_data_list = []
@@ -943,6 +942,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         for param_name, param_data in param_group_data:
             windows = [2]  #, param_data['decoder'].values[0].aligned_data_window]  # time in seconds
             align_times = param_data['decoder'].values[0].align_times
+            compiled_data = []
 
             for plot_types in list(itertools.product(*plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
@@ -954,54 +954,89 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
                     for ind, time_label in enumerate(align_times[:-1]):
                         filter_dict = dict(time_label=[time_label], **plot_group_dict)
-                        group_aligned_data = self._select_group_aligned_data(param_data, filter_dict, window)
+                        p_data = param_data.copy(deep=True)  # TODO - idk if needed but having weird double flipping cases
+                        group_aligned_data = self._select_group_aligned_data(p_data, filter_dict, window)
                         if np.size(group_aligned_data) and group_aligned_data is not None:
-                            quant_aligned_data = self._quantify_aligned_data(param_data, group_aligned_data)
+                            quant_aligned_data = self._quantify_aligned_data(p_data, group_aligned_data)
                             bounds = [v['bound_values'] for v in quant_aligned_data.values()]
                             self.plot_1d_around_update(group_aligned_data, quant_aligned_data, time_label, feat, axes,
                                                    row_id=np.arange(nrows), col_id=[ind] * nrows,
                                                    feature_name=feat, prob_map_axis=0, bounds=bounds)
+                            if filter_dict['turn_type'] == [1, 2]:
+                                compiled_data.append(dict(data=group_aligned_data, quant=quant_aligned_data,
+                                                          **{k: v[0] for k, v in filter_dict.items()}))
                     # save figure
                     fig.suptitle(title)
                     tags = f'{"_".join(["".join(n) for n in name])}_{title}_win{window}_' \
                            f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
                     self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
 
-            # # make plots for direct comparisons
-            comparisons = [dict(update_type=[['switch'], ['stay']]), dict(correct=[[1], [0]])]
-            data_for_stats = []
-            for comp in comparisons:
+            # make plots for direct comparisons
+            compiled_data_df = pd.DataFrame(compiled_data)
+            filter_dict = dict(time_label='t_update', correct=1)
+            update_mask = pd.concat([compiled_data_df[k] == v for k, v in filter_dict.items()], axis=1).all(axis=1)
+            filter_dict = dict(time_label='t_update', update_type='switch')
+            correct_mask = pd.concat([compiled_data_df[k] == v for k, v in filter_dict.items()], axis=1).all(axis=1)
+            compare_df = dict(update_type=dict(data=compiled_data_df[update_mask],
+                                               comparison=['switch', 'stay']),
+                              correct=dict(data=compiled_data_df[correct_mask],
+                                           comparison=[0, 1]))
+
+            data_for_stats_all = []
+            for comp, data_dict in compare_df.items():
+                data_for_stats = []
+
                 ncols, nrows = (2, 6)
                 fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
-                filter_dict = dict(time_label=['t_update'], update_type=['switch'], turn_type=[1, 2], correct=[1])
-                comp_key = list(comp.keys())[0]
-                for ind, v in enumerate(comp[comp_key]):
-                    filter_dict[comp_key] = v  # replace filter dict with value comparing
-                    title = f'{comp_key}_{v}_{filter_dict["time_label"]}_{filter_dict["update_type"]}'
-                    group_aligned_data = self._select_group_aligned_data(param_data, filter_dict, window)
-                    quant_aligned_data = self._quantify_aligned_data(param_data, group_aligned_data)
-                    bounds = [v['bound_values'] for v in quant_aligned_data.values()]
-                    self.plot_1d_around_update(group_aligned_data, quant_aligned_data, title, feat, axes,
-                                           row_id=np.arange(nrows), col_id=[ind] * nrows,
+                for ind, v in enumerate(data_dict['comparison']):
+                    title = f'{v}_{"".join([f"{k}{v}" for k, v in filter_dict.items()])}'
+                    data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
+                    quant = data_dict['data'][data_dict['data'][comp] == v]['quant'].values[0]
+                    bounds = [v['bound_values'] for v in quant.values()]
+                    self.plot_1d_around_update(data, quant, title, feat, axes, row_id=np.arange(nrows), col_id=[ind] * nrows,
                                            feature_name=feat, prob_map_axis=0, bounds=bounds)
-                    data_for_stats.append(dict(prob_sum=quant_aligned_data['left']['prob_sum'], bound='initial',
-                                               comparison=comp_key, group=v[0]))
-                    data_for_stats.append(dict(prob_sum=quant_aligned_data['right']['prob_sum'], bound='switch',
-                                               comparison=comp_key, group=v[0]))
+                    initial_data = dict(prob_sum=quant['left']['prob_sum'], bound='initial', comparison=comp, group=v)
+                    new_data = dict(prob_sum=quant['right']['prob_sum'], bound='new', comparison=comp, group=v)
+                    data_for_stats.extend([initial_data, new_data])
+                    data_for_stats_all.extend([initial_data, new_data])
+
+                # add significance stars to sections of plot
+                prob_sum_df = pd.DataFrame(data_for_stats)
+                prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
+                bins_to_grab = np.floor([len(data['times']) / 2, 3 * len(data['times']) / 4]).astype(int)
+                times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
+                stars_to_plot = []
+                blanks_to_plot = []
+                for ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
+                    prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
+                    temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
+                        drop=True)
+                    df = pd.DataFrame(temp_df.to_dict())
+                    for name, group in df.groupby(['comparison', 'bound']):
+                        data_to_compare = {'_'.join((*name, str(v))): group[group['group'] == v]['data'].values for v in
+                                           list(group['group'].unique())}
+                        comp_stats = get_comparative_stats(*data_to_compare.values())
+                        if comp_stats['ranksum']['p_value'] < 0.05:
+                            stars_to_plot.append(times[ind])
+                        else:
+                            blanks_to_plot.append(times[ind])
+                stars_height = [axes[3][0].get_ylim()[1]/2] * len(stars_to_plot)
+                blanks_height = [axes[3][0].get_ylim()[1]/2] * len(blanks_to_plot)
+                axes[3][0].plot(blanks_to_plot, blanks_height, marker="o", linestyle='', markerfacecolor='k', markersize=5)
+                axes[3][0].plot(stars_to_plot, stars_height, marker="*", linestyle='', markerfacecolor='r', markersize=10)
+
                 tags = f'{"_".join(["".join(n) for n in name])}' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare{comp_key}_aligned_data', additional_tags=tags)
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data', additional_tags=tags)
 
-            add_tags = f'{"_".join(["".join(n) for n in name])}' \
-                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-            self._plot_group_aligned_stats(data_for_stats, tags=add_tags)
+            self._plot_group_aligned_stats(data_for_stats, tags=tags)
 
     def _plot_group_aligned_stats(self, data_for_stats, tags=''):
         # grab data from the first second after the update occurs  TODO - make this more generalized
         prob_sum_df = pd.DataFrame(data_for_stats)
         prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
         bins_to_grab = np.floor([len(prob_sum_df['prob_sum'].values[0])/2,
-                                 3 * len(prob_sum_df['prob_sum'].values[0])/4]).astype(int)
+                                 5 * len(prob_sum_df['prob_sum'].values[0])/8]).astype(int)
         prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[bins_to_grab[0]:bins_to_grab[1]]))
         temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(drop=True)
         df = pd.DataFrame(temp_df.to_dict())  # fix weird object error for violin plots
