@@ -5,14 +5,14 @@ import pandas as pd
 import seaborn as sns
 import warnings
 
-from collections import defaultdict
 from pathlib import Path
 
 from update_project.camera_sync.cam_plot_utils import write_camera_video
 from update_project.decoding.interpolate import griddata_time_intervals
+from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, get_limits_from_data, get_color_theme
-from update_project.statistics import get_fig_stats, get_comparative_stats
+from update_project.statistics import get_comparative_stats
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
@@ -28,42 +28,6 @@ class BayesianDecoderVisualizer:
         self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
                                                          num_trials=[self.exclusion_criteria['trials']])
         self.colors = get_color_theme()
-
-    def _get_confusion_matrix(self, data, bins):
-        if len(bins):
-            df_bins = pd.cut(data['actual_feature'], bins, include_lowest=True)
-            decoding_matrix = data['prob_dist'].groupby(df_bins).apply(
-                lambda x: self._get_mean_prob_dist(x, bins)).values
-
-            confusion_matrix = np.vstack(decoding_matrix).T  # transpose so that true position is on the x-axis
-        else:
-            confusion_matrix = []
-
-        return confusion_matrix
-
-    @staticmethod
-    def _get_confusion_matrix_sum(confusion_matrix):
-        num_bins_to_sum = int(
-            (len(confusion_matrix) / 10 - 1) / 2)  # one tenth of the track minus the identity line bin
-        values_to_sum = []
-        for i in range(len(confusion_matrix)):
-            values_to_sum.append(confusion_matrix[i, i])  # identity line values
-            if i < len(confusion_matrix) - num_bins_to_sum:
-                values_to_sum.append(confusion_matrix[i + num_bins_to_sum, i])  # bins above
-                values_to_sum.append(confusion_matrix[i, i + num_bins_to_sum])  # bins to right
-        confusion_matrix_sum = np.nansum(values_to_sum)
-
-        return confusion_matrix_sum
-
-    @staticmethod
-    def _get_mean_prob_dist(probabilities, bins):
-        if probabilities.empty:
-            mean_prob_dist = np.empty(np.shape(bins[1:]))  # remove one bin to match other probabilities shapes
-            mean_prob_dist[:] = np.nan
-        else:
-            mean_prob_dist = np.nanmean(np.vstack(probabilities.values), axis=0)
-
-        return mean_prob_dist
 
     @staticmethod
     def _check_data_exists(data):
@@ -183,7 +147,6 @@ class BayesianDecoderVisualizer:
                     axes[row_id[4 + bound_ind][col_id[4 + bound_ind]]].set(xlabel='Time (s)')
 
                 bound_ind = + 1
-
 
     def plot_2d_around_update(self, data_around_update, time_bin, times, title, color, axes, ax_dict):
         stats = data_around_update['stats']
@@ -407,31 +370,11 @@ class SessionVisualizer(BayesianDecoderVisualizer):
 
 
 class GroupVisualizer(BayesianDecoderVisualizer):
-    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None):
+    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None, overwrite=False):
         super().__init__(data, exclusion_criteria=exclusion_criteria, params=params, threshold_params=threshold_params)
 
-        # get session visualization info
-        for sess_dict in self.data:  # this could probably be done with dataframe group not with loop
-            # get decoding matrices
-            if sess_dict['decoder'].convert_to_binary:
-                bins = [-1, 0, 1]
-            else:
-                bins = sess_dict['decoder'].bins
-            sess_dict.update(confusion_matrix=self._get_confusion_matrix(sess_dict['decoder'].summary_df, bins))
-
-            # get session error data
-            session_error = self._get_session_error(sess_dict['decoder'])
-            sess_dict.update(confusion_matrix_sum=session_error['confusion_matrix_sum'])
-            sess_dict.update(rmse=session_error['rmse'])
-            sess_dict.update(raw_error=session_error['raw_error_median'])
-
-            # loop through different exclusion criteria
-            sess_dict.update(num_units=len(sess_dict['decoder'].spikes))
-            sess_dict.update(num_trials=len(sess_dict['decoder'].train_df))
-            sess_dict.update(excluded_session=self._meets_exclusion_criteria(sess_dict['decoder']))
-
-        group_df = pd.DataFrame(self.data)
-        self.group_df = group_df[~group_df['excluded_session']]  # only keep non-excluded sessions
+        self.aggregator = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria)
+        self.aggregator.run_df_aggregation(data, overwrite)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self, group_by=None):
@@ -446,7 +389,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
             # make plots for each individual subgroup
-            group_data = self.group_df.groupby(group_names)
+            group_data = self.aggregator.group_df.groupby(group_names)
             for name, data in group_data:
                 print(f'Plotting data for group {name}...')
                 # plot model metrics
@@ -466,86 +409,6 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         else:
             print(f'No data found to plot')
 
-    @staticmethod
-    def _get_group_summary_df(data):
-        # get giant dataframe of all decoding data
-        summary_df_list = []
-        for _, sess_data in data.iterrows():
-            summary_df_list.append(sess_data['decoder'].summary_df)
-        group_summary_df = pd.concat(summary_df_list, axis=0, ignore_index=True)
-
-        return group_summary_df
-
-    def _get_group_aligned_data(self, param_data):
-        # compile aligned data
-        num_trials = 0
-        aligned_data_list = []
-        for _, sess_data in param_data.iterrows():
-            for item in sess_data['decoder'].aligned_data:
-                aligned_data_list.append(dict(session_id=sess_data['session_id'],
-                                              animal=sess_data['animal'],
-                                              region=sess_data['region'],
-                                              **item))
-                num_trials = num_trials + len(item['turn_type'])
-        aligned_data_df = pd.DataFrame(aligned_data_list)
-        aligned_data_df.drop(['stats'], axis='columns', inplace=True)  # get rid of stats dict bc for session
-        data_to_explode = ['feature', 'decoding', 'error', 'probability', 'turn_type', 'correct']
-        other_cols = [col for col in aligned_data_df.columns.values if col not in data_to_explode]
-        exploded_df = pd.concat([aligned_data_df.explode(d).reset_index()[d] if d != 'feature'
-                                 else aligned_data_df[[*other_cols, 'feature']].explode(d).reset_index(drop=True)
-                                 for d in data_to_explode], axis=1)
-        exploded_df.dropna(axis='rows', inplace=True)
-        assert len(exploded_df) == num_trials, 'Number of expected trials does not match dataframe'
-
-        return exploded_df
-
-    @staticmethod
-    def _get_group_tuning_curves(param_data):
-        tuning_curve_list = []
-        for _, sess_data in param_data.iterrows():
-            for key, unit_tuning in sess_data['decoder'].model.items():
-                tuning_curve_list.append(dict(animal=sess_data['decoder'].results_io.animal,
-                                              session=sess_data['decoder'].results_io.session_id,
-                                              unit=key,
-                                              tuning_curve=unit_tuning,
-                                              bins=sess_data['decoder'].bins))
-
-        tuning_curve_df = pd.DataFrame(tuning_curve_list)
-
-        return tuning_curve_df
-
-    def _meets_exclusion_criteria(self, data):
-        exclude_session = False  # default to include session
-
-        # apply exclusion criteria
-        units_threshold = self.exclusion_criteria.get('units', 0)
-        if len(data.spikes) < units_threshold:
-            exclude_session = True
-
-        trials_threshold = self.exclusion_criteria.get('trials', 0)
-        if len(data.train_df) < trials_threshold:
-            exclude_session = True
-
-        return exclude_session
-
-    def _get_session_error(self, data):
-        # get error from heatmap
-        if data.convert_to_binary:
-            bins = [-1, 0, 1]
-        else:
-            bins = data.bins
-        confusion_matrix = self._get_confusion_matrix(data.summary_df, bins)
-        confusion_matrix_sum = self._get_confusion_matrix_sum(confusion_matrix)
-
-        # get error from
-        rmse = data.summary_df['session_rmse'].mean()
-        raw_error_median = data.summary_df['decoding_error'].median()
-        session_error = dict(confusion_matrix_sum=confusion_matrix_sum,
-                             rmse=rmse,
-                             raw_error_median=raw_error_median)
-
-        return session_error
-
     def _sort_group_confusion_matrices(self, data):
         param_group_data_sorted = []
         for iter_list in itertools.product(*self.threshold_params.values()):
@@ -555,29 +418,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
             param_group_data = subset_data.groupby(self.params)  # main group is what gets the different plots
             for param_name, param_data in param_group_data:
-
-                # get parameter specific data (confusion matrix, track, bins)
-                group_summary_df = self._get_group_summary_df(param_data)
-                if param_data['decoder'].values[0].convert_to_binary:
-                    bins = [-1, 0, 1]
-                else:
-                    bins = param_data['decoder'].values[0].bins
-                vmax = 2  # default to 5 vmax probability/chance
-                if param_data['feature'].values[0] in ['choice', 'turn_type']:
-                    vmax = 2
-                virtual_track = param_data['decoder'].values[0].virtual_track
-                confusion_matrix = self._get_confusion_matrix(group_summary_df, bins)
-                confusion_matrix_sum = self._get_confusion_matrix_sum(confusion_matrix)
-                locations = virtual_track.get_cue_locations().get(param_data['feature'].values[0], dict())
-
-                # save to output list
-                param_group_data_sorted.append(dict(confusion_matrix=confusion_matrix,
-                                                    confusion_matrix_sum=confusion_matrix_sum,
-                                                    locations=locations,
-                                                    bins=bins,
-                                                    vmax=vmax,
-                                                    param_values=param_name,
-                                                    thresh_values=iter_list))
+                sorted_dict = self.aggregator.get_group_confusion_matrices(param_name, param_data)
+                param_group_data_sorted.append(dict(**sorted_dict, thresh_values=iter_list))
 
         # sort the list output
         sorted_data = pd.DataFrame(param_group_data_sorted)
@@ -585,124 +427,18 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
         return sorted_data
 
-    @staticmethod
-    def _flip_y_position(data, bounds, bins=None):
-        flipped_data = []
-        for ind, row in data.iteritems():
-            if bins is not None:
-                areas = dict()
-                for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                    prob_map_bins = (bins[1:] + bins[:-1]) / 2
-                    areas[f'{bound_name}_start'] = np.searchsorted(prob_map_bins, bound_values[0])
-                    areas[f'{bound_name}_stop'] = np.searchsorted(prob_map_bins, bound_values[1])
-
-                left_data = row[areas['left_start']:areas['left_stop'], :].copy()
-                right_data = row[areas['right_start']:areas['right_stop'], :].copy()
-
-                row[areas['left_start']:areas['left_stop'], :] = right_data
-                row[areas['right_start']:areas['right_stop'], :] = left_data
-            else:
-                offset = bounds['right'][0] - bounds['left'][0]
-                left_data = np.logical_and(row > bounds['left'][0], row < bounds['left'][1])
-                right_data = np.logical_and(row > bounds['right'][0], row < bounds['right'][1])
-                row[left_data] = row[left_data] + offset
-                row[right_data] = row[right_data] - offset
-            flipped_data.append(row)
-
-        return flipped_data
-
-    def _select_group_aligned_data(self, param_data, filter_dict, window=None, flip_trials=True):
-        group_aligned_df = self._get_group_aligned_data(param_data)
-
-        # filter for specific features
-        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
-        data_subset = group_aligned_df[mask]
-
-        # flip trials if indicated
-        turn_to_flip = 2
-        trials_to_flip = data_subset[data_subset['turn_type'] == turn_to_flip]
-        if np.size(trials_to_flip):
-            if flip_trials and data_subset['feature_name'].values[0] == 'y_position':
-                feat_bins = param_data['decoder'].values[0].bins
-                virtual_track = param_data['decoder'].values[0].virtual_track
-                bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
-
-                trials_to_flip = trials_to_flip.apply(lambda x: self._flip_y_position(x, bounds) if x.name in ['feature', 'decoding'] else x)
-                trials_to_flip = trials_to_flip.apply(lambda x: self._flip_y_position(x, bounds, feat_bins) if x.name in ['probability'] else x)
-                data_subset.loc[data_subset['turn_type'] == turn_to_flip, :] = trials_to_flip
-            elif flip_trials:
-                feat_before_flip = trials_to_flip['feature'].values[0][0]
-                prob_before_flip = trials_to_flip['probability'].values[0][0][0]
-                trials_to_flip = trials_to_flip.apply(lambda x: x*-1 if x.name in ['feature', 'decoding'] else x)
-                trials_to_flip['probability'] = trials_to_flip['probability'].apply(lambda x: np.flipud(x))
-                data_subset.loc[data_subset['turn_type'] == turn_to_flip, :] = trials_to_flip
-                if ~np.isnan(feat_before_flip):
-                    assert feat_before_flip == -trials_to_flip['feature'].values[0][0], 'Data not correctly flipped'
-                if ~np.isnan(prob_before_flip):
-                    assert prob_before_flip == trials_to_flip['probability'].values[0][-1][0], 'Data not correctly flipped'
-
-        if np.size(data_subset):
-            if window:
-                nbins = len(data_subset['times'].values[0])
-                orig_window_start = data_subset['window_start'].values[0]
-                orig_window_stop = data_subset['window_stop'].values[0]
-                times = np.linspace(np.max([-window, orig_window_start]), np.min([window, orig_window_stop]), num=nbins)
-            else:
-                times = data_subset['times'].values[0]
-
-            field_names = ['feature', 'decoding', 'error']
-            group_data = {n: np.vstack(data_subset[n]) for n in field_names}
-            group_data.update(probability=np.stack(data_subset['probability']))
-            group_data.update(times=times)
-            group_data.update(stats={k: get_fig_stats(v, axis=0) for k, v in group_data.items()})
-        else:
-            group_data = None
-
-        return group_data
-
-    @staticmethod
-    def _quantify_aligned_data(param_data, aligned_data):
-        # get bounds to use to quantify choices
-        bins = param_data['decoder'].values[0].bins
-        virtual_track = param_data['decoder'].values[0].virtual_track
-        bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
-
-        prob_map = aligned_data['probability']
-        prob_choice = dict()
-        num_bins = dict()
-        for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-            prob_map_bins = (bins[1:] + bins[:-1]) / 2
-            start_bin = np.searchsorted(prob_map_bins, bound_values[0])
-            stop_bin = np.searchsorted(prob_map_bins, bound_values[1])
-
-            threshold = 0.1  # total probability density to call a left/right choice
-            integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
-            num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
-            assert len(bins) - 1 == np.shape(prob_map)[1], 'Bound bins not being sorted on right dimension'
-
-            bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
-                                        thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
-            bound_quantification.update(stats={k: get_fig_stats(v, axis=0) for k, v in bound_quantification.items()})
-            bound_quantification.update(bound_values=bound_values,
-                                        threshold=threshold)
-            prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
-
-        assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
-
-        return prob_choice
-
     def plot_all_groups_error(self, main_group, sub_group, thresh_params=False):
         # select no threshold data to plot if thresholds indicated, otherwise combine
         if thresh_params:
             df_list = []
             for thresh_val in self.threshold_params[sub_group]:
-                new_df = self.group_df[self.group_df[sub_group] >= thresh_val]
+                new_df = self.aggregator.group_df[self.aggregator.group_df[sub_group] >= thresh_val]
                 new_df[f'{sub_group}_thresh'] = thresh_val
                 df_list.append(new_df)  # duplicate dfs for each thresh
             df = pd.concat(df_list, axis=0, ignore_index=True)
             sub_group = f'{sub_group}_thresh'  # rename threshold
         else:
-            df = self.group_df
+            df = self.aggregator.group_df
 
         group_data = df.groupby(main_group)  # main group is what gets the different plots
         for name, data in group_data:
@@ -803,14 +539,13 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
             for _, row in param_data.iterrows():
                 sess_matrix = row['confusion_matrix']
-                sess_data = row['decoder']
                 sess_key = row['session_id']
                 vmax = 4  # default to 5 vmax probability/chance
                 if row['feature'] in ['choice', 'turn_type']:
                     vmax = 2
 
                 if (counter % (ncols * nrows) == 0) and (counter != 0):
-                    fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}')
+                    fig.suptitle(f'Confusion matrices - all sessions - {row["results_tags"]}')
                     param_tags = '_'.join([f'{p}_{n}' for p, n in zip(self.params, param_name)])
                     add_tags = f'{tags}_{"_".join(["".join(n) for n in name])}_{param_tags}_plot{plot_num}'
                     self.results_io.save_fig(fig=fig, axes=axes, filename=f'all_confusion_matrices', additional_tags=add_tags)
@@ -823,11 +558,11 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     col_id = counter - row_id * ncols
 
                     # plot confusion matrix
-                    if hasattr(sess_data.bins, 'astype'):  # if the matrix exists
-                        matrix = np.vstack(sess_matrix) * sess_data.encoder_bin_num  # scale to be probability/chance
-                        locations = sess_data.virtual_track.get_cue_locations().get(row['feature'],
+                    if hasattr(row['bins'], 'astype'):  # if the matrix exists
+                        matrix = np.vstack(sess_matrix) * row['encoder_bin_num']  # scale to be probability/chance
+                        locations = row['virtual_track'].get_cue_locations().get(row['feature'],
                                                                                     dict())  # don't annotate graph if no locations indicated
-                        limits = [np.min(sess_data.bins.astype(int)), np.max(sess_data.bins.astype(int))]
+                        limits = [np.min(row['bins'].astype(int)), np.max(row['bins'].astype(int))]
                         im = axes[row_id][col_id].imshow(matrix, cmap=self.colors['cmap'], origin='lower',  # aspect='auto',
                                                          vmin=0, vmax=vmax,
                                                          extent=[limits[0], limits[1], limits[0], limits[1]])
@@ -841,8 +576,8 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
                         # add labels
                         new_line = '\n'
-                        axes[row_id][col_id].text(0.6, 0.2, f'{len(sess_data.trials)} trials {new_line}'
-                                                            f'{len(sess_data.spikes)} units',
+                        axes[row_id][col_id].text(0.6, 0.2, f'{row["num_trials"]} trials {new_line}'
+                                                            f'{row["num_units"]} units',
                                                   transform=axes[row_id][col_id].transAxes, verticalalignment='top',
                                                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
                         axes[row_id][col_id].set_title(f'{sess_key}')
@@ -859,7 +594,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     counter += 1
 
             # wrap up last plot after loop finished
-            fig.suptitle(f'Confusion matrices - all sessions - {sess_data.results_tags}')
+            fig.suptitle(f'Confusion matrices - all sessions - {row["results_tags"]}')
             param_tags = '_'.join([f'{p}_{n}' for p, n in zip(self.params, param_name)])
             add_tags = f'{tags}_{"_".join(["".join(n) for n in name])}_{param_tags}_plot{plot_num}'
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'all_confusion_matrices', additional_tags=add_tags)
@@ -941,7 +676,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
             windows = [2]  #, param_data['decoder'].values[0].aligned_data_window]  # time in seconds
-            align_times = param_data['decoder'].values[0].align_times
+            align_times = self.aggregator.align_times
             compiled_data = []
 
             for plot_types in list(itertools.product(*plot_groups.values())):
@@ -955,9 +690,9 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     for ind, time_label in enumerate(align_times[:-1]):
                         filter_dict = dict(time_label=[time_label], **plot_group_dict)
                         p_data = param_data.copy(deep=True)  # TODO - idk if needed but having weird double flipping cases
-                        group_aligned_data = self._select_group_aligned_data(p_data, filter_dict, window)
+                        group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict, window)
                         if np.size(group_aligned_data) and group_aligned_data is not None:
-                            quant_aligned_data = self._quantify_aligned_data(p_data, group_aligned_data)
+                            quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
                             bounds = [v['bound_values'] for v in quant_aligned_data.values()]
                             self.plot_1d_around_update(group_aligned_data, quant_aligned_data, time_label, feat, axes,
                                                    row_id=np.arange(nrows), col_id=[ind] * nrows,
@@ -1035,9 +770,9 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                        f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
                 self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data', additional_tags=tags)
 
-            self._plot_group_aligned_stats(data_for_stats, tags=tags)
+            self.plot_group_aligned_stats(data_for_stats, tags=tags)
 
-    def _plot_group_aligned_stats(self, data_for_stats, tags=''):
+    def plot_group_aligned_stats(self, data_for_stats, tags=''):
         # grab data from the first second after the update occurs  TODO - make this more generalized
         prob_sum_df = pd.DataFrame(data_for_stats)
         prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
@@ -1064,10 +799,9 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                                list(group['group'].unique())}
             self.results_io.export_statistics(data_to_compare, f'aligned_data_{"_".join(name)}_stats_{tags}')
 
-
     def plot_tuning_curves(self, data, name):
         feat = data['feature'].values[0]
-        locations = data['decoder'].values[0].virtual_track.get_cue_locations().get(feat, dict())
+        locations = data.virtual_track.values[0].get_cue_locations().get(feat, dict())
         tuning_curve_params = [p for p in self.params if p not in ['decoder_bins']]
         data_const_decoding = data[data['decoder_bins'] == data['decoder_bins'].values[0]]
         param_group_data = data_const_decoding.groupby(tuning_curve_params)
@@ -1075,7 +809,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         nrows, ncols = (1, 3)
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False)
         for param_name, param_data in param_group_data:
-            group_tuning_curve_df = self._get_group_tuning_curves(param_data)
+            group_tuning_curve_df = self.aggregator.get_tuning_data(param_data)
             tuning_curve_mat = np.stack(group_tuning_curve_df['tuning_curve'].values)
             tuning_curve_scaled = tuning_curve_mat / np.nanmax(tuning_curve_mat, axis=1)[:, None]
             tuning_curve_bins = group_tuning_curve_df['bins'].values[0]
