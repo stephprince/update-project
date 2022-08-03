@@ -29,7 +29,7 @@ def run_bayesian_decoding():
     regions = [['CA1'], ['PFC']]  # run PFC later
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bins=[40],
-                          decoder_bins=[0.050, 0.25])
+                          decoder_bins=[0.25])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop

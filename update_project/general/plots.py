@@ -74,7 +74,7 @@ def get_color_theme():
 
 
 def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True,
-                       palette=None, histstat='proportion'):
+                       palette=None, histstat='proportion', common_norm=False):
     palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
     if len(palette) > len(data[group].unique()):
         palette = palette[:len(data[group].unique())]
@@ -103,7 +103,7 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
 
     # histograms
     axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
-                                                element='step', palette=palette, stat=histstat)
+                                                element='step', palette=palette, stat=histstat, common_norm=False)
     axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
 
     # violin plots

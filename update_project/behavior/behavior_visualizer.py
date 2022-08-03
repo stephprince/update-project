@@ -53,18 +53,20 @@ class BehaviorVisualizer:
         title = 'Performance - rolling'
         xlabel = 'proportion correct'
         rolling_df = df_by_bin[df_by_bin["type"] == 'rolling']
-        plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='update_type', row_ids=[0, 1, 2],
-                           col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title, palette=self.colors['trials'])
-        plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
-                           col_ids=[1, 1, 1, 1], xlabel=xlabel, title=title)
+        if np.size(rolling_df['prop_correct'].dropna()):
+            plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='update_type', row_ids=[0, 1, 2],
+                               col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title, palette=self.colors['trials'])
+            plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
+                               col_ids=[1, 1, 1, 1], xlabel=xlabel, title=title)
 
         # binned proportion correct
         title = 'Performance - binned'
         xlabel = 'proportion correct'
         binned_df = df_by_bin[df_by_bin["type"] == 'binned']
-        plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='update_type', row_ids=[0, 1, 2],
+        if np.size(binned_df['prop_correct'].dropna()):
+            plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='update_type', row_ids=[0, 1, 2],
                            col_ids=[2, 2, 2, 2], xlabel=xlabel, title=title, palette=self.colors['trials'])
-        plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
+            plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
                            col_ids=[3, 3, 3, 3], xlabel=xlabel, title=title)
 
         # wrap up and save plot

@@ -1003,27 +1003,33 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 # add significance stars to sections of plot
                 prob_sum_df = pd.DataFrame(data_for_stats)
                 prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
-                bins_to_grab = np.floor([len(data['times']) / 2, 3 * len(data['times']) / 4]).astype(int)
+                bins_to_grab = [0, len(data['times'])]
                 times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
-                stars_to_plot = []
-                blanks_to_plot = []
+                stars_to_plot = dict(initial=[], new=[])
+                blanks_to_plot = dict(initial=[], new=[])
                 for ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
                     prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
                     temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
                         drop=True)
                     df = pd.DataFrame(temp_df.to_dict())
-                    for name, group in df.groupby(['comparison', 'bound']):
-                        data_to_compare = {'_'.join((*name, str(v))): group[group['group'] == v]['data'].values for v in
+                    for n, group in df.groupby(['comparison', 'bound']):
+                        data_to_compare = {'_'.join((*n, str(v))): group[group['group'] == v]['data'].values for v in
                                            list(group['group'].unique())}
                         comp_stats = get_comparative_stats(*data_to_compare.values())
+                        self.results_io.export_statistics(data_to_compare, f'aligned_data_{"_".join(n)}_stats_{tags}_bin{ind}')
                         if comp_stats['ranksum']['p_value'] < 0.05:
-                            stars_to_plot.append(times[ind])
+                            stars_to_plot[n[1]].append(times[ind])
                         else:
-                            blanks_to_plot.append(times[ind])
-                stars_height = [axes[3][0].get_ylim()[1]/2] * len(stars_to_plot)
-                blanks_height = [axes[3][0].get_ylim()[1]/2] * len(blanks_to_plot)
-                axes[3][0].plot(blanks_to_plot, blanks_height, marker="o", linestyle='', markerfacecolor='k', markersize=5)
-                axes[3][0].plot(stars_to_plot, stars_height, marker="*", linestyle='', markerfacecolor='r', markersize=10)
+                            blanks_to_plot[n[1]].append(times[ind])
+
+                bound_plot_info = dict(initial=dict(height=10, color=self.colors['stay']), new=dict(height=5, color=self.colors['switch']))
+                for key, val in bound_plot_info.items():
+                    stars_height = [axes[3][0].get_ylim()[1] / (val['height'])] * len(stars_to_plot[key])
+                    blanks_height = [axes[3][0].get_ylim()[1] / (val['height'])] * len(blanks_to_plot[key])
+                    axes[3][0].plot(blanks_to_plot[key], blanks_height, marker="o", linestyle='', markerfacecolor='k',
+                                    markersize=5, label='n.s.')
+                    axes[3][0].plot(stars_to_plot[key], stars_height, marker="*", linestyle='', markerfacecolor=val['color'],
+                                    markersize=10, label=f'{key} sig.')
 
                 tags = f'{"_".join(["".join(n) for n in name])}' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
@@ -1046,9 +1052,9 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         ncols = 4  # 1 column for switch vs. stay, correct vs. incorrect switch * 3 for left, right
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10))
         count = 0
-        for name, group in df.groupby(['comparison', 'bound']):
+        for n, group in df.groupby(['comparison', 'bound']):
             plot_distributions(group, axes=axes, column_name='data', group='group', row_ids=[0, 1, 2],
-                               col_ids=[count] * 3, xlabel='probability sum', title=name, stripplot=False)
+                               col_ids=[count] * 3, xlabel='probability sum', title=n, stripplot=False)
             count += 1
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'prob_sum_dist', additional_tags=tags)
 
