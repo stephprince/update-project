@@ -54,6 +54,7 @@ def get_color_theme():
     color_theme_dict['switch'] = '#927ff9'  # 270 in degrees, 95 saturation, 60 light
     color_theme_dict['stay_update'] = color_theme_dict['stay']
     color_theme_dict['switch_update'] = color_theme_dict['switch']
+    color_theme_dict['initial_stay'] = color_theme_dict['stay']
     color_theme_dict['non_update'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
 

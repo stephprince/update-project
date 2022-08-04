@@ -4,12 +4,14 @@ from track_linearization import make_track_graph, get_linearized_position
 
 
 class VirtualTrack:
-    def __init__(self, coords, nodes, edges, cue_locations, choice_boundaries, mappings=None, linearization=False):
+    def __init__(self, coords, nodes, edges, cue_locations, choice_boundaries, home_boundaries,
+                 mappings=None, linearization=False):
         self.coords = coords
         self.nodes = nodes
         self.edges = edges
         self.cue_locations = cue_locations
         self.choice_boundaries = choice_boundaries
+        self.home_boundaries = home_boundaries
         self.mappings = mappings
         self.linearization = linearization
 
@@ -61,13 +63,10 @@ class UpdateTrack(VirtualTrack):
                              turn_type={'left': (-2, 0), 'right': (0, 2)})
     mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},
                     turn_type={'1': 'left', '2': 'right'})
+    home_boundaries = dict(x_position=(-1, 1),
+                           y_position=(5, 255),
+                           view_angle=(2 * np.pi / 9, -2 * np.pi/9))
 
     def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_locations=cue_locations,
-                 choice_boundaries=choice_boundaries, mappings=mappings, linearization=False):
-        super().__init__(coords, nodes, edges, cue_locations, choice_boundaries, mappings, linearization)
-
-        # setup cue locations
-        if self.linearization:
-            self.cue_locations['y_position'].update({'left arm': 298, 'right arm': 341})
-        else:
-            self.cue_locations['y_position'].update({'arms': 285})
+                 choice_boundaries=choice_boundaries, home_boundaries=home_boundaries, mappings=mappings, linearization=False):
+        super().__init__(coords, nodes, edges, cue_locations, choice_boundaries, home_boundaries, mappings, linearization)

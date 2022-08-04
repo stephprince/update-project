@@ -6,6 +6,7 @@ import warnings
 from math import sqrt
 from pathlib import Path
 from sklearn.metrics import mean_squared_error
+from scipy.stats import sem
 
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
@@ -133,6 +134,69 @@ class BayesianDecoderAggregator:
             group_data = None
 
         return group_data
+
+    def calc_theta_phase_data(self, param_data, filter_dict):
+        # get aligned df and apply filters
+        group_aligned_df = self._get_aligned_data(param_data)
+        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
+        data_subset = group_aligned_df[mask].rename_axis('trial').reset_index()
+        data_subset['probability'] = data_subset['probability'].apply(lambda x: x.T)
+
+        # break down so each row has a single theta phase/amplitude value
+        data_to_explode = ['feature', 'decoding', 'error', 'probability', 'theta_phase', 'theta_amplitude', 'times']
+        other_cols = [col for col in data_subset.columns.values if col not in data_to_explode]
+        theta_phase_df = pd.concat([data_subset.explode(d).reset_index()[d] if d != 'feature'
+                                 else data_subset[[*other_cols, 'feature']].explode(d).reset_index(drop=True)
+                                 for d in data_to_explode], axis=1)
+        theta_phase_df.dropna(axis='rows', inplace=True)  # TODO - get theta phase values aligned to center not start
+
+        # get integrated probability densities for each brain region
+        virtual_track = param_data['virtual_track'].values[0]
+        prob_map_bins = param_data['bins'].values[0]
+        choice_bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
+        home_bounds = virtual_track.home_boundaries.get(param_data['feature'].values[0], dict())
+        bounds = dict(**choice_bounds, home=home_bounds)
+        bound_mapping = dict(left='initial_stay', right='switch', home='home')
+        for b_name, b_value in bounds.items():
+            theta_phase_df[bound_mapping[b_name]] = theta_phase_df['probability'].apply(
+                lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
+
+        # get histogram, ratio, and mean probability values for different theta phases
+        theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), half=np.linspace(-np.pi, np.pi, 3))
+        time_bins = [-10, 0.0, 10]  # large numbers just to set upper limits
+        data_to_average = [*list(bound_mapping.values()), 'theta_amplitude']
+        theta_phase_list = []
+        for t_name, t_bins in theta_bins.items():
+            theta_df_bins = pd.cut(theta_phase_df['theta_phase'], t_bins)
+            time_df_bins = pd.cut(theta_phase_df['times'], time_bins, right=False)
+            if not theta_phase_df.empty:
+                mean = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(lambda x: np.mean(x))
+                err_upper = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
+                    lambda x: np.mean(x) + sem(x.astype(float)))
+                err_lower = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
+                    lambda x: np.mean(x) - sem(x.astype(float)))
+                t_df = err_lower.join(err_upper, lsuffix='_err_lower', rsuffix='_err_upper')
+                t_df = mean.join(t_df).reset_index()
+                t_df['phase_mid'] = t_df['theta_phase'].astype('interval').apply(lambda x: x.mid)
+                t_df['time_mid'] = t_df['times'].astype('interval').apply(lambda x: x.mid)
+
+                for g_name, g_value in t_df.groupby('times'):
+                    if g_value['time_mid'].values[0] < 0:
+                        times_label = 'pre'
+                    elif g_value['time_mid'].values[0] > 0:
+                        times_label = 'post'
+                    theta_phase_list.append(dict(bin_name=t_name, times=times_label, df=g_value))
+
+        return theta_phase_list
+
+    @staticmethod
+    def _integrate_prob_density(prob_density, prob_density_bins, bounds, axis=0):
+        prob_map_bins = (prob_density_bins[1:] + prob_density_bins[:-1]) / 2
+        start_bin = np.searchsorted(prob_map_bins, bounds[0])
+        stop_bin = np.searchsorted(prob_map_bins, bounds[1])
+        integrated_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
+
+        return integrated_prob
 
     @staticmethod
     def quantify_aligned_data(param_data, aligned_data):
