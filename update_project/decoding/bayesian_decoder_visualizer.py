@@ -13,7 +13,6 @@ from update_project.decoding.interpolate import griddata_time_intervals
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, get_limits_from_data, get_color_theme
-from update_project.statistics import get_comparative_stats
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
@@ -375,7 +374,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         super().__init__(data, exclusion_criteria=exclusion_criteria, params=params, threshold_params=threshold_params)
 
         self.aggregator = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria)
-        self.aggregator.run_df_aggregation(data, overwrite)
+        self.aggregator.run_df_aggregation(data, overwrite=True)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self, group_by=None):
@@ -396,6 +395,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 # plot correct vs. incorrect trial types
                 self.plot_theta_phase_histogram(data, name)
                 self.plot_group_aligned_data(data, name)
+                #self.plot_group_aligned_comparisons(data, name)
 
                 # plot model metrics
                 self.plot_tuning_curves(data, name)
@@ -677,38 +677,52 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
-            windows = [2]  #, param_data['decoder'].values[0].aligned_data_window]  # time in seconds
+            window = 2
             align_times = self.aggregator.align_times
-            compiled_data = []
 
             for plot_types in list(itertools.product(*plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
                 title = '_'.join([''.join([k, str(v)]) for k, v in zip(plot_groups.keys(), plot_types)])
 
-                for window in windows:  # TODO - fix for multiple windows bc right now flips back and forth
-                    # make plots for aligned data (1 row for each plot, 1 col for each align time)
-                    ncols, nrows = (len(align_times[:-1]), 6)
-                    fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
-                    for ind, time_label in enumerate(align_times[:-1]):
-                        filter_dict = dict(time_label=[time_label], **plot_group_dict)
-                        p_data = param_data.copy(deep=True)  # TODO - idk if needed but having weird double flipping cases
-                        group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict, window)
-                        if np.size(group_aligned_data) and group_aligned_data is not None:
-                            quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
-                            bounds = [v['bound_values'] for v in quant_aligned_data.values()]
-                            self.plot_1d_around_update(group_aligned_data, quant_aligned_data, time_label, feat, axes,
-                                                   row_id=np.arange(nrows), col_id=[ind] * nrows,
-                                                   feature_name=feat, prob_map_axis=0, bounds=bounds)
-                            if filter_dict['turn_type'] == [1, 2]:
-                                compiled_data.append(dict(data=group_aligned_data, quant=quant_aligned_data,
-                                                          **{k: v[0] for k, v in filter_dict.items()}))
-                    # save figure
-                    fig.suptitle(title)
-                    tags = f'{"_".join(["".join(n) for n in name])}_{title}_win{window}_' \
-                           f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                    self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
+                # make plots for aligned data (1 row for each plot, 1 col for each align time)
+                ncols, nrows = (len(align_times[:-1]), 6)
+                fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
+                for ind, time_label in enumerate(align_times[:-1]):
+                    filter_dict = dict(time_label=[time_label], **plot_group_dict)
+                    p_data = param_data.copy(deep=True)
+                    group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict, window)
+                    if np.size(group_aligned_data) and group_aligned_data is not None:
+                        quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
+                        bounds = [v['bound_values'] for v in quant_aligned_data.values()]
+                        self.plot_1d_around_update(group_aligned_data, quant_aligned_data, time_label, feat, axes,
+                                               row_id=np.arange(nrows), col_id=[ind] * nrows,
+                                               feature_name=feat, prob_map_axis=0, bounds=bounds)
 
-            # make plots for direct comparisons
+                # save figure
+                fig.suptitle(title)
+                tags = f'{"_".join(["".join(n) for n in name])}_{title}_win{window}_' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
+
+    def plot_group_aligned_comparisons(self, data, name, plot_groups=None):
+        plot_groups = plot_groups or dict(update_type=[['non_update'], ['switch'], ['stay']],
+                                          turn_type=[[1, 2]], correct=[[0], [1]])
+        feat = data['feature'].values[0]
+        window = 2
+        for param_name, param_data in data.groupby(self.params):
+            compiled_data = []
+            for plot_types in list(itertools.product(*plot_groups.values())):
+                plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
+                for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
+                    filter_dict = dict(time_label=[time_label], **plot_group_dict)
+                    p_data = param_data.copy(deep=True)
+                    group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict, window)
+                    if np.size(group_aligned_data) and group_aligned_data is not None:
+                        quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
+                        compiled_data.append(dict(data=group_aligned_data, quant=quant_aligned_data,
+                                                  **{k: v[0] for k, v in filter_dict.items()}))
+
+            # compile data for comparisons
             compiled_data_df = pd.DataFrame(compiled_data)
             filter_dict = dict(time_label='t_update', correct=1)
             update_mask = pd.concat([compiled_data_df[k] == v for k, v in filter_dict.items()], axis=1).all(axis=1)
@@ -719,60 +733,77 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                               correct=dict(data=compiled_data_df[correct_mask],
                                            comparison=[0, 1]))
 
-            data_for_stats_all = []
+            # plot the data and accompanying stats
+            stats_data_all = []
             for comp, data_dict in compare_df.items():
-                data_for_stats = []
-
-                ncols, nrows = (2, 6)
+                ncols, nrows = (3, 6)  # one col for each comparison, 1 col for difference between two
                 fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
-                for ind, v in enumerate(data_dict['comparison']):
-                    title = f'{v}_{"".join([f"{k}{v}" for k, v in filter_dict.items()])}'
-                    data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
-                    quant = data_dict['data'][data_dict['data'][comp] == v]['quant'].values[0]
-                    bounds = [v['bound_values'] for v in quant.values()]
-                    self.plot_1d_around_update(data, quant, title, feat, axes, row_id=np.arange(nrows), col_id=[ind] * nrows,
-                                           feature_name=feat, prob_map_axis=0, bounds=bounds)
-                    initial_data = dict(prob_sum=quant['left']['prob_sum'], bound='initial', comparison=comp, group=v)
-                    new_data = dict(prob_sum=quant['right']['prob_sum'], bound='new', comparison=comp, group=v)
-                    data_for_stats.extend([initial_data, new_data])
-                    data_for_stats_all.extend([initial_data, new_data])
-
-                # add significance stars to sections of plot
-                prob_sum_df = pd.DataFrame(data_for_stats)
-                prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
-                bins_to_grab = [0, len(data['times'])]
-                times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
-                stars_to_plot = dict(initial=[], new=[])
-                blanks_to_plot = dict(initial=[], new=[])
-                for ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
-                    prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
-                    temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
-                        drop=True)
-                    df = pd.DataFrame(temp_df.to_dict())
-                    for n, group in df.groupby(['comparison', 'bound']):
-                        data_to_compare = {'_'.join((*n, str(v))): group[group['group'] == v]['data'].values for v in
-                                           list(group['group'].unique())}
-                        comp_stats = get_comparative_stats(*data_to_compare.values())
-                        self.results_io.export_statistics(data_to_compare, f'aligned_data_{"_".join(n)}_stats_{tags}_bin{ind}')
-                        if comp_stats['ranksum']['p_value'] < 0.05:
-                            stars_to_plot[n[1]].append(times[ind])
-                        else:
-                            blanks_to_plot[n[1]].append(times[ind])
-
-                bound_plot_info = dict(initial=dict(height=10, color=self.colors['stay']), new=dict(height=5, color=self.colors['switch']))
-                for key, val in bound_plot_info.items():
-                    stars_height = [axes[3][0].get_ylim()[1] / (val['height'])] * len(stars_to_plot[key])
-                    blanks_height = [axes[3][0].get_ylim()[1] / (val['height'])] * len(blanks_to_plot[key])
-                    axes[3][0].plot(blanks_to_plot[key], blanks_height, marker="o", linestyle='', markerfacecolor='k',
-                                    markersize=5, label='n.s.')
-                    axes[3][0].plot(stars_to_plot[key], stars_height, marker="*", linestyle='', markerfacecolor=val['color'],
-                                    markersize=10, label=f'{key} sig.')
-
                 tags = f'{"_".join(["".join(n) for n in name])}' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data', additional_tags=tags)
+                stats_data, stats_plot_data = self.aggregator.get_aligned_stats(comp, data_dict, quant_aligned_data, tags)
+                stats_data_all.append(stats_data)
+                self.plot_aligned_comparison(comp, data_dict, stats_plot_data, nrows, feat, filter_dict)
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data',
+                                         additional_tags=tags)  # TODO - is feature in this name/tags
 
-            self.plot_group_aligned_stats(data_for_stats, tags=tags)
+            self.plot_group_aligned_stats(stats_data_all, tags=tags)
+
+    def plot_aligned_comparison(self, comp, data_dict, stats_data, axes, nrows, feat, filter_dict):
+        data_to_compare = []
+        quant_to_compare = []
+        for ind, v in enumerate(data_dict['comparison']):
+            title = f'{v}_{"".join([f"{k}{v}" for k, v in filter_dict.items()])}'
+            data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
+            quant = data_dict['data'][data_dict['data'][comp] == v]['quant'].values[0]
+            bounds = [v['bound_values'] for v in quant.values()]
+            self.plot_1d_around_update(data, quant, title, feat, axes, row_id=np.arange(nrows), col_id=[ind] * nrows,
+                                       feature_name=feat, prob_map_axis=0, bounds=bounds)
+            data_to_compare.append(data)
+            quant_to_compare.append(quant)
+
+        # get color mappings
+        data_split = dict(initial_stay=dict(data=quant_to_compare['left'],
+                                            color=self.colors['stay'],
+                                            cmap=self.colors['stay_cmap']),
+                          switch=dict(data=quantification_data['right'],
+                                      color=self.colors['switch'],
+                                      cmap=self.colors['switch_cmap']))
+
+        prob_map = np.nanmean(data_around_update['probability'], axis=prob_map_axis)
+        if prob_map_axis == 1:
+            prob_map = prob_map.T
+
+        stats = data_around_update['stats']
+        limits = get_limits_from_data([data_around_update['feature']], balanced=balanced)
+        err_limits = get_limits_from_data(
+            [(v['data']['stats']['prob_sum'][f'{error_bars}lower'],
+              v['data']['stats']['prob_sum'][f'{error_bars}upper'])
+             for k, v in data_split.items()], balanced=False)
+        err_limits[0] = 0
+        all_limits_balanced = get_limits_from_data([v['data']['prob_sum'] for v in data_split.values()])
+        times = data_around_update['times']
+        time_tick_values = times.astype(int)
+        n_position_bins = np.shape(prob_map)[0]
+        data_values = np.linspace(np.nanmin(data_around_update['decoding']),
+                                  np.nanmax(data_around_update['decoding']),
+                                  n_position_bins)
+
+        pos_values_after_update = np.sum(
+            data_around_update['feature'][int(len(time_tick_values) / 2):int(len(time_tick_values) / 2) + 10],
+            axis=0)
+        sort_index = np.argsort(pos_values_after_update)
+
+        # add significance stars
+        bound_plot_info = dict(initial=dict(height=10, color=self.colors['stay']),
+                               new=dict(height=5, color=self.colors['switch']))
+        for key, val in bound_plot_info.items():
+            stars_height = [axes[3][0].get_ylim()[1] / (val['height'])] * len(stats_data['sig'][key])
+            blanks_height = [axes[3][0].get_ylim()[1] / (val['height'])] * len(stats_data['ns'][key])
+            axes[3][2].plot(stats_data['ns'][key], blanks_height, marker="o", linestyle='', markerfacecolor='k',
+                            markersize=5, label='n.s.')
+            axes[3][2].plot(stats_data['sig'][key], stars_height, marker="*", linestyle='',
+                            markerfacecolor=val['color'],
+                            markersize=10, label=f'{key} sig.')
 
     def plot_group_aligned_stats(self, data_for_stats, tags=''):
         # grab data from the first second after the update occurs  TODO - make this more generalized
@@ -793,7 +824,6 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             plot_distributions(group, axes=axes, column_name='data', group='group', row_ids=[0, 1, 2],
                                col_ids=[count] * 3, xlabel='probability sum', title=n, stripplot=False)
             count += 1
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'prob_sum_dist', additional_tags=tags)
 
         # get stats
         for name, group in df.groupby(['comparison', 'bound']):
@@ -878,16 +908,19 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             for plot_types in list(itertools.product(*plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
 
-                # make plots for aligned data (1 row for hists,  half-cycle data, 1 col for each align time)
+                # make plots for aligned data (1 row for hists, half-cycle data, 1 col for each align time)
                 ncols, nrows = (len(align_times[:-1]), 6)
                 fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row', sharex='col')
                 for ind, time_label in enumerate(align_times[:-1]):
                     filter_dict = dict(time_label=[time_label], **plot_group_dict)
-                    theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict)
+                    p_data = param_data.copy(deep=True)
+                    theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict)
                     for t in theta_phase_data:
-                        rows = dict(full=0, half=3, theta_amplitude=0, initial_stay=1, switch=1, home=2)
+                        rows = dict(full=0, half=2, theta_amplitude=0, initial_stay=1, switch=1, home=2)
                         row_ind = rows[t['bin_name']]  # full or half
                         for loc in ['switch', 'initial_stay', 'home', 'theta_amplitude']:
+                            if t['times'] == 'post' and time_label == 'choice_made':
+                                continue  # don't plot this bc should be minimal values here
                             lstyle = ['dashed' if t['times'] == 'pre' else 'solid'][0]
                             color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
                             axes[rows[loc]+row_ind][ind].plot(t['df']['phase_mid']/np.pi, t['df'][f'{loc}'], color=color, linestyle=lstyle,

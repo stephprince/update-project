@@ -8,6 +8,7 @@ from pathlib import Path
 from update_project.general.plots import clean_plot
 from update_project.statistics import get_stats_summary
 
+
 class ResultsIO:
     git_hash = Repo(search_parent_directories=True).head.object.hexsha[:10]
     base_path = Path().absolute().parent.parent / 'results'
