@@ -11,7 +11,7 @@ from scipy.stats import sem
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.results_io import ResultsIO
-from update_project.statistics import get_fig_stats
+from update_project.statistics import get_fig_stats, get_comparative_stats
 
 
 class BayesianDecoderAggregator:
@@ -83,18 +83,9 @@ class BayesianDecoderAggregator:
         return dict(confusion_matrix=confusion_matrix, confusion_matrix_sum=confusion_matrix_sum, locations=locations,
                     bins=bins, vmax=vmax, param_values=param_name)
 
-    def select_group_aligned_data(self, param_data, filter_dict, window=None, flip_trials=True):
-        group_aligned_df = self._get_aligned_data(param_data)
-
-        # filter for specific features
-        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
-        data_subset = group_aligned_df[mask]
-
-        # flip trials if indicated
-        turn_to_flip = 2
-        trials_to_flip = data_subset[data_subset['turn_type'] == turn_to_flip]
+    def _flip_trials(self, trials_to_flip, turn_to_flip, data_subset, param_data):
         if np.size(trials_to_flip):
-            if flip_trials and data_subset['feature_name'].values[0] == 'y_position':
+            if data_subset['feature_name'].values[0] == 'y_position':
                 feat_bins = param_data['bins'].values[0]
                 virtual_track = param_data['virtual_track'].values[0]
                 bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
@@ -104,7 +95,7 @@ class BayesianDecoderAggregator:
                 trials_to_flip = trials_to_flip.apply(
                     lambda x: self._flip_y_position(x, bounds, feat_bins) if x.name in ['probability'] else x)
                 data_subset.loc[data_subset['turn_type'] == turn_to_flip, :] = trials_to_flip
-            elif flip_trials:
+            else:
                 feat_before_flip = trials_to_flip['feature'].values[0][0]
                 prob_before_flip = trials_to_flip['probability'].values[0][0][0]
                 trials_to_flip = trials_to_flip.apply(lambda x: x * -1 if x.name in ['feature', 'decoding'] else x)
@@ -115,6 +106,21 @@ class BayesianDecoderAggregator:
                 if ~np.isnan(prob_before_flip):
                     assert prob_before_flip == trials_to_flip['probability'].values[0][-1][
                         0], 'Data not correctly flipped'
+
+        return data_subset
+
+    def select_group_aligned_data(self, param_data, filter_dict, window=None, flip_trials=True):
+        group_aligned_df = self._get_aligned_data(param_data)
+
+        # filter for specific features
+        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
+        data_subset = group_aligned_df[mask]
+
+        # flip trials if indicated
+        if flip_trials:
+            turn_to_flip = 2
+            trials_to_flip = data_subset[data_subset['turn_type'] == turn_to_flip]
+            data_subset = self._flip_trials(trials_to_flip, turn_to_flip, data_subset, param_data)
 
         if np.size(data_subset):
             if window:
@@ -140,6 +146,8 @@ class BayesianDecoderAggregator:
         group_aligned_df = self._get_aligned_data(param_data)
         mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
         data_subset = group_aligned_df[mask].rename_axis('trial').reset_index()
+        trials_to_flip = data_subset[data_subset['turn_type'] == 2]
+        data_subset = self._flip_trials(trials_to_flip, 2, data_subset, param_data)
         data_subset['probability'] = data_subset['probability'].apply(lambda x: x.T)
 
         # break down so each row has a single theta phase/amplitude value
@@ -194,9 +202,9 @@ class BayesianDecoderAggregator:
         prob_map_bins = (prob_density_bins[1:] + prob_density_bins[:-1]) / 2
         start_bin = np.searchsorted(prob_map_bins, bounds[0])
         stop_bin = np.searchsorted(prob_map_bins, bounds[1])
-        integrated_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
+        mean_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
 
-        return integrated_prob
+        return mean_prob
 
     @staticmethod
     def quantify_aligned_data(param_data, aligned_data):
@@ -335,8 +343,8 @@ class BayesianDecoderAggregator:
         feature_mean = []
         for index, trial in decoder.decoder_times.iterrows():
             trial_bins = np.arange(trial['start'], trial['end'] + decoder.decoder_bin_size, decoder.decoder_bin_size)
-            bins = pd.cut(decoder.features_test[decoder.feature_names[0]].index, trial_bins)
-            feature_mean.append(decoder.features_test[decoder.feature_names[0]].groupby(bins).mean())
+            bins = pd.cut(decoder.features_test.index, trial_bins)
+            feature_mean.append(decoder.features_test.iloc[:, 0].groupby(bins).mean())
             time_index.append(trial_bins[0:-1] + np.diff(trial_bins) / 2)
         time_index = np.hstack(time_index)
         feature_means = np.hstack(feature_mean)
@@ -418,9 +426,11 @@ class BayesianDecoderAggregator:
                     trials_to_flip = trials_to_agg['turn_type'][~mid_times.isna()] == 100  # set all to false
                 mid_times.dropna(inplace=True)
 
-                vars = dict(feature=decoder.features_test[decoder.feature_names[0]], decoded=decoder.decoded_values,
-                            probability=decoder.decoded_probs, theta_phase=decoder.theta['phase'],
-                            theta_amplitude=decoder.theta['amplitude'])
+                phase_col = np.argwhere(decoder.theta.columns == 'phase')[0][0]
+                amp_col = np.argwhere(decoder.theta.columns == 'amplitude')[0][0]
+                vars = dict(feature=decoder.features_test.iloc[:, 0], decoded=decoder.decoded_values,
+                            probability=decoder.decoded_probs, theta_phase=decoder.theta.iloc[:, phase_col],
+                            theta_amplitude=decoder.theta.iloc[:, amp_col])
                 locs = self._get_start_stop_locs(vars, mid_times, window_start, window_stop)
 
                 interp_dict = dict()
@@ -504,6 +514,39 @@ class BayesianDecoderAggregator:
                              raw_error_median=raw_error_median)
 
         return session_error
+
+    def get_aligned_stats(self, comp, data_dict, quant, tags):
+        data_for_stats = []
+        for ind, v in enumerate(data_dict['comparison']):
+            data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
+            initial_data = dict(prob_sum=quant['left']['prob_sum'], bound='initial', comparison=comp, group=v)
+            new_data = dict(prob_sum=quant['right']['prob_sum'], bound='new', comparison=comp, group=v)
+            data_for_stats.extend([initial_data, new_data])
+
+            # add significance stars to sections of plot
+            prob_sum_df = pd.DataFrame(data_for_stats)
+            prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
+            bins_to_grab = [0, len(data['times'])]
+            times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
+            stars_to_plot = dict(initial=[], new=[])
+            blanks_to_plot = dict(initial=[], new=[])
+            for b_ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
+                prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
+                temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
+                    drop=True)
+                df = pd.DataFrame(temp_df.to_dict())
+                for n, group in df.groupby(['comparison', 'bound']):
+                    data_to_compare = {'_'.join((*n, str(v))): group[group['group'] == v]['data'].values for v in
+                                       list(group['group'].unique())}
+                    comp_stats = get_comparative_stats(*data_to_compare.values())
+                    self.results_io.export_statistics(data_to_compare,
+                                                      f'aligned_data_{"_".join(n)}_stats_{tags}_bin{b_ind}')
+                    if comp_stats['ranksum']['p_value'] < 0.05:
+                        stars_to_plot[n[1]].append(times[b_ind])
+                    else:
+                        blanks_to_plot[n[1]].append(times[b_ind])
+
+        return data_for_stats, dict(sig=stars_to_plot, ns=blanks_to_plot)
 
     def _load_data(self):
         for name, file_info in self.data_files.items():
