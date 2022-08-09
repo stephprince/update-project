@@ -59,3 +59,20 @@ def align_by_time_intervals(
         out.append(x + start)
 
     return out
+
+
+def bin_spikes(spike_times, tt):
+    """Evaluate gaussian smoothing of spike_times at uniformly spaced array t
+    Args:
+      spike_times:
+          A 1D numpy ndarray of spike times
+      tt:
+          1D array, uniformly spaced, e.g. the output of np.linspace or np.arange
+    Returns:
+          Spikes binned by tt
+    """
+    binned_spikes = np.zeros_like(tt)
+    binned_spikes[np.searchsorted(tt, spike_times) - 1] += 1
+    # adjust by 1 bc want to bin into 1st bin if item between 1st and second (also searchsorted returns len(tt) if outside lims)
+
+    return binned_spikes

@@ -11,6 +11,8 @@ from sklearn.model_selection import train_test_split
 
 from update_project.results_io import ResultsIO
 from update_project.virtual_track import UpdateTrack
+from update_project.general.lfp import get_theta
+from update_project.general.acquisition import get_velocity
 
 
 class BayesianDecoder:
@@ -38,8 +40,8 @@ class BayesianDecoder:
         self.trials = nwbfile.trials.to_dataframe()
         self.units = nwbfile.units.to_dataframe()
         self.data = self._setup_data(nwbfile)
-        self.velocity = self._get_velocity(nwbfile)
-        self.theta = self._get_theta(nwbfile)
+        self.velocity = get_velocity(nwbfile)
+        self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
 
         # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
@@ -66,7 +68,7 @@ class BayesianDecoder:
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
-                                                 'feature_names', 'linearized_features',],
+                                                 'feature_names', 'linearized_features', ],
                                            format='npz'))
 
     def run_decoding(self, overwrite=False):
@@ -121,34 +123,6 @@ class BayesianDecoder:
             data_dict[feat] = pd.Series(index=time_series.timestamps[:], data=data)
 
         return pd.DataFrame.from_dict(data_dict)
-
-    @staticmethod
-    def _get_velocity(nwbfile):
-        rotational_velocity = nwbfile.acquisition['rotational_velocity'].data
-        translational_velocity = nwbfile.acquisition['translational_velocity'].data
-        velocity = np.abs(rotational_velocity[:]) + np.abs(translational_velocity[:])
-        rate = nwbfile.acquisition['translational_velocity'].rate
-        timestamps = np.arange(0, len(velocity) / rate, 1 / rate)
-        velocity = pd.Series(index=timestamps[:], data=velocity)
-
-        return velocity
-
-    @staticmethod
-    def _get_theta(nwbfile):
-        electrode_df = nwbfile.electrodes.to_dataframe()
-        ripple_channel = electrode_df.index[electrode_df['ripple_channel'] == 1][0]
-
-        band_df = nwbfile.processing['ecephys']['decomposition_amplitude'].bands.to_dataframe()
-        band_ind = np.array(band_df.index[band_df['band_name'] == 'theta'])[0]
-        amp = nwbfile.processing['ecephys']['decomposition_amplitude'].data[:, ripple_channel, band_ind]
-        phase = nwbfile.processing['ecephys']['decomposition_phase'].data[:, ripple_channel, band_ind]
-        rate = nwbfile.processing['ecephys']['decomposition_amplitude'].rate
-        timestamps = np.arange(0, len(amp) / rate, 1 / rate)
-
-        theta_dict = dict(amplitude=pd.Series(index=timestamps[:], data=amp),
-                          phase=pd.Series(index=timestamps[:], data=phase))
-
-        return pd.DataFrame.from_dict(theta_dict)
 
     def _get_time_intervals(self, trial_starts, trial_stops):
         movement = self.velocity > self.speed_threshold
