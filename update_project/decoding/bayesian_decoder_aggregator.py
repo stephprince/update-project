@@ -523,28 +523,28 @@ class BayesianDecoderAggregator:
             new_data = dict(prob_sum=quant['right']['prob_sum'], bound='new', comparison=comp, group=v)
             data_for_stats.extend([initial_data, new_data])
 
-            # add significance stars to sections of plot
-            prob_sum_df = pd.DataFrame(data_for_stats)
-            prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
-            bins_to_grab = [0, len(data['times'])]
-            times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
-            stars_to_plot = dict(initial=[], new=[])
-            blanks_to_plot = dict(initial=[], new=[])
-            for b_ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
-                prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
-                temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
-                    drop=True)
-                df = pd.DataFrame(temp_df.to_dict())
-                for n, group in df.groupby(['comparison', 'bound']):
-                    data_to_compare = {'_'.join((*n, str(v))): group[group['group'] == v]['data'].values for v in
-                                       list(group['group'].unique())}
-                    comp_stats = get_comparative_stats(*data_to_compare.values())
-                    self.results_io.export_statistics(data_to_compare,
-                                                      f'aligned_data_{"_".join(n)}_stats_{tags}_bin{b_ind}')
-                    if comp_stats['ranksum']['p_value'] < 0.05:
-                        stars_to_plot[n[1]].append(times[b_ind])
-                    else:
-                        blanks_to_plot[n[1]].append(times[b_ind])
+        # add significance stars to sections of plot
+        prob_sum_df = pd.DataFrame(data_for_stats)
+        prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
+        bins_to_grab = [0, len(data['times'])]
+        times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
+        stars_to_plot = dict(initial=[], new=[])
+        blanks_to_plot = dict(initial=[], new=[])
+        for b_ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
+            prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
+            temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
+                drop=True)
+            df = pd.DataFrame(temp_df.to_dict())
+            for n, group in df.groupby(['comparison', 'bound']):
+                data_to_compare = {'_'.join((*n, str(v))): group[group['group'] == v]['data'].values for v in
+                                   list(group['group'].unique())}
+                comp_stats = get_comparative_stats(*data_to_compare.values())
+                self.results_io.export_statistics(data_to_compare,
+                                                  f'aligned_data_{"_".join(n)}_stats_{tags}_bin{b_ind}')
+                if comp_stats['ranksum']['p_value'] < 0.05:
+                    stars_to_plot[n[1]].append(times[b_ind])
+                else:
+                    blanks_to_plot[n[1]].append(times[b_ind])
 
         return data_for_stats, dict(sig=stars_to_plot, ns=blanks_to_plot)
 
