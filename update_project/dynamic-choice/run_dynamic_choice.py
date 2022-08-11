@@ -5,7 +5,7 @@ import tensorflow as tf
 
 from pathlib import Path
 from pynwb import NWBHDF5IO
-from sklearn.model_selection import RepeatedKFold, GridSearchCV
+from sklearn.model_selection import RepeatedStratifiedKFold, GridSearchCV
 from sklearn.preprocessing import normalize
 
 from update_project.session_loader import SessionLoader
@@ -15,12 +15,28 @@ from update_project.general.timeseries import align_by_time_intervals as align_b
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
 
-def load_dynamic_choice_data(nwbfile):
+def log2_likelihood(y_true, y_pred, eps=1e-15):
+    # adjust small values so work with log correctly
+    y_pred = np.clip(y_pred, eps, 1 - eps)
+
+    # calculate log_likelihood of elements and sum
+    log_likelihood_elem = y_true * np.log2(y_pred) + (1 - y_true) * np.log2(1 - y_pred)
+    #log_likelihood = np.sum(log_likelihood_elem) / len(y_true)
+
+    return log_likelihood_elem
+
+
+
+def export_data(nwbfile, dynamic_choice):
+    trial_inds = get_trial_inds(nwbfile)
+
+
+def load_data(nwbfile):
     # get non-update ymaze delay trials
     trials_df = nwbfile.trials.to_dataframe()
     mask = pd.concat([trials_df['update_type'] == 1,  # non-update trials only to train
                       trials_df['maze_id'] == 4,  # delay trials only not visual warmup
-                      trials_df['duration'] <= trials_df['duration'].mean()*2],  # trials shorter than 2*mean only
+                      trials_df['duration'] <= trials_df['duration'].mean() * 2],  # trials shorter than 2*mean only
                      axis=1).all(axis=1)
     trial_inds = np.array(trials_df.index[mask])
 
@@ -44,23 +60,40 @@ def load_dynamic_choice_data(nwbfile):
 
     return input_data, target_data
 
-def get_repeated_fold_average(output_df, label=None, stack='v'):
+
+def get_repeated_fold_average(output_df, label=None):
     all_trial_inds = np.hstack(output_df['test_index'].to_numpy())
-    if stack == 'v':
-        all_trial_outputs = np.vstack(output_df[label].to_numpy())
-    elif stack == 'h':
-        all_trial_outputs = np.hstack(output_df[label].to_numpy())
+    all_trial_outputs = np.vstack(output_df[label].to_numpy())
 
     mean_data = []
     for trial_ind in range(np.shape(np.unique(all_trial_inds))[0]):
-        if np.ndim(all_trial_outputs):
-            output_data = all_trial_outputs[all_trial_inds == trial_ind]
-        else:
-            output_data = all_trial_outputs[all_trial_inds == trial_ind, :]
+        output_data = all_trial_outputs[all_trial_inds == trial_ind, :]
         mean_data.append(np.mean(output_data, axis=0).squeeze())
 
     return np.array(mean_data)
 
+def build_model(input_train_fold=(0,0,0), input_train_no_pad=[0], mask_value=-9999):
+    # setup normalization layer
+    layer_norm = tf.keras.layers.Normalization(axis=1)
+    layer_norm.adapt(np.vstack(input_train_no_pad))  # put in all batch data that is not padded
+
+    # build model
+    print('Creating model...')
+    model = tf.keras.models.Sequential()
+    model.add(tf.keras.Input(shape=np.shape(input_train_fold)[1:]))
+    model.add(tf.keras.layers.Masking(mask_value=mask_value, input_shape=np.shape(input_train_fold)[1:]))
+    model.add(layer_norm)
+    model.add(tf.keras.layers.LSTM(units=10, input_shape=np.shape(input_train_fold), return_sequences=True))
+    model.add(tf.keras.layers.Dense(units=1,
+                                    activation='sigmoid', ))
+
+    # compile model
+    print('Compiling model...')
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+                  metrics=tf.keras.metrics.BinaryAccuracy())  # what should my loss be
+
+    return model
 
 def run_dynamic_choice():
     # setup sessions
@@ -78,26 +111,24 @@ def run_dynamic_choice():
         results_io = ResultsIO(creator_file=__file__, session_id=session_db.get_session_id(name),
                                folder_name='dynamic-choice', )
         # get data
-        input_data, target_data = load_dynamic_choice_data(nwbfile)
+        input_data, target_data = load_data(nwbfile)
+
+        # pad data
+        mask_value = -9999
+        input_data_pad = tf.keras.preprocessing.sequence.pad_sequences(input_data, dtype='float64', padding='post',
+                                                                       value=mask_value)
+        target_data_pad = tf.keras.preprocessing.sequence.pad_sequences(target_data, dtype='float64',
+                                                                        truncating='post',
+                                                                        maxlen=np.shape(input_data_pad)[1])
 
         # k-fold cross validation
         output_data = []
-        cv = RepeatedKFold(n_splits=6, n_repeats=5, random_state=21)
-        for train_index, test_index in cv.split(input_data, target_data):
-            # pad data
-            mask_value = -9999
-            input_data_pad = tf.keras.preprocessing.sequence.pad_sequences(input_data, dtype='float64', padding='post',
-                                                                           value=mask_value)
-            target_data_pad = tf.keras.preprocessing.sequence.pad_sequences(target_data, dtype='float64',
-                                                                            truncating='post',
-                                                                            maxlen=np.shape(input_data_pad)[1])
+        cv = RepeatedStratifiedKFold(n_splits=6, n_repeats=2, random_state=21)
+        for train_index, test_index in cv.split(input_data, np.array(target_data)[:, 0]):
 
             # get input and target data
             input_train_fold, input_test_fold = input_data_pad[train_index, :, :], input_data_pad[test_index, :, :]
             target_train_fold, target_test_fold = target_data_pad[train_index], target_data_pad[test_index]
-
-            # balance data (can't use stratifiedKFold to balance bc classes of target and input not the same)
-            # TODO - resample L/R trial types if needed so equal amounts of each
 
             # normalize, sort, and pad data
             input_train_no_pad = [d for ind, d in enumerate(input_data) if ind in train_index]
@@ -112,9 +143,7 @@ def run_dynamic_choice():
             model.add(layer_norm)
             model.add(tf.keras.layers.LSTM(units=10, input_shape=np.shape(input_train_fold), return_sequences=True))
             model.add(tf.keras.layers.Dense(units=1,
-                                            activation='sigmoid',
-                                            kernel_regularizer=tf.keras.regularizers.L2(l2=0.1)))  # is this where it goes?
-            # TODO - might want to add kernel_regularizer to LSTM too?
+                                            activation='sigmoid',))
 
             print('Compiling model...')
             model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
@@ -136,44 +165,48 @@ def run_dynamic_choice():
             # concatenate data
             output_data.append(dict(history=history.history, score=score, accuracy=acc, prediction=prediction,
                                     input_test_fold=input_test_fold,
-                                    target_test_fold=target_test_fold[:, 0].astype(int), test_index=test_index))
+                                    target_test_fold=target_test_fold, test_index=test_index))
 
         # get average for each trial across all cross-validation folds
         output_df = pd.DataFrame(output_data)
-        predict_data = get_repeated_fold_average(output_df, label='prediction', stack='v')
-        target_data = get_repeated_fold_average(output_df, label='target_test_fold', stack='h').astype(int)
-        y_position = get_repeated_fold_average(output_df, label='input_test_fold', stack='v')[:, :, 0]
+        predict_data = get_repeated_fold_average(output_df, label='prediction')
+        target_data = get_repeated_fold_average(output_df, label='target_test_fold')[:, 0].astype(int)
+        y_position = get_repeated_fold_average(output_df, label='input_test_fold')[:, :, 0]
         y_position[y_position < -9000] = np.nan
+        log_likelihood = np.array([log2_likelihood(np.tile(t, len(p)), p) for t, p in zip(target_data, predict_data)])
 
         # plot the results for the session
-        fig, axes = plt.subplots()
-        axes.plot(y_position.T[:, target_data == 1], predict_data.T[:, target_data == 1], color='b',
-                  label='left choice')
-        axes.plot(y_position.T[:, target_data == 0], predict_data.T[:, target_data == 0], color='r',
-                  label='right choice')
-        axes.set(xlabel='position in track', ylabel='p(left)', title='LSTM prediction - test trials')
+        fig, axes = plt.subplots(nrows=2, ncols=2, squeeze=False)
+        y_pos_left = y_position.T[:, target_data == 1]
+        y_pos_right = y_position.T[:, target_data == 0]
+        predict_left = predict_data.T[:, target_data == 1]
+        predict_right = predict_data.T[:, target_data == 0]
+        axes[0][0].plot(np.nanmean(y_pos_left, axis=1), np.nanmean(predict_left, axis=1), color='b', label='left choice')  #TODO - should bin by position instead of doing weird averaging
+        axes[0][0].plot(np.nanmean(y_pos_right, axis=1), np.nanmean(predict_right, axis=1), color='r', label='right choice')
+        axes[0][0].set(xlabel='position in track', ylabel='p(left)', ylim=[0, 1], title='LSTM prediction - test trials')
+        axes[1][0].plot(y_pos_left, predict_left, color='b')
+        axes[1][0].plot(y_pos_right, predict_right, color='r')
+        axes[1][0].set(xlabel='position in track', ylabel='p(left)', ylim=[0, 1], title='LSTM prediction - test trials')
+
+        axes[0][1].plot(np.nanmean(y_pos_left, axis=1), np.nanmean(log_likelihood.T[:, target_data == 1], axis=1), color='b')
+        axes[0][1].plot(np.nanmean(y_pos_right, axis=1), np.nanmean(log_likelihood.T[:, target_data == 0], axis=1), color='r')
+        axes[0][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-3, 0], title='Log likelihood (0 = perfect)')
+
+        axes[1][1].plot(y_pos_left, log_likelihood.T[:, target_data == 1], color='b')
+        axes[1][1].plot(y_pos_right, log_likelihood.T[:, target_data == 0], color='r')
+        axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-3, 0], title='Log likelihood (0 = perfect)')
+        axes[1][1].axhline(-1, linestyle='dashed', color='k')
         plt.show()
 
-        # get log likelihood
-        log_likelihood = target_data * log2(predict_data) + (1 - target_data)*log2(1 - predict_data)
         # grid search for hyperparameters
         params = dict(batch_size=[100, 20, 50],
                       epochs=[3, 5, 10, 20],
-                      )  # TODO - maybe something about k-fold numbers, unit numbers, l2 regularization etc. loss fxn
-        estimator = tf.keras.wrappers.scikit_learn.KerasClassifier(model)  # want this to be model only up to compile
-        gs = GridSearchCV(estimator=estimator, param_grid=params, cv=cv)
+                      )  # TODO - maybe something about k-fold numbers, unit numbers,
+        estimator = tf.keras.wrappers.scikit_learn.KerasClassifier(model)
+        gs = GridSearchCV(estimator, param_grid=params, cv=cv)
         gs = gs.fit(input_data, target_data)
         gs.cv_results
         #cross_val_score(model, input_data, test_data, scoring='accuracy', cv=cv)
-
-        # get decoder accuracy
-
-        #  The decoder performance, or the decodability of reported choice or cue identity, was quantified as model log
-        #  likelihood, equivalent to the negatively signed binary cross-entropy loss. where
-        #  is the true binary value (reported choice or cue), and
-        #  is the prediction (dynamic choice or cue-biased running). Log base 2 was used so that the log likelihood
-        #  equals -1 for chance-level predictions and 0 for perfect prediction.
-
 
 
 if __name__ == '__main__':
