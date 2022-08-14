@@ -6,7 +6,7 @@ import tensorflow as tf
 from pathlib import Path
 from pynwb import NWBHDF5IO
 from sklearn.model_selection import RepeatedStratifiedKFold, GridSearchCV
-from sklearn.preprocessing import normalize
+from scikeras.wrappers import KerasClassifier
 
 from update_project.session_loader import SessionLoader
 from update_project.results_io import ResultsIO
@@ -21,10 +21,8 @@ def log2_likelihood(y_true, y_pred, eps=1e-15):
 
     # calculate log_likelihood of elements and sum
     log_likelihood_elem = y_true * np.log2(y_pred) + (1 - y_true) * np.log2(1 - y_pred)
-    #log_likelihood = np.sum(log_likelihood_elem) / len(y_true)
 
     return log_likelihood_elem
-
 
 
 def export_data(nwbfile, dynamic_choice):
@@ -72,29 +70,6 @@ def get_repeated_fold_average(output_df, label=None):
 
     return np.array(mean_data)
 
-def build_model(input_train_fold=(0,0,0), input_train_no_pad=[0], mask_value=-9999):
-    # setup normalization layer
-    layer_norm = tf.keras.layers.Normalization(axis=1)
-    layer_norm.adapt(np.vstack(input_train_no_pad))  # put in all batch data that is not padded
-
-    # build model
-    print('Creating model...')
-    model = tf.keras.models.Sequential()
-    model.add(tf.keras.Input(shape=np.shape(input_train_fold)[1:]))
-    model.add(tf.keras.layers.Masking(mask_value=mask_value, input_shape=np.shape(input_train_fold)[1:]))
-    model.add(layer_norm)
-    model.add(tf.keras.layers.LSTM(units=10, input_shape=np.shape(input_train_fold), return_sequences=True))
-    model.add(tf.keras.layers.Dense(units=1,
-                                    activation='sigmoid', ))
-
-    # compile model
-    print('Compiling model...')
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
-                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
-                  metrics=tf.keras.metrics.BinaryAccuracy())  # what should my loss be
-
-    return model
-
 def run_dynamic_choice():
     # setup sessions
     animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
@@ -113,18 +88,18 @@ def run_dynamic_choice():
         # get data
         input_data, target_data = load_data(nwbfile)
 
-        # pad data
-        mask_value = -9999
-        input_data_pad = tf.keras.preprocessing.sequence.pad_sequences(input_data, dtype='float64', padding='post',
-                                                                       value=mask_value)
-        target_data_pad = tf.keras.preprocessing.sequence.pad_sequences(target_data, dtype='float64',
-                                                                        truncating='post',
-                                                                        maxlen=np.shape(input_data_pad)[1])
-
         # k-fold cross validation
         output_data = []
+        scores = []
         cv = RepeatedStratifiedKFold(n_splits=6, n_repeats=2, random_state=21)
         for train_index, test_index in cv.split(input_data, np.array(target_data)[:, 0]):
+            # pad data
+            mask_value = -9999
+            input_data_pad = tf.keras.preprocessing.sequence.pad_sequences(input_data, dtype='float64', padding='post',
+                                                                           value=mask_value)
+            target_data_pad = tf.keras.preprocessing.sequence.pad_sequences(target_data, dtype='float64',
+                                                                            truncating='post',
+                                                                            maxlen=np.shape(input_data_pad)[1])
 
             # get input and target data
             input_train_fold, input_test_fold = input_data_pad[train_index, :, :], input_data_pad[test_index, :, :]
@@ -148,7 +123,7 @@ def run_dynamic_choice():
             print('Compiling model...')
             model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
                           loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
-                          metrics=tf.keras.metrics.BinaryAccuracy())  # what should my loss be
+                          metrics=tf.keras.metrics.BinaryAccuracy())
             model.summary()
 
             # fit model
@@ -198,16 +173,7 @@ def run_dynamic_choice():
         axes[1][1].axhline(-1, linestyle='dashed', color='k')
         plt.show()
 
-        # grid search for hyperparameters
-        params = dict(batch_size=[100, 20, 50],
-                      epochs=[3, 5, 10, 20],
-                      )  # TODO - maybe something about k-fold numbers, unit numbers,
-        estimator = tf.keras.wrappers.scikit_learn.KerasClassifier(model)
-        gs = GridSearchCV(estimator, param_grid=params, cv=cv)
-        gs = gs.fit(input_data, target_data)
-        gs.cv_results
-        #cross_val_score(model, input_data, test_data, scoring='accuracy', cv=cv)
-
+        test =1
 
 if __name__ == '__main__':
     run_dynamic_choice()
