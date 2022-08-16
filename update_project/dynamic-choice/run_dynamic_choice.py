@@ -73,7 +73,7 @@ def get_repeated_fold_average(output_df, label=None):
 def run_dynamic_choice():
     # setup sessions
     animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-    dates_included = [210913]  # 210913
+    dates_included = []  # 210913
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
@@ -171,9 +171,8 @@ def run_dynamic_choice():
         axes[1][1].plot(y_pos_right, log_likelihood.T[:, target_data == 0], color='r')
         axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-3, 0], title='Log likelihood (0 = perfect)')
         axes[1][1].axhline(-1, linestyle='dashed', color='k')
-        plt.show()
+        results_io.save_fig(fig=fig, axes=axes, filename='decoding performance', results_type='session')
 
-        test =1
 
 if __name__ == '__main__':
     run_dynamic_choice()
