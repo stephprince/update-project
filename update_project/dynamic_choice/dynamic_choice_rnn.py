@@ -19,10 +19,10 @@ class DynamicChoiceRNN:
         self.input_data, self.target_data = self._setup_data(nwbfile)
 
         self.mask_value = -9999
-        self.grid_search_params = dict(batch_size=[100, 20, 50],
-                                       epochs=[3, 5, 10, 20],
-                                       regularizer=[tf.keras.regularizers.l2(0.001),
-                                                    tf.keras.regularizers.l2(0.01), None])
+        self.grid_search_params = dict(batch_size=[20, 50, 100],
+                                       epochs=[5, 10, 20],
+                                       regularizer=[None, tf.keras.regularizers.l2(0.001),
+                                                    tf.keras.regularizers.l2(0.01)])
 
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic-choice', )
         self.data_files = dict(behavior_output=dict(vars=['output_data', 'agg_data', 'trajectories'],
@@ -43,15 +43,15 @@ class DynamicChoiceRNN:
     def grid_search(self):
         grid_search_data = []
         for batch_size, epochs, regularizer in itertools.product(*list(self.grid_search_params.values())):
-            cv = RepeatedStratifiedKFold(n_splits=6, n_repeats=2, random_state=21)
+            cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=1, random_state=21)
             for train_index, test_index in cv.split(self.input_data, np.array(self.target_data)[:, 0]):
                 preprocessed_data = self._preprocess_data(train_index, test_index)
-
                 build_data = dict(norm_data=preprocessed_data['input_train_no_pad'], regularizer=regularizer,
                                   shape=np.shape(preprocessed_data['input_train']), mask_value=self.mask_value)
                 model = self._get_classifier(build_data)
                 history = model.fit(preprocessed_data['input_train'], preprocessed_data['target_train'],
-                                     batch_size=batch_size, epochs=epochs)
+                                    validation_data=(preprocessed_data['input_test'], preprocessed_data['target_test']),
+                                    batch_size=batch_size, epochs=epochs)
                 score, acc = model.evaluate(preprocessed_data['input_test'], preprocessed_data['target_test'],
                                             verbose=0)
 
@@ -66,23 +66,17 @@ class DynamicChoiceRNN:
         cv = RepeatedStratifiedKFold(n_splits=6, n_repeats=2, random_state=21)
         for train_index, test_index in cv.split(self.input_data, np.array(self.target_data)[:, 0]):
             preprocessed_data = self._preprocess_data(train_index, test_index)
-
-            # build model
             build_data = dict(norm_data=preprocessed_data['input_train_no_pad'], regularizer=None,
                               shape=np.shape(preprocessed_data['input_train']), mask_value=self.mask_value)
             model = self._get_classifier(build_data)
 
-            # fit model
             print('Fitting model...')
             history = model.fit(preprocessed_data['input_train'], preprocessed_data['target_train'],
                                 batch_size=100, epochs=5)
 
-            # assess model accuracy
             score, acc = model.evaluate(preprocessed_data['input_test'], preprocessed_data['target_test'], verbose=0)
-            print(f'Evaluating model... score: {score}, binary_accuracy: {acc}')
-
-            # use model to generate dynamic choice variable
             prediction = model.predict(preprocessed_data['input_test'])
+            print(f'Evaluating model... score: {score}, binary_accuracy: {acc}')
 
             # concatenate data
             output_data.append(dict(history=history.history, score=score, accuracy=acc, prediction=prediction,
