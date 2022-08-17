@@ -98,7 +98,7 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
     # add median annotations to the first plot
     new_line = '\n'
     median_text = [f"{g} median: {m:.2f} {new_line}" for g, m in medians.items()]
-    axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text),
+    axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text)[:-1],
                                       transform=axes[row_ids[0]][col_ids[0]].transAxes, verticalalignment='top',
                                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
 
