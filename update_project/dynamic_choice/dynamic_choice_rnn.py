@@ -5,8 +5,7 @@ import pandas as pd
 import tensorflow as tf
 import warnings
 
-from sklearn.model_selection import RepeatedStratifiedKFold, GridSearchCV
-from scikeras.wrappers import KerasClassifier
+from sklearn.model_selection import RepeatedStratifiedKFold
 
 from update_project.results_io import ResultsIO
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
@@ -22,32 +21,40 @@ class DynamicChoiceRNN:
         self.grid_search_params = dict(batch_size=[20, 50, 100],
                                        epochs=[5, 10, 20],
                                        regularizer=[None, tf.keras.regularizers.l2(0.001),
-                                                    tf.keras.regularizers.l2(0.01)])
-
+                                                    tf.keras.regularizers.l2(0.01)],
+                                       learning_rate=[0.001, 0.01])
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic-choice', )
         self.data_files = dict(behavior_output=dict(vars=['output_data', 'agg_data', 'trajectories'],
                                                     format='pkl'))
 
-    def run(self, overwrite=False):
+    def run(self, overwrite=False, grid_search=False):
         if overwrite:
-            self._get_dynamic_choice()
-            self._aggregate_data()
+            if grid_search:
+                self.data_files = dict(behavior_output=dict(vars=['grid_search_data'], format='pkl'))
+                self._grid_search()
+            else:
+                self._get_dynamic_choice()
+                self._aggregate_data()
             self._export_data()
         else:
+            if grid_search:
+                self.data_files = dict(behavior_output=dict(vars=['grid_search_data'], format='pkl'))
+
             if self.results_io.data_exists(self.data_files):
                 self._load_data()  # load data structure if it exists and matches the params
             else:
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
                 self.run(overwrite=True)
 
-    def grid_search(self):
+    def _grid_search(self):
         grid_search_data = []
-        for batch_size, epochs, regularizer in itertools.product(*list(self.grid_search_params.values())):
+        for batch_size, epochs, regularizer, learning_rate in itertools.product(*list(self.grid_search_params.values())):
             cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=1, random_state=21)
             for train_index, test_index in cv.split(self.input_data, np.array(self.target_data)[:, 0]):
                 preprocessed_data = self._preprocess_data(train_index, test_index)
                 build_data = dict(norm_data=preprocessed_data['input_train_no_pad'], regularizer=regularizer,
-                                  shape=np.shape(preprocessed_data['input_train']), mask_value=self.mask_value)
+                                  shape=np.shape(preprocessed_data['input_train']), mask_value=self.mask_value,
+                                  learning_rate=learning_rate)
                 model = self._get_classifier(build_data)
                 history = model.fit(preprocessed_data['input_train'], preprocessed_data['target_train'],
                                     validation_data=(preprocessed_data['input_test'], preprocessed_data['target_test']),
@@ -56,7 +63,7 @@ class DynamicChoiceRNN:
                                             verbose=0)
 
                 grid_search_data.append(dict(score=score, accuracy=acc, history=history.history, batch_size=batch_size,
-                                             epochs=epochs, regularizer=regularizer))
+                                             epochs=epochs, regularizer=regularizer, learning_rate=learning_rate))
 
         self.grid_search_data = pd.DataFrame(grid_search_data)
 
@@ -106,7 +113,7 @@ class DynamicChoiceRNN:
 
         # compile model
         print('Compiling model...')
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=build_data['learning_rate']),
                       loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
                       metrics=tf.keras.metrics.BinaryAccuracy())
 
@@ -196,9 +203,21 @@ class DynamicChoiceRNN:
 
         return np.array(mean_data)
 
+    def _load_data(self):
+        print(f'Loading existing data for session {self.results_io.session_id}...')
+
+        # load npz files
+        for name, file_info in self.data_files.items():
+            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
+
+            import_data = self.results_io.load_pickled_data(fname)
+            for v, data in zip(file_info['vars'], import_data):
+                setattr(self, v, data)
+
+        return self
+
     def _export_data(self):
         print(f'Exporting data for session {self.results_io.session_id}...')
-        trial_inds = self._get_trial_inds()  # TODO - combine agg data with trial inds for use by bayesian decoder
 
         # save npz files
         for name, file_info in self.data_files.items():

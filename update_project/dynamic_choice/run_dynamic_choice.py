@@ -11,7 +11,8 @@ plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
 # setup sessions
 animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-dates_included = [210913, 210914]  # 210913
+dates_included = [210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115,
+                  211105, 211111]  # subset of sessions to use for grid search
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
@@ -28,10 +29,7 @@ for name in session_names:
     nwbfile = io.read()
 
     rnn = DynamicChoiceRNN(nwbfile=nwbfile, session_id=session_db.get_session_id(name))
-    if grid_search:
-        rnn.grid_search()
-    else:
-        rnn.run(overwrite=overwrite)
+    rnn.run(overwrite=overwrite, grid_search=grid_search)
 
     # save to group output
     session_data = dict(session_id=session_db.get_session_id(name),

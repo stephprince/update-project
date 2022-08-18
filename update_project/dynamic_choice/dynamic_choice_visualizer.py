@@ -60,15 +60,7 @@ class DynamicChoiceVisualizer:
         cmap_mapping = {str(round(k, 3)): v for k, v in zip(grid_search_df['regularizer'].unique(), range(len(cmap)))}
 
         # 2 rows for accuracy, loss history, 2 for final scores, 1 column for each param
-        mosaic = """
-         ABC
-        DEF
-        GGG
-        HHH
-        """
-
-        #fig, axes = plt.subplots(nrows=4, ncols=len(grid_search_params['epochs']), squeeze=False, sharey='row')
-        axes = plt.figure(figsize=(17, 22)).subplot_mosaic(mosaic, sharey='row')
+        fig, axes = plt.subplots(nrows=4, ncols=len(grid_search_params['batch_size']), squeeze=False, sharey='row')
         for name, group in grid_search_df.groupby(list(grid_search_params.keys()), dropna=False):
             # get group specific data
             col_id = [ind for ind, val in enumerate(grid_search_params['batch_size']) if val == name[0]][0]
@@ -78,37 +70,51 @@ class DynamicChoiceVisualizer:
             results = dict()
             for m in metrics:
                 results[m] = np.nanmean(np.array([l for l in group[m].to_numpy()]).T, axis=1)
-            label = f'regularizer: {np.round(group["regularizer"].to_numpy()[0], 3)}'
+            label = f'reg: {np.round(group["regularizer"].to_numpy()[0], 3)}, learn: {name[3]}'
 
             # plot history over training
             kwargs = dict(color=color, linestyle='dashed')
             if name[1] == 20:
                 kwargs.update(label=label)
-            row = 'ABC'
-            axes[row[col_id]].plot(epoch, results['loss'], **kwargs)
-            axes[row[col_id]].plot(epoch, results['val_loss'], color=color)
-            axes[row[col_id]].set(xlabel='epoch', ylabel='loss', title=f'Loss - {title}')
-            axes[row[col_id]].legend()
+            axes[0][col_id].plot(epoch, results['loss'], **kwargs)
+            axes[0][col_id].plot(epoch, results['val_loss'], color=color)
+            axes[0][col_id].set(xlabel='epoch', ylabel='loss', ylim=(0, 1.2), title=f'Loss - {title}')
+            axes[0][col_id].legend()
 
-            row = 'DEF'
-            axes[row[col_id]].plot(epoch, results['binary_accuracy'], **kwargs)
-            axes[row[col_id]].plot(epoch, results['val_binary_accuracy'], color=color)
-            axes[row[col_id]].set(xlabel='epoch', ylabel='accuracy', title=f'Accuracy - {title}')
-            axes[row[col_id]].legend()
+            axes[1][col_id].plot(epoch, results['binary_accuracy'], **kwargs)
+            axes[1][col_id].plot(epoch, results['val_binary_accuracy'], color=color)
+            axes[1][col_id].set(xlabel='epoch', ylabel='accuracy', ylim=(0, 1), title=f'Accuracy - {title}')
+            axes[1][col_id].legend()
 
         # violin plots
-        axes['G'] = sns.violinplot(data=grid_search_df, x=list(grid_search_params.keys()), y='score', ax=axes['G'])
-        plt.setp(axes['G'].collections, alpha=.25)
-        sns.stripplot(data=grid_search_df, y='score', x=list(grid_search_params.keys()), size=3, jitter=True,
-                      ax=axes['G'])
-        axes['G'].set(title='Final loss across parameters')
+        count = 0
+        for name, group in grid_search_df.groupby(['batch_size']):
+            group['regularizer'] = group['regularizer'].fillna(0)
+            axes[2][count] = sns.violinplot(data=group, x='epochs', y='score', palette=cmap, ax=axes[2][count],
+                                            hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1),)
+            plt.setp(axes[2][count].collections, alpha=.25)
+            sns.stripplot(data=group, y='score', x='epochs', palette=cmap, size=3, jitter=True, dodge=True,
+                          ax=axes[2][count], hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1),)
+            axes[2][count].set(title=f'Final loss - batch_size {name}')
+            handles, labels = axes[2][count].get_legend_handles_labels()
+            new_labels = [str(np.round(float(l), 3)) for l in labels]
+            axes[2][count].legend(handles[:int(len(new_labels)/2)], new_labels[:int(len(new_labels)/2)])
 
-        axes['H'] = sns.violinplot(data=grid_search_df, x=list(grid_search_params.keys()), y='accuracy', ax=axes['H'])
-        plt.setp(axes['H'].collections, alpha=.25)
-        sns.stripplot(data=grid_search_df, y='accuracy', x=list(grid_search_params.keys()), size=3, jitter=True,
-                      ax=axes['H'])
-        axes['H'].set(title='Final accuracy across parameters')
+            axes[3][count] = sns.violinplot(data=group, x='epochs', y='accuracy', palette=cmap, ax=axes[3][count],
+                                            hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1))
+            plt.setp(axes[3][count].collections, alpha=.25)
+            sns.stripplot(data=group, y='accuracy', x='epochs', size=3, jitter=True, palette=cmap, dodge=True,
+                          hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1), ax=axes[3][count])
+            axes[3][count].set(title=f'Final accuracy - batch_size {name}')
+            handles, labels = axes[3][count].get_legend_handles_labels()
+            new_labels = [str(np.round(float(l), 3)) for l in labels]
+            axes[3][count].legend(handles[:int(len(new_labels)/2)], new_labels[:int(len(new_labels)/2)])
+            count += 1
 
+        self.results_io.save_fig(fig=fig, axes=axes, filename='grid_search_results', results_type=self.results_type)
+
+        grid_search_results = grid_search_df.groupby(list(grid_search_params.keys())).mean()
+        grid_search_results.sort_values(['accuracy'], ascending=False)
 
     def plot_dynamic_choice_by_position(self):
         # plot the results for the session
