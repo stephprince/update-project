@@ -19,10 +19,10 @@ class DynamicChoiceRNN:
 
         self.mask_value = -9999
         self.grid_search_params = dict(batch_size=[20, 50, 100],
-                                       epochs=[5, 10, 20],
-                                       regularizer=[None, tf.keras.regularizers.l2(0.001),
-                                                    tf.keras.regularizers.l2(0.01)],
-                                       learning_rate=[0.001, 0.01])
+                                       epochs=[10, 20, 30],
+                                       regularizer=[None, tf.keras.regularizers.l2(0.01),
+                                                    tf.keras.regularizers.l2(0.1)],
+                                       learning_rate=[0.01, 0.1])
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic-choice', )
         self.data_files = dict(behavior_output=dict(vars=['output_data', 'agg_data', 'trajectories'],
                                                     format='pkl'))
@@ -161,6 +161,7 @@ class DynamicChoiceRNN:
                                                                nwbfile.intervals['trials'][trial_inds])
 
         # resample data so all constant sampling rate
+        pos_data = [p/np.nanmax(p) for p in pos_data]  # max of y_position
         input_data = [np.vstack([p[:, 1], t, r, v]).T for p, t, r, v in zip(pos_data, trans_data, rot_data, view_data)]
 
         # get target sequence (binary, reported choice OR initial cue)
