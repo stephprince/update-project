@@ -23,6 +23,7 @@ def get_theta(nwbfile, adjust_reference=False, session_id=''):
 
     return pd.DataFrame.from_dict(theta_dict)
 
+
 def adjust_theta_reference(phase, session_id):
     # load phase reference data
     results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='phase-reference')
@@ -34,13 +35,16 @@ def adjust_theta_reference(phase, session_id):
     #phase_mins = theta_hist_df['phase_interval'].apply(lambda x: x.left).to_numpy()
     phase_mins = np.linspace(-np.pi, np.pi, 12)
     phase_peak = phase_mins[theta_hist_df['phase_adj'].to_numpy()[0]]
+    new_ref = phase_mins[int(len(phase_mins)/2 - 1)]
 
     # adjust phase
     phase_adjusted = phase.copy()
-    amount_to_shift = -np.pi - phase_peak
+    amount_to_shift = new_ref - phase_peak  #-np.pi - phase_peak
     phase_adjusted = phase_adjusted + amount_to_shift
-    vals_to_cycle = phase_adjusted < -np.pi
-    phase_adjusted[vals_to_cycle] = phase_adjusted[vals_to_cycle] - amount_to_shift + np.pi - phase_peak
+    vals_left = phase_adjusted < -np.pi
+    vals_right = phase_adjusted > np.pi
+    phase_adjusted[vals_left] = phase_adjusted[vals_left] + np.pi * 2
+    phase_adjusted[vals_right] = phase_adjusted[vals_right] - np.pi * 2
 
     assert (np.unique(np.histogram(phase, phase_mins)[0]) == np.unique(np.histogram(phase_adjusted, phase_mins)[0])).all()
 
