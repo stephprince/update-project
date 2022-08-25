@@ -11,20 +11,19 @@ plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
 # setup sessions
 animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-dates_included = [210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115,
-                  211105, 211111]  # subset of sessions to use for grid search
+dates_included = [210520, 210909]
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
-overwrite = True
+overwrite = False
 plot = True
-grid_search = True
+grid_search = False
 
 group_data = []
 for name in session_names:
     # load nwb file
-    print(f'Getting dynamic-choice data for {session_db.get_session_id(name)}')
+    print(f'Getting dynamic choice data for {session_db.get_session_id(name)}')
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
@@ -38,5 +37,5 @@ for name in session_names:
     group_data.append(session_data)
 
 if plot:
-    visualizer = DynamicChoiceVisualizer(group_data)
+    visualizer = DynamicChoiceVisualizer(group_data, grid_search=grid_search)
     visualizer.plot()

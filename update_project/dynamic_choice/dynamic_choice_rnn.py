@@ -18,19 +18,25 @@ class DynamicChoiceRNN:
         self.input_data, self.target_data = self._setup_data(nwbfile)
 
         self.mask_value = -9999
+        self.params = dict(batch_size=32, epochs=20, regularizer=None, learning_rate=0.1)
         self.grid_search_params = dict(batch_size=[20, 50, 100],
                                        epochs=[10, 20, 30],
                                        regularizer=[None, tf.keras.regularizers.l2(0.01),
                                                     tf.keras.regularizers.l2(0.1)],
                                        learning_rate=[0.01, 0.1])
-        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic-choice', )
-        self.data_files = dict(behavior_output=dict(vars=['output_data', 'agg_data', 'trajectories'],
-                                                    format='pkl'))
+
+        # based on grid search of subset of sessions (210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115),
+        # best parameters were regularizer = None, learning_rate = 0.1, batch_size = 20-50, epochs = 20-30
+        # extra 10 epochs buys 1-2% improvement in accuracy so probably will stick with 20
+        # batch size will go with 32 between the two good options since it also seems recommended to keep at power of 2
+
+        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic_choice', )
+        self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'params'], format='pkl'))
 
     def run(self, overwrite=False, grid_search=False):
         if overwrite:
             if grid_search:
-                self.data_files = dict(behavior_output=dict(vars=['grid_search_data'], format='pkl'))
+                self.data_files = dict(grid_search=dict(vars=['grid_search_data', 'grid_search_params'], format='pkl'))
                 self._grid_search()
             else:
                 self._get_dynamic_choice()
@@ -38,7 +44,7 @@ class DynamicChoiceRNN:
             self._export_data()
         else:
             if grid_search:
-                self.data_files = dict(behavior_output=dict(vars=['grid_search_data'], format='pkl'))
+                self.data_files = dict(grid_search=dict(vars=['grid_search_data', 'grid_search_params'], format='pkl'))
 
             if self.results_io.data_exists(self.data_files):
                 self._load_data()  # load data structure if it exists and matches the params
@@ -70,23 +76,24 @@ class DynamicChoiceRNN:
     def _get_dynamic_choice(self):
         # k-fold cross validation
         output_data = []
-        cv = RepeatedStratifiedKFold(n_splits=6, n_repeats=2, random_state=21)
+        cv = RepeatedStratifiedKFold(n_splits=6, n_repeats=3, random_state=21)
         for train_index, test_index in cv.split(self.input_data, np.array(self.target_data)[:, 0]):
             preprocessed_data = self._preprocess_data(train_index, test_index)
-            build_data = dict(norm_data=preprocessed_data['input_train_no_pad'], regularizer=None,
-                              shape=np.shape(preprocessed_data['input_train']), mask_value=self.mask_value)
+            build_data = dict(norm_data=preprocessed_data['input_train_no_pad'], regularizer=self.params['regularizer'],
+                              shape=np.shape(preprocessed_data['input_train']), mask_value=self.mask_value,
+                              learning_rate=self.params['learning_rate'])
             model = self._get_classifier(build_data)
 
             print('Fitting model...')
             history = model.fit(preprocessed_data['input_train'], preprocessed_data['target_train'],
-                                batch_size=100, epochs=5)
+                                batch_size=self.params['batch_size'], epochs=self.params['epochs'])
 
             score, acc = model.evaluate(preprocessed_data['input_test'], preprocessed_data['target_test'], verbose=0)
             prediction = model.predict(preprocessed_data['input_test'])
             print(f'Evaluating model... score: {score}, binary_accuracy: {acc}')
 
             # concatenate data
-            output_data.append(dict(history=history.history, score=score, accuracy=acc, prediction=prediction,
+            output_data.append(dict(score=score, accuracy=acc, history=history.history, prediction=prediction,
                                     input_test_fold=preprocessed_data['input_test'],
                                     target_test_fold=preprocessed_data['target_test'], test_index=test_index))
 

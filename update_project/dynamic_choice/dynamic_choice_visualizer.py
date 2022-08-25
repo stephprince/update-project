@@ -11,8 +11,9 @@ from update_project.general.plots import plot_distributions, get_color_theme
 
 class DynamicChoiceVisualizer:
 
-    def __init__(self, data, session_id=None):
+    def __init__(self, data, session_id=None, grid_search=False):
         self.data = data
+        self.grid_search = grid_search
 
         if session_id:
             self.results_type = 'session'
@@ -23,14 +24,27 @@ class DynamicChoiceVisualizer:
 
         # get session visualization info
         for sess_dict in self.data:
-            sess_dict.update(dict(grid_search_data=sess_dict['rnn'].grid_search_data,
-                                  grid_search_params=sess_dict['rnn'].grid_search_params))
+            if grid_search:
+                sess_dict.update(dict(grid_search_data=sess_dict['rnn'].grid_search_data,
+                                      grid_search_params=sess_dict['rnn'].grid_search_params))
+            sess_dict.update(dict(agg_data=sess_dict['rnn'].agg_data,
+                                  output_data=sess_dict['rnn'].output_data))
 
-        self.group_df = pd.DataFrame(data)
+        self.group_df = pd.DataFrame(self.data)
+        self.group_df.drop('rnn', axis='columns', inplace=True)
 
     def plot(self):
-        self.plot_grid_search_results()
         self.plot_dynamic_choice_by_position()
+
+        if self.grid_search:
+            self.plot_grid_search_results()
+
+    def _get_group_prediction(self):
+        predict_df = pd.concat([self.group_df[['session_id', 'animal']], pd.json_normalize(self.group_df['agg_data'])],
+                               axis=1)
+        predict_df = predict_df.set_index(['session_id', 'animal']).apply(pd.Series.explode).reset_index()
+
+        return predict_df
 
     def _get_group_grid_search(self):
         # get giant dataframe of all decoding data
@@ -52,11 +66,50 @@ class DynamicChoiceVisualizer:
 
         return group_grid_search_df
 
+    def plot_dynamic_choice_by_position(self):
+        predict_df = self._get_group_prediction()
+        predict_df = predict_df.rename_axis('trial').reset_index()
+        pos_summary_df = predict_df.set_index(['session_id', 'animal', 'trial', 'target']).apply(
+            pd.Series.explode).reset_index()
+        y_position_bins = pd.cut(pos_summary_df['y_position'], np.linspace(0, 1.01, 30))
+        pos_summary_df['y_position_binned'] = y_position_bins.apply(lambda x: x.mid)
+        spatial_map_trials = pos_summary_df.groupby(['trial', 'y_position_binned']).apply(lambda x: np.mean(x))
+
+        # plot overall predictions
+        fig, axes = plt.subplots(nrows=2, ncols=2, squeeze=False)
+        axes[0][0] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='predict', hue='target',
+                                  estimator='mean', ci=95, ax=axes[0][0], palette=sns.color_palette())
+        axes[1][0] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='predict', hue='target',
+                                  style='trial',
+                                  estimator=None, ax=axes[1][0], plot_kws=dict(alpha=0.2), palette=sns.color_palette())
+        axes[1][0].legend([], [], frameon=False)
+        axes[1][0].set(xlabel='position in track', ylabel='p(left)', title='LSTM prediction')
+        for a in [0, 1]:
+            axes[a][0].axhline(0.9, linestyle='dashed', color='k')
+            axes[a][0].axhline(0.1, linestyle='dashed', color='k')
+
+        # plot log likelihood performance
+        axes[0][1] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='log_likelihood', hue='target',
+                                  estimator='mean', ci=95, ax=axes[0][1], palette=sns.color_palette())
+        axes[1][1] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='log_likelihood', hue='target',
+                                  style='trial', estimator=None, ax=axes[1][1], plot_kws=dict(alpha=0.2),
+                                  palette=sns.color_palette())
+        axes[1][1].legend([], [], frameon=False)
+        axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', title='Log likelihood', ylim=[-2, 0])
+        for a in [0, 1]:
+            axes[a][1].axhline(0, linestyle='dashed', color='k')
+            axes[a][1].axhline(-1, linestyle='dashed', color='k')
+        fig.suptitle('LSTM predictions and performance')
+
+        self.results_io.save_fig(fig=fig, axes=axes, filename='prediction')
+
     def plot_grid_search_results(self):
         grid_search_df = self._get_group_grid_search()
         grid_search_params = self.group_df['grid_search_params'].to_numpy()[0]
         metrics = ['loss', 'val_loss', 'binary_accuracy', 'val_binary_accuracy']
-        cmap = sns.color_palette(palette='Blues', n_colors=len(grid_search_params['regularizer']))
+        cmap_b = sns.color_palette(palette='Blues', n_colors=len(grid_search_params['regularizer']))
+        cmap_p = sns.color_palette(palette='Purples', n_colors=len(grid_search_params['regularizer']))
+        cmap = sns.color_palette([val for pair in zip(cmap_b, cmap_p) for val in pair])
         cmap_mapping = {str(round(k, 3)): v for k, v in zip(grid_search_df['regularizer'].unique(), range(len(cmap)))}
 
         # 2 rows for accuracy, loss history, 2 for final scores, 1 column for each param
@@ -64,7 +117,10 @@ class DynamicChoiceVisualizer:
         for name, group in grid_search_df.groupby(list(grid_search_params.keys()), dropna=False):
             # get group specific data
             col_id = [ind for ind, val in enumerate(grid_search_params['batch_size']) if val == name[0]][0]
-            color = cmap[cmap_mapping[str(round(name[2], 3))]]
+            if name[3] == grid_search_params['learning_rate'][0]:
+                color = cmap_b[cmap_mapping[str(round(name[2], 3))]]
+            elif name[3] == grid_search_params['learning_rate'][1]:
+                color = cmap_p[cmap_mapping[str(round(name[2], 3))]]
             title = f'batch_size: {name[0]}'
             epoch = range(group['epochs'].values[0])
             results = dict()
@@ -91,57 +147,27 @@ class DynamicChoiceVisualizer:
         for name, group in grid_search_df.groupby(['batch_size']):
             group['regularizer'] = group['regularizer'].fillna(0)
             axes[2][count] = sns.violinplot(data=group, x='epochs', y='score', palette=cmap, ax=axes[2][count],
-                                            hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1),)
+                                            hue=group[['learning_rate', 'regularizer']].apply(tuple, axis=1),)
             plt.setp(axes[2][count].collections, alpha=.25)
             sns.stripplot(data=group, y='score', x='epochs', palette=cmap, size=3, jitter=True, dodge=True,
-                          ax=axes[2][count], hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1),)
+                          ax=axes[2][count], hue=group[['learning_rate', 'regularizer']].apply(tuple, axis=1),)
             axes[2][count].set(title=f'Final loss - batch_size {name}')
-            handles, labels = axes[2][count].get_legend_handles_labels()
-            new_labels = [str(np.round(float(l), 3)) for l in labels]
-            axes[2][count].legend(handles[:int(len(new_labels)/2)], new_labels[:int(len(new_labels)/2)])
+            axes[2][count].legend([], [], frameon=False)
 
             axes[3][count] = sns.violinplot(data=group, x='epochs', y='accuracy', palette=cmap, ax=axes[3][count],
-                                            hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1))
+                                            hue=group[['learning_rate', 'regularizer']].apply(tuple, axis=1))
             plt.setp(axes[3][count].collections, alpha=.25)
             sns.stripplot(data=group, y='accuracy', x='epochs', size=3, jitter=True, palette=cmap, dodge=True,
-                          hue=group[['regularizer', 'learning_rate']].apply(tuple, axis=1), ax=axes[3][count])
+                          hue=group[['learning_rate', 'regularizer']].apply(tuple, axis=1), ax=axes[3][count])
             axes[3][count].set(title=f'Final accuracy - batch_size {name}')
-            handles, labels = axes[3][count].get_legend_handles_labels()
-            new_labels = [str(np.round(float(l), 3)) for l in labels]
-            axes[3][count].legend(handles[:int(len(new_labels)/2)], new_labels[:int(len(new_labels)/2)])
+            axes[3][count].legend([], [], frameon=False)
             count += 1
 
         self.results_io.save_fig(fig=fig, axes=axes, filename='grid_search_results', results_type=self.results_type)
 
-        grid_search_results = grid_search_df.groupby(list(grid_search_params.keys())).mean()
-        grid_search_results.sort_values(['accuracy'], ascending=False)
-
-    def plot_dynamic_choice_by_position(self):
-        # plot the results for the session
-        fig, axes = plt.subplots(nrows=2, ncols=2, squeeze=False)
-        y_pos_left = self.agg_data['y_position'].T[:, self.agg_data['target_data'] == 1]
-        y_pos_right = self.agg_data['y_position'].T[:, self.agg_data['target_data'] == 0]
-        predict_left = self.agg_data['predict_data'].T[:, self.agg_data['target_data'] == 1]
-        predict_right = self.agg_data['predict_data'].T[:, self.agg_data['target_data'] == 0]
-        axes[0][0].plot(np.nanmean(y_pos_left, axis=1), np.nanmean(predict_left, axis=1), color='b',
-                        label='left choice')  # TODO - should bin by position instead of doing weird averaging
-        axes[0][0].plot(np.nanmean(y_pos_right, axis=1), np.nanmean(predict_right, axis=1), color='r',
-                        label='right choice')
-        axes[0][0].set(xlabel='position in track', ylabel='p(left)', ylim=[0, 1], title='LSTM prediction - test trials')
-        axes[1][0].plot(y_pos_left, predict_left, color='b')
-        axes[1][0].plot(y_pos_right, predict_right, color='r')
-        axes[1][0].set(xlabel='position in track', ylabel='p(left)', ylim=[0, 1], title='LSTM prediction - test trials')
-
-        axes[0][1].plot(np.nanmean(y_pos_left, axis=1), np.nanmean(log_likelihood.T[:, target_data == 1], axis=1),
-                        color='b')
-        axes[0][1].plot(np.nanmean(y_pos_right, axis=1), np.nanmean(log_likelihood.T[:, target_data == 0], axis=1),
-                        color='r')
-        axes[0][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-3, 0],
-                       title='Log likelihood (0 = perfect)')
-
-        axes[1][1].plot(y_pos_left, self.agg_data['log_likelihood'].T[:, self.agg_data['target_data'] == 1], color='b')
-        axes[1][1].plot(y_pos_right, self.agg_data['log_likelihood'].T[:, self.agg_data['target_data'] == 0], color='r')
-        axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-3, 0],
-                       title='Log likelihood (0 = perfect)')
-        axes[1][1].axhline(-1, linestyle='dashed', color='k')
-        self.results_io.save_fig(fig=fig, axes=axes, filename='decoding performance', results_type='session')
+        # sort outputs by best accuracy
+        grid_search_results = grid_search_df.groupby(list(grid_search_params.keys()), dropna=False).mean()
+        grid_search_results.sort_values(['accuracy'], ascending=False, inplace=True)
+        grid_search_results.reset_index()
+        fname = self.results_io.get_data_filename(filename='grid_search_table', format='csv')
+        grid_search_results.to_csv(fname, na_rep='nan')
