@@ -35,27 +35,13 @@ class BayesianDecoder:
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
 
-        # setup data
-        self.feature_names = features
-        self.trials = nwbfile.trials.to_dataframe()
-        self.units = nwbfile.units.to_dataframe()
-        self.data = self._setup_data(nwbfile)
-        self.velocity = get_velocity(nwbfile)
-        self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
-
-        # setup feature specific settings
-        self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
-        if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
-            self.convert_to_binary = True  # always convert choice to binary
-            self.encoder_bin_num = 2
-
         # setup decoding/encoding functions based on dimensions
         self.dim_num = params.get('dim_num', 1)  # 1D decoding default
         self.encoder, self.decoder = self._setup_decoding_functions()
 
         # setup file paths for io
         trial_types = [str(t) for t in self.encoder_trial_types['correct']]
-        self.results_tags = f"{'_'.join(self.feature_names)}_regions_{'_'.join(self.units_types['region'])}_" \
+        self.results_tags = f"{'_'.join(features)}_regions_{'_'.join(self.units_types['region'])}_" \
                             f"enc_bins{self.encoder_bin_num}_dec_bins{self.decoder_bin_size}_speed_thresh" \
                             f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
@@ -70,6 +56,20 @@ class BayesianDecoder:
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
                                                  'feature_names', 'linearized_features', ],
                                            format='npz'))
+
+        # setup data
+        self.feature_names = features
+        self.trials = nwbfile.trials.to_dataframe()
+        self.units = nwbfile.units.to_dataframe()
+        self.data = self._setup_data(nwbfile, session_id=session_id)
+        self.velocity = get_velocity(nwbfile)
+        self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
+
+        # setup feature specific settings
+        self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
+        if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
+            self.convert_to_binary = True  # always convert choice to binary
+            self.encoder_bin_num = 2
 
     def run_decoding(self, overwrite=False):
         print(f'Decoding data for session {self.results_io.session_id}...')
@@ -86,7 +86,7 @@ class BayesianDecoder:
 
         return self
 
-    def _setup_data(self, nwbfile):
+    def _setup_data(self, nwbfile, session_id):
         data_dict = dict()
         for feat in self.feature_names:
             if feat in ['x_position', 'y_position']:
@@ -117,6 +117,21 @@ class BayesianDecoder:
                     if feat in ['turn_type'] and ~np.isnan(trial['t_update']) and trial['update_type'] == 2:
                         idx_switch = bisect_left(time_series.timestamps, trial['t_update'])
                         data[idx_switch:idx_stop] = -1 * choice_mapping[str(int(trial[feat]))]
+            elif feat in ['dynamic_choice', 'cue_bias']:
+                time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
+
+                # load dynamic choice from saved output
+                data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type')
+                feat = data_mapping[self.feature_names[0]]
+                choice_path = Path().absolute().parent.parent / 'results' / 'dynamic_choice'
+                fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{feat}',
+                                                          results_type='session', format='pkl',
+                                                          diff_base_path=choice_path)
+                import_data = self.results_io.load_pickled_data(fname)  #  TODO - make this more robust
+                for v, i_data in zip(['output_data', 'agg_data', 'decoder_data', 'params'], import_data):
+                    if v == 'decoder_data':
+                        choice_data = i_data
+                data = choice_data - 0.5  # convert to -0.5 and +0.5 for flipping between trials
             else:
                 raise RuntimeError(f'{feat} feature is not currently supported')
 

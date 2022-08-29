@@ -732,7 +732,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             compare_df = dict(update_type=dict(data=compiled_data_df[update_mask],
                                                comparison=['switch', 'stay']),
                               correct=dict(data=compiled_data_df[correct_mask],
-                                           comparison=[0, 1]))
+                                           comparison=[1, 0]))
 
             # plot the data and accompanying stats
             for comp, data_dict in compare_df.items():
@@ -902,6 +902,64 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         fig.suptitle(f'Feature tuning curves - {name}')
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=tags)
 
+    def plot_phase_modulation_around_update(self, data, name, plot_groups=None):
+        plot_groups = plot_groups or dict(update_type=[['non_update'], ['switch'], ['stay']],
+                                          turn_type=[[1], [2], [1, 2]], correct=[[0], [1]])
+        feat = data['feature'].values[0]
+        align_times = self.aggregator.align_times
+
+        param_group_data = data.groupby(self.params)  # main group is what gets the different plots
+        for param_name, param_data in param_group_data:
+            for plot_types in list(itertools.product(*plot_groups.values())):
+                plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
+
+                # make plots for aligned data (1 row for heatmap, 1 row for modulation index, 1 col for each align time)
+                ncols, nrows = (len(align_times[:-1]), 6)
+                fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row',
+                                         sharex='col')
+                for ind, time_label in enumerate(align_times[:-1]):
+                    filter_dict = dict(time_label=[time_label], **plot_group_dict)
+                    p_data = param_data.copy(deep=True)
+                    theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict)
+                    for t in theta_phase_data:
+                        rows = dict(full=0, half=3, theta_amplitude=0, initial_stay=1, switch=1, home=2)
+                        row_ind = rows[t['bin_name']]  # full or half
+                        if t['times'] == 'post' and time_label == 't_choice_made':
+                            pass  # don't plot post-choice made data bc really messy
+                        else:
+                            for loc in ['switch', 'initial_stay', 'home', 'theta_amplitude']:
+                                lstyle = ['dashed' if t['times'] == 'pre' else 'solid'][0]
+                                color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
+                                axes[rows[loc] + row_ind][ind].plot(t['df']['phase_mid'] / np.pi, t['df'][f'{loc}'],
+                                                                    color=color, linestyle=lstyle,
+                                                                    label=f'{loc}_{t["times"]}')
+                                axes[rows[loc] + row_ind][ind].fill_between(t['df']['phase_mid'] / np.pi,
+                                                                            t['df'][f'{loc}_err_lower'],
+                                                                            t['df'][f'{loc}_err_upper'], alpha=0.2,
+                                                                            color=color, )
+                                axes[rows[loc] + row_ind][ind].xaxis.set_major_formatter(
+                                    ticker.FormatStrFormatter('%g $\pi$'))
+                                axes[rows[loc] + row_ind][ind].xaxis.set_major_locator(ticker.MultipleLocator(base=1.0))
+                                axes[rows[loc] + row_ind][ind].relim()
+                                if ind == 0 and rows[loc] + row_ind != 0:
+                                    axes[rows[loc] + row_ind][ind].legend()
+                                    axes[rows[loc] + row_ind][ind].set_ylabel('prob_density')
+                                elif ind == 0 and loc == 'theta_amplitude':
+                                    axes[rows[loc] + row_ind][ind].legend()
+                                    axes[rows[loc] + row_ind][ind].set_ylabel('theta_amplitude')
+
+                            if rows[loc] + row_ind == nrows - 1:
+                                axes[rows[loc] + row_ind][ind].set(xlabel='Time around update')
+                            if rows[loc] + row_ind == 0:
+                                axes[rows[loc] + row_ind][ind].set_title(time_label)
+
+                # save figure
+                title = '_'.join([''.join([k, str(v)]) for k, v in zip(plot_groups.keys(), plot_types)])
+                fig.suptitle(f'{feat}_{title}')
+                tags = f'{"_".join(["".join(n) for n in name])}_{title}' \
+                       f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_mod_around_update', additional_tags=tags)
+
     def plot_theta_phase_histogram(self, data, name, plot_groups=None):
         plot_groups = plot_groups or dict(update_type=[['non_update'], ['switch'], ['stay']],
                                           turn_type=[[1], [2], [1, 2]], correct=[[0], [1]])
@@ -971,7 +1029,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             update_mask = pd.concat([compiled_data_df[k] == v for k, v in dict(correct=1).items()], axis=1).all(axis=1)
             correct_mask = pd.concat([compiled_data_df[k] == v for k, v in dict(update_type='switch').items()], axis=1).all(axis=1)
             compare_df = dict(update_type=dict(data=compiled_data_df[update_mask], comparison=['switch', 'stay']),
-                              correct=dict(data=compiled_data_df[correct_mask], comparison=[0, 1]))
+                              correct=dict(data=compiled_data_df[correct_mask], comparison=[1, 0]))
 
             # plot the data and accompanying stats
             for comp, data_dict in compare_df.items():
