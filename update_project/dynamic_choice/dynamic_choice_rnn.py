@@ -5,6 +5,7 @@ import pandas as pd
 import tensorflow as tf
 import warnings
 
+from bisect import bisect, bisect_left
 from sklearn.model_selection import RepeatedStratifiedKFold
 
 from update_project.results_io import ResultsIO
@@ -13,39 +14,60 @@ from update_project.general.timeseries import align_by_time_intervals as align_b
 
 class DynamicChoiceRNN:
 
-    def __init__(self, nwbfile, session_id):
-        self.trials_df = nwbfile.trials.to_dataframe()
-        self.input_data, self.target_data = self._setup_data(nwbfile)
-
-        self.mask_value = -9999
-        self.params = dict(batch_size=32, epochs=20, regularizer=None, learning_rate=0.1)
-        self.grid_search_params = dict(batch_size=[20, 50, 100],
-                                       epochs=[10, 20, 30],
-                                       regularizer=[None, tf.keras.regularizers.l2(0.01),
-                                                    tf.keras.regularizers.l2(0.1)],
-                                       learning_rate=[0.01, 0.1])
-
+    def __init__(self, nwbfile, session_id, target_var='choice'):
         # based on grid search of subset of sessions (210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115),
         # best parameters were regularizer = None, learning_rate = 0.1, batch_size = 20-50, epochs = 20-30
         # extra 10 epochs buys 1-2% improvement in accuracy so probably will stick with 20
         # batch size will go with 32 between the two good options since it also seems recommended to keep at power of 2
 
-        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic_choice', )
-        self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'params'], format='pkl'))
+        # setup params
+        self.mask_value = -9999
+        self.params = dict(batch_size=32, epochs=20, regularizer=None, learning_rate=0.1, predict_update=True)
+        self.grid_search_params = dict(batch_size=[20, 50, 100],
+                                       epochs=[10, 20, 30],
+                                       regularizer=[None, tf.keras.regularizers.l2(0.01),
+                                                    tf.keras.regularizers.l2(0.1)],
+                                       learning_rate=[0.01, 0.1],
+                                       predict_update=[False])
+
+        # setup data
+        self.trials_df = nwbfile.trials.to_dataframe()
+        self.session_ts = nwbfile.processing['behavior']['view_angle']['view_angle']
+        self.input_data, self.target_data, self.timestamp_data = self._setup_data(nwbfile, target_var)
+        _, self.non_update_index = self._get_trial_inds(with_update=False, ret_index=True)
+        if self.params.get('predict_update', False):
+            input, target, timestamp = self._setup_data(nwbfile, target_var, with_update=True)
+            self.update_input_data = input
+            self.update_target_data = target
+            self.update_timestamp_data = timestamp
+            _, self.update_index = self._get_trial_inds(with_update=True, ret_index=True)
+            self.max_pad_length = np.max([np.max([len(i) for i in self.input_data]),
+                                          np.max([len(u) for u in self.update_input_data])])
+        else:
+            self.update_input_data = []
+            self.update_target_data = []
+            self.update_index = []
+            self.max_pad_length = np.max([len(i) for i in self.input_data])
+
+        # get results to sav
+        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic_choice',
+                                    tags=target_var)
+        self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'decoder_data', 'params'],
+                                                          format='pkl'))
 
     def run(self, overwrite=False, grid_search=False):
+        if grid_search:
+            self.data_files = dict(grid_search=dict(vars=['grid_search_data', 'grid_search_params'], format='pkl'))
+
         if overwrite:
             if grid_search:
-                self.data_files = dict(grid_search=dict(vars=['grid_search_data', 'grid_search_params'], format='pkl'))
                 self._grid_search()
             else:
                 self._get_dynamic_choice()
                 self._aggregate_data()
+                self._get_decoder_data()  # get data in format for bayesian decoder
             self._export_data()
         else:
-            if grid_search:
-                self.data_files = dict(grid_search=dict(vars=['grid_search_data', 'grid_search_params'], format='pkl'))
-
             if self.results_io.data_exists(self.data_files):
                 self._load_data()  # load data structure if it exists and matches the params
             else:
@@ -89,13 +111,26 @@ class DynamicChoiceRNN:
                                 batch_size=self.params['batch_size'], epochs=self.params['epochs'])
 
             score, acc = model.evaluate(preprocessed_data['input_test'], preprocessed_data['target_test'], verbose=0)
-            prediction = model.predict(preprocessed_data['input_test'])
             print(f'Evaluating model... score: {score}, binary_accuracy: {acc}')
+
+            print(f'Predicting with model...')
+            prediction = model.predict(preprocessed_data['input_test'])
+            if self.params.get('predict_update', False):
+                update_input_data, update_target_data, update_timestamp_data = self._pad_data(self.update_input_data,
+                                                                                              self.update_target_data,
+                                                                                              self.update_timestamp_data)
+                update_prediction = model.predict(update_input_data)
+            else:
+                update_prediction = []
 
             # concatenate data
             output_data.append(dict(score=score, accuracy=acc, history=history.history, prediction=prediction,
                                     input_test_fold=preprocessed_data['input_test'],
-                                    target_test_fold=preprocessed_data['target_test'], test_index=test_index))
+                                    target_test_fold=preprocessed_data['target_test'], test_index=test_index,
+                                    update_prediction=update_prediction, update_test_index=self.update_index,
+                                    timestamp_train=preprocessed_data['timestamp_train'],
+                                    timestamp_test=preprocessed_data['timestamp_test'],
+                                    timestamp_update=update_timestamp_data))
 
         self.output_data = pd.DataFrame(output_data)
 
@@ -126,68 +161,115 @@ class DynamicChoiceRNN:
 
         return model
 
-    def _preprocess_data(self, train_index, test_index):
-        # pad data
-        input_data_pad = tf.keras.preprocessing.sequence.pad_sequences(self.input_data, dtype='float64', padding='post',
-                                                                       value=self.mask_value)
-        target_data_pad = tf.keras.preprocessing.sequence.pad_sequences(self.target_data, dtype='float64',
+    def _setup_data(self, nwbfile, target_var, with_update=False):
+        # get trial data
+        trial_inds = self._get_trial_inds(with_update=with_update)
+
+        # get position/velocity data
+        pos_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['position']['position'],
+                                              nwbfile.intervals['trials'][trial_inds],)
+        trans_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['translational_velocity'],
+                                                nwbfile.intervals['trials'][trial_inds], )
+        rot_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['rotational_velocity'],
+                                              nwbfile.intervals['trials'][trial_inds], )
+        view_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['view_angle']['view_angle'],
+                                               nwbfile.intervals['trials'][trial_inds])
+        _, timestamps = align_by_time_intervals_ts(nwbfile.processing['behavior']['position']['position'],
+                                                   nwbfile.intervals['trials'][trial_inds], return_timestamps=True)
+
+        # compile data into input matrix
+        pos_data = [p/np.nanmax(p) for p in pos_data]  # max of y_position
+        input_data = [np.vstack([p[:, 1], t, r, v]).T for p, t, r, v in zip(pos_data, trans_data, rot_data, view_data)]
+
+        # get target sequence (binary, reported choice OR initial cue)
+        longest_length = np.max([np.shape(k)[0] for k in input_data])
+        choice_values = self.trials_df.iloc[trial_inds][target_var].to_numpy() - 1  # 0 for left and 1 for right
+        target_data = [np.tile(choice, longest_length) for choice in choice_values]
+
+        return input_data, target_data, timestamps
+
+    def _pad_data(self, input_data, target_data, timestamp_data):
+        input_data_pad = tf.keras.preprocessing.sequence.pad_sequences(input_data, dtype='float64', padding='post',
+                                                                       value=self.mask_value,
+                                                                       maxlen=self.max_pad_length)
+        target_data_pad = tf.keras.preprocessing.sequence.pad_sequences(target_data, dtype='float64',
                                                                         truncating='post',
                                                                         maxlen=np.shape(input_data_pad)[1])
+        timestamp_data_pad = tf.keras.preprocessing.sequence.pad_sequences(timestamp_data, dtype='float64',
+                                                                           padding='post', value=self.mask_value,
+                                                                           maxlen=np.shape(input_data_pad)[1])
+
+        return input_data_pad, target_data_pad, timestamp_data_pad
+
+    def _preprocess_data(self, train_index, test_index):
+        input_data_pad, target_data_pad, timestamp_data_pad = self._pad_data(self.input_data,
+                                                                             self.target_data,
+                                                                             self.timestamp_data)
 
         # get input and target data
         input_train, input_test = input_data_pad[train_index, :, :], input_data_pad[test_index, :, :]
+        timestamp_train, timestamp_test = timestamp_data_pad[train_index, :], timestamp_data_pad[test_index, :]
         target_train, target_test = target_data_pad[train_index], target_data_pad[test_index]
 
         # normalize, sort, and pad data
         input_train_no_pad = [d for ind, d in enumerate(self.input_data) if ind in train_index]
 
         return dict(input_train=input_train, input_test=input_test, target_train=target_train, target_test=target_test,
+                    timestamp_train=timestamp_train, timestamp_test=timestamp_test,
                     input_train_no_pad=input_train_no_pad)
 
-    def _get_trial_inds(self):
+    def _get_trial_inds(self, with_update, ret_index=False):
+        if with_update:
+            update_types = [2, 3]
+        else:
+            update_types = [1]
+
         # get non-update ymaze delay trials
-        mask = pd.concat([self.trials_df['update_type'] == 1,  # non-update trials only to train
+        mask = pd.concat([self.trials_df['update_type'].isin(update_types),  # non-update trials only to train
                           self.trials_df['maze_id'] == 4,  # delay trials only not visual warmup
                           self.trials_df['duration'] <= self.trials_df['duration'].mean() * 2],  # trials shorter than 2*mean only
                           axis=1).all(axis=1)
 
-        return np.array(self.trials_df.index[mask])
+        if ret_index:
+            return np.array(self.trials_df.index[mask]), self.trials_df.index[mask]
+        else:
+            return np.array(self.trials_df.index[mask])
 
-    def _setup_data(self, nwbfile):
-        # get trial data
-        trial_inds = self._get_trial_inds()
-
-        # get position/velocity data
-        pos_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['position']['position'],
-                                                             nwbfile.intervals['trials'][trial_inds],)
-        trans_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['translational_velocity'],
-                                                   nwbfile.intervals['trials'][trial_inds], )
-        rot_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['rotational_velocity'],
-                                                   nwbfile.intervals['trials'][trial_inds], )
-        view_data = align_by_time_intervals_ts(nwbfile.processing['behavior']['view_angle']['view_angle'],
-                                                               nwbfile.intervals['trials'][trial_inds])
-
-        # resample data so all constant sampling rate
-        pos_data = [p/np.nanmax(p) for p in pos_data]  # max of y_position
-        input_data = [np.vstack([p[:, 1], t, r, v]).T for p, t, r, v in zip(pos_data, trans_data, rot_data, view_data)]
-
-        # get target sequence (binary, reported choice OR initial cue)
-        longest_length = np.max([np.shape(k)[0] for k in input_data])
-        choice_values = self.trials_df.iloc[trial_inds]['choice'].to_numpy() - 1  # 0 for left and 1 for right
-        target_data = [np.tile(choice, longest_length) for choice in choice_values]
-
-        return input_data, target_data
-
-    def _aggregate_data(self):  # TODO - decide if I should leave here or move to visualizer
+    def _aggregate_data(self):
         # get average for each trial across all cross-validation folds
         predict_data = self._get_repeated_fold_average(self.output_data, label='prediction')
+        update_predict_data = self._get_repeated_fold_average(self.output_data, label='update_prediction',
+                                                              trial_index='update_test_index')
         target_data = self._get_repeated_fold_average(self.output_data, label='target_test_fold')[:, 0].astype(int)
-        y_position = self._get_repeated_fold_average(self.output_data, label='input_test_fold')[:, :, 0]
-        y_position[y_position < -9000] = np.nan  # remove mask values
         log_likelihood = np.array([self._log2_likelihood(np.tile(t, len(p)), p) for t, p in zip(target_data, predict_data)])
 
-        self.agg_data = dict(predict=predict_data, target=target_data, y_position=y_position,
-                             log_likelihood=log_likelihood)
+        y_position = self._get_repeated_fold_average(self.output_data, label='input_test_fold')[:, :, 0]
+        y_position[y_position < -9000] = np.nan  # remove mask values
+        timestamps = self._get_repeated_fold_average(self.output_data, label='timestamp_test')
+        timestamps[timestamps < -9000] = np.nan  # remove mask values
+        update_timestamps = self._get_repeated_fold_average(self.output_data, label='timestamp_update',
+                                                            trial_index='update_test_index')
+        update_timestamps[update_timestamps < -9000] = np.nan  # remove mask values
+
+        self.agg_data = dict(predict=predict_data, update_predict_data=update_predict_data, target=target_data,
+                             y_position=y_position, timestamps=timestamps, update_timestamps=update_timestamps,
+                             log_likelihood=log_likelihood, )
+
+    def _get_decoder_data(self):
+        # input to decoder is just a long series of
+        data = np.empty(np.shape(self.session_ts.data))
+        data[:] = np.nan
+        session_timestamps = np.round(self.session_ts.timestamps[:], 6)
+
+        for key, value in dict(update_timestamps='update_predict_data', timestamps='predict').items():
+            for timestamps, prediction in zip(self.agg_data[key], self.agg_data[value]):
+                trial_timestamps = timestamps[~np.isnan(timestamps)]
+                trial_prediction = prediction[~np.isnan(timestamps)]
+                idx_start = bisect_left(session_timestamps, np.round(trial_timestamps[0], 6))
+                idx_stop = bisect(session_timestamps, np.round(trial_timestamps[-1], 6), lo=idx_start)
+                data[idx_start:idx_stop] = trial_prediction  # fill in values with the choice value
+
+        self.decoder_data = data  # TODO - test this works ok with the decoder
 
     @staticmethod
     def _log2_likelihood(y_true, y_pred, eps=1e-15):
@@ -200,12 +282,12 @@ class DynamicChoiceRNN:
         return log_likelihood_elem
 
     @staticmethod
-    def _get_repeated_fold_average(output_df, label=None):
-        all_trial_inds = np.hstack(output_df['test_index'].to_numpy())
+    def _get_repeated_fold_average(output_df, label=None, trial_index='test_index'):
+        all_trial_inds = np.hstack(output_df[trial_index].to_numpy())
         all_trial_outputs = np.vstack(output_df[label].to_numpy())
 
         mean_data = []
-        for trial_ind in range(np.shape(np.unique(all_trial_inds))[0]):
+        for trial_ind in np.unique(all_trial_inds):
             output_data = all_trial_outputs[all_trial_inds == trial_ind, :]
             mean_data.append(np.mean(output_data, axis=0).squeeze())
 

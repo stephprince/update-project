@@ -11,14 +11,15 @@ plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
 # setup sessions
 animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-dates_included = [210520, 210909]
+dates_included = [210520]
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
-overwrite = False
+overwrite = True
 plot = True
 grid_search = False
+target_var = 'choice'  # choice
 
 group_data = []
 for name in session_names:
@@ -27,7 +28,7 @@ for name in session_names:
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
-    rnn = DynamicChoiceRNN(nwbfile=nwbfile, session_id=session_db.get_session_id(name))
+    rnn = DynamicChoiceRNN(nwbfile=nwbfile, session_id=session_db.get_session_id(name), target_var=target_var)
     rnn.run(overwrite=overwrite, grid_search=grid_search)
 
     # save to group output
@@ -37,5 +38,5 @@ for name in session_names:
     group_data.append(session_data)
 
 if plot:
-    visualizer = DynamicChoiceVisualizer(group_data, grid_search=grid_search)
+    visualizer = DynamicChoiceVisualizer(group_data, grid_search=grid_search, target_var=target_var)
     visualizer.plot()
