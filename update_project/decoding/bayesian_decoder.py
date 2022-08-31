@@ -13,6 +13,7 @@ from update_project.results_io import ResultsIO
 from update_project.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
+from update_project.general.trials import get_trials_dataframe
 
 
 class BayesianDecoder:
@@ -59,9 +60,9 @@ class BayesianDecoder:
 
         # setup data
         self.feature_names = features
-        self.trials = nwbfile.trials.to_dataframe()
+        self.trials = get_trials_dataframe(nwbfile, with_pseudoupdate=True)
         self.units = nwbfile.units.to_dataframe()
-        self.data = self._setup_data(nwbfile, session_id=session_id)
+        self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
 
@@ -86,7 +87,7 @@ class BayesianDecoder:
 
         return self
 
-    def _setup_data(self, nwbfile, session_id):
+    def _setup_data(self, nwbfile):
         data_dict = dict()
         for feat in self.feature_names:
             if feat in ['x_position', 'y_position']:
@@ -122,9 +123,9 @@ class BayesianDecoder:
 
                 # load dynamic choice from saved output
                 data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type')
-                feat = data_mapping[self.feature_names[0]]
+                fname_tag = data_mapping[self.feature_names[0]]
                 choice_path = Path().absolute().parent.parent / 'results' / 'dynamic_choice'
-                fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{feat}',
+                fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{fname_tag}',
                                                           results_type='session', format='pkl',
                                                           diff_base_path=choice_path)
                 import_data = self.results_io.load_pickled_data(fname)  #  TODO - make this more robust
