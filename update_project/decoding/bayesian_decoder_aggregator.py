@@ -7,6 +7,7 @@ from math import sqrt
 from pathlib import Path
 from sklearn.metrics import mean_squared_error
 from scipy.stats import sem
+#from tensorpac.methods import meth_pac
 
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
@@ -24,7 +25,7 @@ class BayesianDecoderAggregator:
         self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df'],  format='pkl'),
                                params=dict(vars=['exclusion_criteria', 'align_times', 'flip_trials_by_turn'], format='npz'))
 
-    def run_df_aggregation(self, data, overwrite=False):
+    def run_df_aggregation(self, data, overwrite=False, window=5):
         if overwrite:
             # aggregate session data
             for sess_dict in data:
@@ -32,7 +33,7 @@ class BayesianDecoderAggregator:
                 bins = [[-1, 0, 1] if sess_dict['decoder'].convert_to_binary else sess_dict['decoder'].bins][0]
                 summary_df = self._summarize(sess_dict['decoder'])
                 session_error = self._get_session_error(sess_dict['decoder'], summary_df)
-                session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['decoder']),
+                session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['decoder'], window=window),
                                               summary_df=summary_df,
                                               confusion_matrix=self._get_confusion_matrix(summary_df, bins),
                                               confusion_matrix_sum=session_error['confusion_matrix_sum'],
@@ -78,7 +79,7 @@ class BayesianDecoderAggregator:
         virtual_track = param_data['virtual_track'].values[0]
         confusion_matrix = self._get_confusion_matrix(group_summary_df, bins)
         confusion_matrix_sum = self._get_confusion_matrix_sum(confusion_matrix)
-        locations = virtual_track.get_cue_locations().get(param_data['feature'].values[0], dict())
+        locations = virtual_track.cue_end_locations.get(param_data['feature'].values[0], dict())
 
         return dict(confusion_matrix=confusion_matrix, confusion_matrix_sum=confusion_matrix_sum, locations=locations,
                     bins=bins, vmax=vmax, param_values=param_name)
@@ -109,7 +110,7 @@ class BayesianDecoderAggregator:
 
         return data_subset
 
-    def select_group_aligned_data(self, param_data, filter_dict, window=None, flip_trials=True):
+    def select_group_aligned_data(self, param_data, filter_dict, flip_trials=True):
         group_aligned_df = self._get_aligned_data(param_data)
 
         # filter for specific features
@@ -123,13 +124,13 @@ class BayesianDecoderAggregator:
             data_subset = self._flip_trials(trials_to_flip, turn_to_flip, data_subset, param_data)
 
         if np.size(data_subset):
-            if window:
-                nbins = len(data_subset['times'].values[0])
-                orig_window_start = data_subset['window_start'].values[0]
-                orig_window_stop = data_subset['window_stop'].values[0]
-                times = np.linspace(np.max([-window, orig_window_start]), np.min([window, orig_window_stop]), num=nbins)
-            else:
-                times = data_subset['times'].values[0]
+            # if window:
+            #     nbins = len(data_subset['times'].values[0])
+            #     orig_window_start = data_subset['window_start'].values[0]
+            #     orig_window_stop = data_subset['window_stop'].values[0]
+            #     times = np.linspace(np.max([-window, orig_window_start]), np.min([window, orig_window_stop]), num=nbins)
+            # else:
+            times = data_subset['times'].values[0]
 
             field_names = ['feature', 'decoding', 'error']
             group_data = {n: np.vstack(data_subset[n]) for n in field_names}
@@ -168,6 +169,11 @@ class BayesianDecoderAggregator:
         for b_name, b_value in bounds.items():
             theta_phase_df[bound_mapping[b_name]] = theta_phase_df['probability'].apply(
                 lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
+
+        # get phase-probability density coupling measurements - work in progress
+        # meth_pac.modulation_index(pha=theta_phase_df['theta_phase'].to_numpy()[np.newaxis, :],
+        #                           amp=theta_phase_df[['initial_stay', 'switch', 'home']].to_numpy().T,
+        #                           n_bins=12)
 
         # get histogram, ratio, and mean probability values for different theta phases
         theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), half=np.linspace(-np.pi, np.pi, 3))
@@ -401,7 +407,7 @@ class BayesianDecoderAggregator:
 
         return confusion_matrix
 
-    def _align_by_times(self, decoder, window=2):
+    def _align_by_times(self, decoder, window):
         nbins = int(window*2/decoder.decoder_bin_size)
 
         trial_type_dict = dict(non_update=1, switch=2, stay=3)

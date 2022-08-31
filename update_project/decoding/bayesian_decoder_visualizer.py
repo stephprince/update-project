@@ -50,7 +50,7 @@ class BayesianDecoderVisualizer:
 
         feature_name = feature_name or self.data.feature_names[0]
         error_bars = ''
-        if feature_name in ['x_position', 'view_angle', 'choice', 'turn_type']:  # divergent color maps for div data
+        if feature_name in ['x_position', 'view_angle', 'choice', 'turn_type', 'dynamic_choice', 'cue_bias']:  # divergent color maps for div data
             cmap_pos = self.colors['left_right_cmap_div']
             scaling_value = 0.5
             balanced = True
@@ -374,7 +374,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         super().__init__(data, exclusion_criteria=exclusion_criteria, params=params, threshold_params=threshold_params)
 
         self.aggregator = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria)
-        self.aggregator.run_df_aggregation(data, overwrite=True)
+        self.aggregator.run_df_aggregation(data, overwrite=True, window=2.5)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self, group_by=None):
@@ -392,16 +392,17 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             group_data = self.aggregator.group_df.groupby(group_names)
             for name, data in group_data:
                 print(f'Plotting data for group {name}...')
-                # plot correct vs. incorrect trial types
-                self.plot_theta_phase_histogram(data, name)
-                self.plot_theta_phase_comparisons(data, name)
-                self.plot_group_aligned_data(data, name)
-                self.plot_group_aligned_comparisons(data, name)
 
                 # plot model metrics
                 self.plot_tuning_curves(data, name)
                 self.plot_group_confusion_matrices(data, name)
                 self.plot_parameter_comparison(data, name, thresh_params=True)
+
+                # plot correct vs. incorrect trial types
+                self.plot_group_aligned_data(data, name)
+                self.plot_group_aligned_comparisons(data, name)
+                self.plot_theta_phase_histogram(data, name)
+                self.plot_theta_phase_comparisons(data, name)
 
                 for iter_list in itertools.product(*self.threshold_params.values()):
                     thresh_mask = pd.concat([data[k] >= v for k, v in zip(self.threshold_params.keys(), iter_list)],
@@ -563,7 +564,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     # plot confusion matrix
                     if hasattr(row['bins'], 'astype'):  # if the matrix exists
                         matrix = np.vstack(sess_matrix) * row['encoder_bin_num']  # scale to be probability/chance
-                        locations = row['virtual_track'].get_cue_locations().get(row['feature'],
+                        locations = row['virtual_track'].cue_end_locations.get(row['feature'],
                                                                                     dict())  # don't annotate graph if no locations indicated
                         limits = [np.min(row['bins'].astype(int)), np.max(row['bins'].astype(int))]
                         im = axes[row_id][col_id].imshow(matrix, cmap=self.colors['cmap'], origin='lower',  # aspect='auto',
@@ -637,7 +638,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     if isinstance(sorted_data['bins'], list):
                         limits = [np.min(np.array(sorted_data['bins'])), np.max(np.array(sorted_data['bins']))]
                     else:
-                        limits = [np.min(sorted_data['bins'].astype(int)), np.max(sorted_data['bins'].astype(int))]
+                        limits = [np.round(np.min(sorted_data['bins']), 2), np.round(np.max(sorted_data['bins']), 2)]
                     im = axes[row_id][col_id].imshow(matrix, cmap=self.colors['cmap'], origin='lower',  # aspect='auto',
                                                      vmin=0, vmax=sorted_data['vmax'],
                                                      extent=[limits[0], limits[1], limits[0], limits[1]])
@@ -678,7 +679,6 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         feat = data['feature'].values[0]
         param_group_data = data.groupby(self.params)  # main group is what gets the different plots
         for param_name, param_data in param_group_data:
-            window = 2
             align_times = self.aggregator.align_times
 
             for plot_types in list(itertools.product(*plot_groups.values())):
@@ -691,7 +691,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 for ind, time_label in enumerate(align_times[:-1]):
                     filter_dict = dict(time_label=[time_label], **plot_group_dict)
                     p_data = param_data.copy(deep=True)
-                    group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict, window)
+                    group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict)
                     if np.size(group_aligned_data) and group_aligned_data is not None:
                         quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
                         bounds = [v['bound_values'] for v in quant_aligned_data.values()]
@@ -701,7 +701,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
                 # save figure
                 fig.suptitle(title)
-                tags = f'{"_".join(["".join(n) for n in name])}_{title}_win{window}_' \
+                tags = f'{"_".join(["".join(n) for n in name])}_{title}_' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
                 self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
 
@@ -709,7 +709,6 @@ class GroupVisualizer(BayesianDecoderVisualizer):
         plot_groups = plot_groups or dict(update_type=[['non_update'], ['switch'], ['stay']],
                                           turn_type=[[1, 2]], correct=[[0], [1]])
         feat = data['feature'].values[0]
-        window = 2
         for param_name, param_data in data.groupby(self.params):
             compiled_data = []
             for plot_types in list(itertools.product(*plot_groups.values())):
@@ -717,7 +716,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
                     filter_dict = dict(time_label=[time_label], **plot_group_dict)
                     p_data = param_data.copy(deep=True)
-                    group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict, window)
+                    group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict)
                     if np.size(group_aligned_data) and group_aligned_data is not None:
                         quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
                         compiled_data.append(dict(data=group_aligned_data, quant=quant_aligned_data,
@@ -838,7 +837,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
     def plot_tuning_curves(self, data, name):
         feat = data['feature'].values[0]
-        locations = data.virtual_track.values[0].get_cue_locations().get(feat, dict())
+        locations = data.virtual_track.values[0].cue_end_locations.get(feat, dict())
         tuning_curve_params = [p for p in self.params if p not in ['decoder_bins']]
         data_const_decoding = data[data['decoder_bins'] == data['decoder_bins'].values[0]]
         param_group_data = data_const_decoding.groupby(tuning_curve_params)
@@ -874,7 +873,7 @@ class GroupVisualizer(BayesianDecoderVisualizer):
 
                 # plot heatmaps
                 y_limits = [0, np.shape(tuning_curve_scaled)[0]]
-                x_limits = [np.min(tuning_curve_bins.astype(int)), np.max(tuning_curve_bins.astype(int))]
+                x_limits = [np.round(np.min(tuning_curve_bins), 2), np.round(np.max(tuning_curve_bins), 2)]
                 im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['plain_cmap'], origin='lower',
                                                  vmin=0.1,
                                                  aspect='auto',
