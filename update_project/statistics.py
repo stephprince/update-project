@@ -6,7 +6,7 @@ from scipy.stats import sem, ranksums, kstest
 def get_fig_stats(data, axis=0):
     if len(data):  # if not empty
         mean = np.nanmean(data, axis=axis)
-        err = sem(data, axis=axis)
+        err = sem(data, axis=axis, nan_policy='omit')
         upper = mean + 2 * err
         lower = mean - 2 * err
         err_upper = mean + err
