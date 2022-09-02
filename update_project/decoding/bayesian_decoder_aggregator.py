@@ -142,7 +142,7 @@ class BayesianDecoderAggregator:
 
         return group_data
 
-    def calc_theta_phase_data(self, param_data, filter_dict):
+    def calc_theta_phase_data(self, param_data, filter_dict, time_bins=3):
         # get aligned df and apply filters
         group_aligned_df = self._get_aligned_data(param_data)
         mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
@@ -177,7 +177,7 @@ class BayesianDecoderAggregator:
 
         # get histogram, ratio, and mean probability values for different theta phases
         theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), half=np.linspace(-np.pi, np.pi, 3))
-        time_bins = [-10, 0.0, 10]  # large numbers just to set upper limits
+        time_bins = np.linspace(-3, 3, time_bins)  # TODO - change to grab from window periods
         data_to_average = [*list(bound_mapping.values()), 'theta_amplitude']
         theta_phase_list = []
         for t_name, t_bins in theta_bins.items():
@@ -199,9 +199,17 @@ class BayesianDecoderAggregator:
                         times_label = 'pre'
                     elif g_value['time_mid'].values[0] > 0:
                         times_label = 'post'
-                    theta_phase_list.append(dict(bin_name=t_name, times=times_label, df=g_value))
+                    g_value['bin_name'] = t_name
+                    g_value['times'] = times_label
+                    g_value['time_bins'] = [time_bins] * len(g_value)
+                    theta_phase_list.append(g_value)
 
-        return theta_phase_list
+        if len(theta_phase_list):
+            theta_phase_output = pd.concat(theta_phase_list, axis=0, ignore_index=True)
+        else:
+            theta_phase_output = None
+
+        return theta_phase_output
 
     @staticmethod
     def _integrate_prob_density(prob_density, prob_density_bins, bounds, axis=0):

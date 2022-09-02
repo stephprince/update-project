@@ -392,17 +392,17 @@ class GroupVisualizer(BayesianDecoderVisualizer):
             group_data = self.aggregator.group_df.groupby(group_names)
             for name, data in group_data:
                 print(f'Plotting data for group {name}...')
+                self.plot_phase_modulation_around_update(data, name)
+                self.plot_theta_phase_histogram(data, name)
+                self.plot_theta_phase_comparisons(data, name)
+
+                self.plot_group_aligned_data(data, name)
+                self.plot_group_aligned_comparisons(data, name)
 
                 # plot model metrics
                 self.plot_tuning_curves(data, name)
                 self.plot_group_confusion_matrices(data, name)
                 self.plot_parameter_comparison(data, name, thresh_params=True)
-
-                # plot correct vs. incorrect trial types
-                self.plot_group_aligned_data(data, name)
-                self.plot_group_aligned_comparisons(data, name)
-                self.plot_theta_phase_histogram(data, name)
-                self.plot_theta_phase_comparisons(data, name)
 
                 for iter_list in itertools.product(*self.threshold_params.values()):
                     thresh_mask = pd.concat([data[k] >= v for k, v in zip(self.threshold_params.keys(), iter_list)],
@@ -913,51 +913,49 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                 plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
 
                 # make plots for aligned data (1 row for heatmap, 1 row for modulation index, 1 col for each align time)
-                ncols, nrows = (len(align_times[:-1]), 6)
-                fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row',
-                                         sharex='col')
+                ncols, nrows = (len(align_times[:-1]), 4)
+                fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharey='row', sharex='col')
                 for ind, time_label in enumerate(align_times[:-1]):
                     filter_dict = dict(time_label=[time_label], **plot_group_dict)
                     p_data = param_data.copy(deep=True)
-                    theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict)
-                    for t in theta_phase_data:
-                        rows = dict(full=0, half=3, theta_amplitude=0, initial_stay=1, switch=1, home=2)
-                        row_ind = rows[t['bin_name']]  # full or half
-                        if t['times'] == 'post' and time_label == 't_choice_made':
-                            pass  # don't plot post-choice made data bc really messy
-                        else:
-                            for loc in ['switch', 'initial_stay', 'home', 'theta_amplitude']:
-                                lstyle = ['dashed' if t['times'] == 'pre' else 'solid'][0]
-                                color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
-                                axes[rows[loc] + row_ind][ind].plot(t['df']['phase_mid'] / np.pi, t['df'][f'{loc}'],
-                                                                    color=color, linestyle=lstyle,
-                                                                    label=f'{loc}_{t["times"]}')
-                                axes[rows[loc] + row_ind][ind].fill_between(t['df']['phase_mid'] / np.pi,
-                                                                            t['df'][f'{loc}_err_lower'],
-                                                                            t['df'][f'{loc}_err_upper'], alpha=0.2,
-                                                                            color=color, )
-                                axes[rows[loc] + row_ind][ind].xaxis.set_major_formatter(
-                                    ticker.FormatStrFormatter('%g $\pi$'))
-                                axes[rows[loc] + row_ind][ind].xaxis.set_major_locator(ticker.MultipleLocator(base=1.0))
-                                axes[rows[loc] + row_ind][ind].relim()
-                                if ind == 0 and rows[loc] + row_ind != 0:
-                                    axes[rows[loc] + row_ind][ind].legend()
-                                    axes[rows[loc] + row_ind][ind].set_ylabel('prob_density')
-                                elif ind == 0 and loc == 'theta_amplitude':
-                                    axes[rows[loc] + row_ind][ind].legend()
-                                    axes[rows[loc] + row_ind][ind].set_ylabel('theta_amplitude')
-
-                            if rows[loc] + row_ind == nrows - 1:
-                                axes[rows[loc] + row_ind][ind].set(xlabel='Time around update')
-                            if rows[loc] + row_ind == 0:
-                                axes[rows[loc] + row_ind][ind].set_title(time_label)
+                    theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict, time_bins=21)
+                    if theta_phase_data:
+                        theta_phase_data_full = theta_phase_data[theta_phase_data['bin_name'] == 'full']
+                        for row_ind, loc in enumerate(['switch', 'initial_stay', 'home', 'theta_amplitude']):
+                            cmap = self.colors.get(f'{loc}_cmap', self.colors['home_cmap'])
+                            if loc in ['switch', 'initial_stay']:
+                                scaling = (0.1, 0.4)
+                            elif loc in ['home']:
+                                scaling = (0.7, 1.0)
+                            else:
+                                scaling = (-100, 100)
+                            mod_map = theta_phase_data_full.pivot(columns='time_mid', index='phase_mid', values=loc)
+                            phases = mod_map.index.to_numpy()/np.pi
+                            times = mod_map.columns.to_numpy()
+                            im = axes[row_ind][ind].imshow(mod_map, cmap=cmap, origin='lower', aspect='auto',
+                                                           vmin=scaling[0], vmax=scaling[1],
+                                                           extent=[times[0], times[-1], phases[0], phases[-1]])
+                            axes[row_ind][ind].yaxis.set_major_formatter(ticker.FormatStrFormatter('%g $\pi$'))
+                            axes[row_ind][ind].xaxis.set_major_locator(ticker.MultipleLocator(base=1.0))
+                            if loc == 'theta_amplitude':
+                                plt.colorbar(im, ax=axes[row_ind][ind], label='theta amplitude', pad=0.01,
+                                             location='right',
+                                             fraction=0.046)
+                            else:
+                                plt.colorbar(im, ax=axes[row_ind][ind], label=f'{loc} prob density', pad=0.01, location='right',
+                                             fraction=0.046)
+                            if row_ind == nrows - 1:
+                                axes[row_ind][ind].set(xlabel='Time around update')
+                            if row_ind == 0:
+                                axes[row_ind][ind].set_title(time_label)
 
                 # save figure
                 title = '_'.join([''.join([k, str(v)]) for k, v in zip(plot_groups.keys(), plot_types)])
                 fig.suptitle(f'{feat}_{title}')
                 tags = f'{"_".join(["".join(n) for n in name])}_{title}' \
                        f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_mod_around_update', additional_tags=tags)
+                self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_mod_around_update',
+                                         additional_tags=tags)
 
     def plot_theta_phase_histogram(self, data, name, plot_groups=None):
         plot_groups = plot_groups or dict(update_type=[['non_update'], ['switch'], ['stay']],
@@ -977,19 +975,19 @@ class GroupVisualizer(BayesianDecoderVisualizer):
                     filter_dict = dict(time_label=[time_label], **plot_group_dict)
                     p_data = param_data.copy(deep=True)
                     theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict)
-                    for t in theta_phase_data:
-                        rows = dict(full=0, half=3, theta_amplitude=0, initial_stay=1, switch=1, home=2)
-                        row_ind = rows[t['bin_name']]  # full or half
-                        if t['times'] == 'post' and time_label == 't_choice_made':
+                    rows = dict(full=0, half=3, theta_amplitude=0, initial_stay=1, switch=1, home=2)
+                    for g_name, group in theta_phase_data.groupby(['bin_name', 'times']):
+                        row_ind = rows[g_name[0]]  # full or half
+                        if g_name[1] == 'post' and time_label == 't_choice_made':
                             pass  # don't plot post-choice made data bc really messy
                         else:
                             for loc in ['switch', 'initial_stay', 'home', 'theta_amplitude']:
-                                lstyle = ['dashed' if t['times'] == 'pre' else 'solid'][0]
+                                lstyle = ['dashed' if g_name[1] == 'pre' else 'solid'][0]
                                 color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
-                                axes[rows[loc]+row_ind][ind].plot(t['df']['phase_mid']/np.pi, t['df'][f'{loc}'], color=color, linestyle=lstyle,
-                                                          label=f'{loc}_{t["times"]}')
-                                axes[rows[loc]+row_ind][ind].fill_between(t['df']['phase_mid']/np.pi, t['df'][f'{loc}_err_lower'],
-                                                                  t['df'][f'{loc}_err_upper'], alpha=0.2, color=color,)
+                                axes[rows[loc]+row_ind][ind].plot(group['phase_mid']/np.pi, group[f'{loc}'], color=color, linestyle=lstyle,
+                                                          label=f'{loc}_{g_name[1]}')
+                                axes[rows[loc]+row_ind][ind].fill_between(group['phase_mid']/np.pi, group[f'{loc}_err_lower'],
+                                                                  group[f'{loc}_err_upper'], alpha=0.2, color=color,)
                                 axes[rows[loc]+row_ind][ind].xaxis.set_major_formatter(ticker.FormatStrFormatter('%g $\pi$'))
                                 axes[rows[loc]+row_ind][ind].xaxis.set_major_locator(ticker.MultipleLocator(base=1.0))
                                 axes[rows[loc] + row_ind][ind].relim()

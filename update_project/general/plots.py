@@ -60,8 +60,10 @@ def get_color_theme():
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
+    color_theme_dict['home_cmap'] = sns.color_palette("Greys", as_cmap=True)
     color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)
     color_theme_dict['stay_cmap'] = sns.light_palette(color_theme_dict['stay'], as_cmap=True)
+    color_theme_dict['initial_stay_cmap'] = color_theme_dict['stay_cmap']
     color_theme_dict['left_cmap'] = sns.light_palette(color_theme_dict['left'], as_cmap=True)
     color_theme_dict['right_cmap'] = sns.light_palette(color_theme_dict['right'], as_cmap=True)
     color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(270, 152, s=95, l=60, as_cmap=True)
@@ -76,9 +78,12 @@ def get_color_theme():
 
 def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True,
                        palette=None, histstat='proportion', common_norm=False):
-    palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
-    if len(palette) > len(data[group].unique()):
-        palette = palette[:len(data[group].unique())]
+    if group:
+        palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
+        if len(palette) > len(data[group].unique()):
+            palette = palette[:len(data[group].unique())]
+    else:
+        palette = palette or sns.color_palette()
 
     if group and show_median:
         medians = data.groupby([group])[column_name].median()
