@@ -8,6 +8,7 @@ from pathlib import Path
 from update_project.general.plots import clean_plot
 from update_project.statistics import get_stats_summary
 
+
 class ResultsIO:
     git_hash = Repo(search_parent_directories=True).head.object.hexsha[:10]
     base_path = Path().absolute().parent.parent / 'results'
@@ -29,14 +30,17 @@ class ResultsIO:
                 except EOFError:
                     break
 
-    def get_data_filename(self, filename, results_type='group', results_name='', format='npy'):
-        data_path = self.get_data_path(results_type, results_name)
-        fname = data_path / f'{filename}_{self.tags}.{format}'  # only use git hash for figs, not for intermediate data
+    def get_data_filename(self, filename, results_type='group', results_name='', format='npy', diff_base_path=None):
+        data_path = self.get_data_path(results_type, results_name, diff_base_path)
+        if diff_base_path:
+            fname = data_path / f'{filename}.{format}'
+        else:
+            fname = data_path / f'{filename}_{self.tags}.{format}'  # only use git hash for figs, not for intermediate data
 
         return fname
 
-    def get_data_path(self, results_type='group', results_name=''):
-        data_path = self.get_results_path(results_type, results_name=results_name) / 'intermediate_data'
+    def get_data_path(self, results_type='group', results_name='', diff_base_path=None):
+        data_path = self.get_results_path(results_type, results_name=results_name, diff_base_path=diff_base_path) / 'intermediate_data'
         Path(data_path).mkdir(parents=True, exist_ok=True)
 
         return data_path
@@ -48,12 +52,14 @@ class ResultsIO:
 
         return fname
 
-    def get_results_path(self, results_type='group', results_name=''):
+    def get_results_path(self, results_type='group', results_name='', diff_base_path=None):
+        base_path = diff_base_path or self.base_path  # use default base path if none provided
+
         if results_type == 'group':
-            results_path = self.base_path / 'group_summary' / results_name
+            results_path = base_path / 'group_summary' / results_name
         elif results_type == 'session':
             assert self.session_id is not None, "No session id provided so cannot create session folder"
-            results_path = self.base_path / self.session_id / results_name
+            results_path = base_path / self.session_id / results_name
 
         Path(results_path).mkdir(parents=True, exist_ok=True)
 

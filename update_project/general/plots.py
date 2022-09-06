@@ -54,13 +54,16 @@ def get_color_theme():
     color_theme_dict['switch'] = '#927ff9'  # 270 in degrees, 95 saturation, 60 light
     color_theme_dict['stay_update'] = color_theme_dict['stay']
     color_theme_dict['switch_update'] = color_theme_dict['switch']
+    color_theme_dict['initial_stay'] = color_theme_dict['stay']
     color_theme_dict['non_update'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
+    color_theme_dict['home_cmap'] = sns.color_palette("Greys", as_cmap=True)
     color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)
     color_theme_dict['stay_cmap'] = sns.light_palette(color_theme_dict['stay'], as_cmap=True)
+    color_theme_dict['initial_stay_cmap'] = color_theme_dict['stay_cmap']
     color_theme_dict['left_cmap'] = sns.light_palette(color_theme_dict['left'], as_cmap=True)
     color_theme_dict['right_cmap'] = sns.light_palette(color_theme_dict['right'], as_cmap=True)
     color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(270, 152, s=95, l=60, as_cmap=True)
@@ -75,9 +78,12 @@ def get_color_theme():
 
 def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True,
                        palette=None, histstat='proportion', common_norm=False):
-    palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
-    if len(palette) > len(data[group].unique()):
-        palette = palette[:len(data[group].unique())]
+    if group:
+        palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
+        if len(palette) > len(data[group].unique()):
+            palette = palette[:len(data[group].unique())]
+    else:
+        palette = palette or sns.color_palette()
 
     if group and show_median:
         medians = data.groupby([group])[column_name].median()
@@ -97,7 +103,7 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
     # add median annotations to the first plot
     new_line = '\n'
     median_text = [f"{g} median: {m:.2f} {new_line}" for g, m in medians.items()]
-    axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text),
+    axes[row_ids[0]][col_ids[0]].text(0.55, 0.2, ''.join(median_text)[:-1],
                                       transform=axes[row_ids[0]][col_ids[0]].transAxes, verticalalignment='top',
                                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
 

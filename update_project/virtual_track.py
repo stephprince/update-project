@@ -4,12 +4,15 @@ from track_linearization import make_track_graph, get_linearized_position
 
 
 class VirtualTrack:
-    def __init__(self, coords, nodes, edges, cue_locations, choice_boundaries, mappings=None, linearization=False):
+    def __init__(self, coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries, home_boundaries,
+                 mappings=None, linearization=False):
         self.coords = coords
         self.nodes = nodes
         self.edges = edges
-        self.cue_locations = cue_locations
+        self.cue_start_locations = cue_start_locations
+        self.cue_end_locations = cue_end_locations
         self.choice_boundaries = choice_boundaries
+        self.home_boundaries = home_boundaries
         self.mappings = mappings
         self.linearization = linearization
 
@@ -17,9 +20,6 @@ class VirtualTrack:
         xs, ys = zip(*self.coords)
 
         return xs, ys
-
-    def get_cue_locations(self):
-        return self.cue_locations
 
     def linearize_track_position(self, position):
         track_graph = make_track_graph(self.nodes, self.edges)
@@ -50,24 +50,29 @@ class UpdateTrack(VirtualTrack):
     edges = [(0, 1),
              (1, 2),
              (1, 3)]
-    cue_locations = dict(x_position={'left arm': -2, 'home arm': 2, 'right arm': 33},  # actually -1,+1, change for bins
-                         view_angle={'home left max': -np.pi / 4, 'home right max': np.pi / 4},
-                         y_position={'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35,
-                                     'delay2 cue': 250.35, 'choice cue': 255})
+    cue_end_locations = dict(x_position={'left arm': -2, 'home arm': 2, 'right arm': 33},  # actually -1,+1, change for bins
+                             view_angle={'home left max': -np.pi / 4, 'home right max': np.pi / 4},
+                             y_position={'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35,
+                                         'delay2 cue': 250.35, 'choice cue': 255},
+                             dynamic_choice={'p_left': -0.4, 'p_right': 0.4})
+    cue_start_locations = dict(y_position={'initial cue': 5, 'delay cue': 120.325, 'update cue': 145.125,
+                                           'delay2 cue': 215.125})
     choice_boundaries = dict(x_position={'left': (-33, -1), 'right': (1, 33)},
                              y_position={'left': (255, 298), 'right': (298, 341)},
                              view_angle={'left': (np.pi,  2 * np.pi / 9), 'right': (-2 * np.pi/9, -np.pi)},  # 40 deg
                              choice={'left': (-2, 0), 'right': (0, 2)},
-                             turn_type={'left': (-2, 0), 'right': (0, 2)})
+                             turn_type={'left': (-2, 0), 'right': (0, 2)},
+                             dynamic_choice={'left': (-1, -0.4), 'right': (0.4, 1)})
     mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},
                     turn_type={'1': 'left', '2': 'right'})
+    home_boundaries = dict(x_position=(-1, 1),
+                           y_position=(5, 255),
+                           view_angle=(2 * np.pi / 9, -2 * np.pi/9),
+                           dynamic_choice=(-0.5, 0.5),
+                           cue_bias=(-0.4, 0.4))
 
-    def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_locations=cue_locations,
-                 choice_boundaries=choice_boundaries, mappings=mappings, linearization=False):
-        super().__init__(coords, nodes, edges, cue_locations, choice_boundaries, mappings, linearization)
-
-        # setup cue locations
-        if self.linearization:
-            self.cue_locations['y_position'].update({'left arm': 298, 'right arm': 341})
-        else:
-            self.cue_locations['y_position'].update({'arms': 285})
+    def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_start_locations=cue_start_locations,
+                 cue_end_locations=cue_end_locations, choice_boundaries=choice_boundaries,
+                 home_boundaries=home_boundaries, mappings=mappings, linearization=False):
+        super().__init__(coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries,
+                         home_boundaries, mappings, linearization)

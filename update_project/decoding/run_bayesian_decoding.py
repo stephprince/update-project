@@ -1,4 +1,3 @@
-import dill
 import itertools
 
 from pathos.helpers import cpu_count
@@ -18,35 +17,36 @@ def run_bayesian_decoding():
     parallel = False  # cannot be run in conjunction with group currently
 
     # setup sessions
-    animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-    dates_included = []  # 210913  ran 210511
+    animals = [17, 20, 25, 28, 29, 33, 34]
+    dates_included = []
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
     features = ['y_position']
-    regions = [['CA1'], ['PFC']]  # run PFC later
+    regions = [['CA1']]  # run PFC later
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bins=[40],
-                          decoder_bins=[0.25])
+                          decoder_bins=[0.025])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
     if parallel:
-        pool = Pool(nodes=int(cpu_count() / 2) - 1)
+        pool = Pool(nodes=int(cpu_count() / 2) - 2)
         pool.map(lambda x: bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *x), args)
         pool.close()
         pool.join()
 
-    if group:
-        group_data = []
-        for arg_list in args:
-            group_data.append(bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *arg_list))
+    group_data = []
+    for arg_list in args:
+        group_data.append(bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *arg_list))
 
+    if group:
         group_visualizer = GroupVisualizer(group_data,
                                            exclusion_criteria=exclusion_criteria,
-                                           params=list(testing_params.keys()))
+                                           params=list(testing_params.keys()),
+                                           overwrite=overwrite)
         group_visualizer.plot(group_by=dict(region=regions, feature=features))
 
     print(f'Finished running {__file__}')

@@ -4,7 +4,6 @@ import pandas as pd
 
 from pathlib import Path
 from pynwb import NWBHDF5IO
-from scipy.signal import resample
 
 from update_project.general.plots import plot_distributions
 from update_project.session_loader import SessionLoader
@@ -58,7 +57,7 @@ def plot_velocity_distributions(velocity_df, thresholds=[], group=None, show_med
 
 
 # setup sessions
-animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
+animals = [17, 20, 25, 28, 29, 33]  # 17, 20, 25, 28, 29
 dates_included = []  # 210913
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
@@ -82,11 +81,11 @@ for name in session_names:
     # get velocity data
     rot_velocity = np.abs(nwbfile.acquisition['rotational_velocity'].data[:])
     trans_velocity = np.abs(nwbfile.acquisition['translational_velocity'].data[:])
-    rot_velocity_resampled = resample(rot_velocity, int(len(rot_velocity) / downsample_factor))
-    trans_velocity_resampled = resample(trans_velocity, int(len(trans_velocity) / downsample_factor))
+    rot_velocity_resampled = rot_velocity[::downsample_factor]
+    trans_velocity_resampled = trans_velocity[::downsample_factor]
     velocity_dict = dict(rotational=rot_velocity_resampled,
                          translational=trans_velocity_resampled,
-                         summed=(rot_velocity_resampled + trans_velocity_resampled),
+                         summed=abs(rot_velocity_resampled + trans_velocity_resampled),
                          session_id=session_db.get_session_id(name),
                          animal=name[1])
     velocity_df = pd.DataFrame(velocity_dict)

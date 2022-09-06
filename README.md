@@ -52,6 +52,7 @@ import update_project
         - **doc/** - contains relevant documentation files (behavior csvs, methodology, manuscript drafts, etc.)
                 - ephys recording summary: `/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv`
                 - behavior summary: `/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv`
+                - this folder also contains several important notes about the processing pipelines and things to consider when analyzing the data
         - **results/** -  contains relevant output figures and intermediary data structures, not stored on github
         - **requirements.txt** -  contains the minimal package requirements for the project.
         - **update-project/** -  contains relevant matlab and python code
