@@ -17,8 +17,8 @@ def run_bayesian_decoding():
     parallel = False  # cannot be run in conjunction with group currently
 
     # setup sessions
-    animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-    dates_included = []  # 210913  ran 210511
+    animals = [17, 20, 25, 28, 29, 33, 34]
+    dates_included = []
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
@@ -33,7 +33,7 @@ def run_bayesian_decoding():
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
     if parallel:
-        pool = Pool(nodes=int(cpu_count() / 2) - 1)
+        pool = Pool(nodes=int(cpu_count() / 2) - 2)
         pool.map(lambda x: bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *x), args)
         pool.close()
         pool.join()

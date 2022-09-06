@@ -10,16 +10,16 @@ from update_project.dynamic_choice.dynamic_choice_visualizer import DynamicChoic
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
 # setup sessions
-animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-dates_included = [210520]
+animals = [17, 20, 25, 28, 29, 33, 34]
+dates_included = []
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
-overwrite = True
+overwrite = False
 plot = True
 grid_search = False
-target_var = 'choice'  # choice
+target_var = 'choice'  # choice or turn_type
 
 group_data = []
 for name in session_names:
