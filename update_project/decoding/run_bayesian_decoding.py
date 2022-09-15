@@ -6,7 +6,7 @@ from pynwb import NWBHDF5IO
 
 from update_project.session_loader import SessionLoader
 from update_project.decoding.bayesian_decoder import BayesianDecoder
-from update_project.decoding.bayesian_decoder_visualizer import SessionVisualizer, GroupVisualizer
+from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
 
 
 def run_bayesian_decoding():
@@ -24,11 +24,11 @@ def run_bayesian_decoding():
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['y_position']
-    regions = [['CA1']]  # run PFC later
+    features = ['y_position']  # idk if it's a lot of data or what but this takes awhile when give too many options
+    regions = [['CA1']]
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bins=[40],
-                          decoder_bins=[0.025])
+                          decoder_bins=[0.25])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
@@ -43,10 +43,10 @@ def run_bayesian_decoding():
         group_data.append(bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, *arg_list))
 
     if group:
-        group_visualizer = GroupVisualizer(group_data,
-                                           exclusion_criteria=exclusion_criteria,
-                                           params=list(testing_params.keys()),
-                                           overwrite=overwrite)
+        group_visualizer = BayesianDecoderVisualizer(group_data,
+                                                     exclusion_criteria=exclusion_criteria,
+                                                     params=list(testing_params.keys()),
+                                                     overwrite=overwrite)
         group_visualizer.plot(group_by=dict(region=regions, feature=features))
 
     print(f'Finished running {__file__}')
@@ -65,11 +65,6 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     decoder = BayesianDecoder(nwbfile=nwbfile, params=params, session_id=session_id,
                               features=[feat])  # initialize decoder class
     decoder.run_decoding(overwrite=overwrite)  # build decoding model
-
-    # plot data
-    if plot:
-        visualizer = SessionVisualizer(decoder)
-        visualizer.plot()
 
     # save to group output
     if parallel:

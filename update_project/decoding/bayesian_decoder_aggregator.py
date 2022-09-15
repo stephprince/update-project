@@ -25,6 +25,11 @@ class BayesianDecoderAggregator:
         self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df'],  format='pkl'),
                                params=dict(vars=['exclusion_criteria', 'align_times', 'flip_trials_by_turn'], format='npz'))
 
+        # times, locs = self._get_example_period()
+        # self.start_time, self.end_time = times
+        # self.start_loc, self.end_loc = locs
+        # self.prob_density_grid = self._get_prob_density_grid()  # prob density plot for example period
+
     def run_df_aggregation(self, data, overwrite=False, window=5):
         if overwrite:
             # aggregate session data
@@ -110,7 +115,7 @@ class BayesianDecoderAggregator:
 
         return data_subset
 
-    def select_group_aligned_data(self, param_data, filter_dict, flip_trials=True):
+    def select_group_aligned_data(self, param_data, filter_dict, flip_trials=True, ret_df=False):
         group_aligned_df = self._get_aligned_data(param_data)
 
         # filter for specific features
@@ -124,12 +129,6 @@ class BayesianDecoderAggregator:
             data_subset = self._flip_trials(trials_to_flip, turn_to_flip, data_subset, param_data)
 
         if np.size(data_subset):
-            # if window:
-            #     nbins = len(data_subset['times'].values[0])
-            #     orig_window_start = data_subset['window_start'].values[0]
-            #     orig_window_stop = data_subset['window_stop'].values[0]
-            #     times = np.linspace(np.max([-window, orig_window_start]), np.min([window, orig_window_stop]), num=nbins)
-            # else:
             times = data_subset['times'].values[0]
 
             field_names = ['feature', 'decoding', 'error']
@@ -140,7 +139,10 @@ class BayesianDecoderAggregator:
         else:
             group_data = None
 
-        return group_data
+        if ret_df:
+            return data_subset
+        else:
+            return group_data
 
     def calc_theta_phase_data(self, param_data, filter_dict, time_bins=3):
         # get aligned df and apply filters
@@ -211,6 +213,34 @@ class BayesianDecoderAggregator:
 
         return theta_phase_output
 
+    def _get_example_period(self, window=500):
+        time_window = self.data.decoder_bin_size * window
+        times = [self.data.summary_df['decoding_error_rolling'].idxmin()]  # get times/locs with minimum error
+        locs = [self.data.summary_df.index.searchsorted(times[0])]
+        if (times[0] + time_window) < self.data.summary_df.index.max():
+            locs.append(self.data.summary_df.index.searchsorted(times[0] + time_window))
+        else:
+            locs.append(self.data.summary_df.index.searchsorted(times[0] - time_window))
+        times.append(self.data.summary_df.iloc[locs[1]].name)
+        times.sort()
+        locs.sort()
+
+        if np.max(locs) - np.min(locs) <= 1:  # try with a larger window if the bins fall in a weird place
+            times, locs = self._get_example_period(window=1000)
+
+        return times, locs
+
+    def _get_prob_density_grid(self):
+        # something still off - the big jumps are taking up too any bins, everything is a little slow
+        # check that end time is getting us all the way
+        nbins = int((self.end_time - self.start_time) / self.data.decoder_bin_size)
+        trials_to_flip = self.data.test_df['turn_type'] == 100  # set all to false
+        time_bins = np.linspace(self.start_time, self.end_time, nbins)  # time bins
+        grid_prob = griddata_time_intervals(self.data.decoded_probs, [self.start_loc], [self.end_loc], nbins,
+                                            trials_to_flip, method='linear', time_bins=time_bins)
+
+        return np.squeeze(grid_prob)
+
     @staticmethod
     def _integrate_prob_density(prob_density, prob_density_bins, bounds, axis=0):
         prob_map_bins = (prob_density_bins[1:] + prob_density_bins[:-1]) / 2
@@ -221,15 +251,19 @@ class BayesianDecoderAggregator:
         return mean_prob
 
     @staticmethod
-    def quantify_aligned_data(param_data, aligned_data):
+    def quantify_aligned_data(param_data, aligned_data, ret_df=False):
         # get bounds to use to quantify choices
         bins = param_data['bins'].values[0]
         virtual_track = param_data['virtual_track'].values[0]
         bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
 
-        prob_map = aligned_data['probability']
+        if isinstance(aligned_data, dict):
+            prob_map = aligned_data['probability']
+        else:
+            prob_map = np.stack(aligned_data['probability'])
         prob_choice = dict()
         num_bins = dict()
+        output_list = []
         for bound_name, bound_values in bounds.items():  # loop through left/right bounds
             prob_map_bins = (bins[1:] + bins[:-1]) / 2
             start_bin = np.searchsorted(prob_map_bins, bound_values[0])
@@ -247,9 +281,43 @@ class BayesianDecoderAggregator:
                                         threshold=threshold)
             prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
 
+            if ret_df:  # if returning dataframe compile data accordingly
+                bound_quantification.update(dict(choice=bound_name, trial_index=aligned_data.index.to_numpy()))
+                output_list.append(bound_quantification)
+
         assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
 
-        return prob_choice
+        if ret_df:
+            list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'bound_values', 'choice']]
+            list_df = list_df.explode(['prob_sum', 'trial_index']).reset_index(drop=True).set_index('trial_index')
+            output_df = pd.merge(aligned_data[['session_id', 'animal', 'time_label', 'times']], list_df, left_index=True,
+                                 right_index=True)
+            output_df['choice'] = output_df['choice'].map(dict(left='initial_stay', right='switch'))
+            return output_df
+        else:
+            return prob_choice
+
+    @staticmethod
+    def calc_trial_by_trial_quant_data(quant_df):
+        # get diff from baseline
+        prob_sum_mat = np.vstack(quant_df['prob_sum'])
+        align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
+        prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
+        quant_df['diff_baseline'] = list(prob_sum_diff.T)
+
+        # get diff from left vs. right bounds
+        quant_df['trial_index'] = quant_df.index
+        quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
+        quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(-2.5, 2.5, 6)).apply(lambda x: x.mid)
+        quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
+
+        choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
+                                   columns=['choice'],
+                                   values=['prob_sum', 'diff_baseline']).reset_index()  # had times here before
+        choice_df['diff_switch_stay'] = choice_df[('prob_sum', 'switch')] - choice_df[('prob_sum', 'initial_stay')]
+        choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
+
+        return quant_df, choice_df
 
     @staticmethod
     def get_tuning_data(param_data):
