@@ -1,17 +1,20 @@
-import itertools
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
+import warnings
 
 from matplotlib.transforms import Affine2D
 import mpl_toolkits.axisartist.floating_axes as floating_axes
 from mpl_toolkits.axisartist.grid_finder import FixedLocator, MaxNLocator
 
-def clean_plot(fig, axes):
+
+def clean_plot(fig, axes, tight_layout):
     if hasattr(axes, 'flat'):
         ax_list = axes.flat
-    else:
+    elif hasattr(axes, 'values'):
         ax_list = list(axes.values())
+    else:
+        ax_list = [axes]
 
     for axi in ax_list:
         xlim = axi.get_xlim()
@@ -24,9 +27,13 @@ def clean_plot(fig, axes):
         axi.spines['left'].set_bounds(ylim)
         axi.spines['bottom'].set_bounds(xlim)
 
-    sns.despine(fig=fig, offset=5)
+        sns.despine(ax=axi, offset=5)
+    # sns.despine(fig=fig, offset=5)
 
-    fig.tight_layout()
+    if tight_layout:
+        fig.tight_layout()
+
+    fig.align_labels()
 
 
 def get_limits_from_data(data, balanced=True):
@@ -124,8 +131,9 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
         sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]], palette=palette)
     axes[row_ids[2]][col_ids[2]].set_title(title)
 
-def plot_scatter_with_distributions(data, x, y, hue, kind='scatter', palette=None, fig=None,
-                                    ax_joint=None, ax_marg_x=None, ax_marg_y=None):
+
+def plot_scatter_with_distributions(data, x, y, hue, kind='scatter',fig=None, title=None,
+                                    plt_kwargs={'alpha': 0.5, 'palette': sns.color_palette('mako')}):
     """
     based on this example: https://gist.github.com/LegrandNico/2b201863dc7ae28d568573c66047dd86
     """
@@ -140,18 +148,19 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter', palette=Non
             ys.append(data[data[hue] == h][y].to_numpy())
             labels.append(h)
 
-    if ax_joint is None:
+    if fig is None:
         fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(6, 6),
                                  gridspec_kw={'wspace': 0, 'hspace': -0, 'width_ratios': [0.8, 0.2],
                                               'height_ratios': [0.2, 0.8]})
-        ax_joint = axes[1][0]
-        ax_marg_x = axes[0][0]
-        ax_marg_y = axes[1][1]
-        ax_diag = axes[0][1]
+    else:
+        axes = fig.subplots(nrows=2, ncols=2, gridspec_kw={'wspace': 0, 'hspace': -0, 'width_ratios': [0.8, 0.2],
+                                              'height_ratios': [0.2, 0.8]})
+    ax_joint = axes[1][0]
+    ax_marg_x = axes[0][0]
+    ax_marg_y = axes[1][1]
+    ax_diag = axes[0][1]
 
-    palette = palette or sns.color_palette('rocket')  #itertools.cycle(sns.color_palette('mako'))
     dist_from_corner = 0.6425  # distance for histogram to be plot from the corner of main plot
-    subplot_scale = 0.95  # percent rest of plots (not diag) is scaled down
     hist_size = .7  # 0.5 this does not actually end up being the case bc of how I change the main plot size
 
     # Set axes limit
@@ -171,7 +180,6 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter', palette=Non
     bin_range = [-hist_range / 2, hist_range / 2]
 
     # setup diagonal histogram
-    # transform = Affine2D().scale(1 / (hist_range), 1).rotate_deg(-45) # this scales the plot
     transform = Affine2D().scale(diag_plot_extent/(1.5*hist_range*np.sqrt(2)), 1/np.sqrt(2)).rotate_deg(-45)
     helper = floating_axes.GridHelperCurveLinear(transform, extremes=plot_extents, grid_locator1=MaxNLocator(4))
     inset = floating_axes.FloatingAxes(fig, [dist_from_corner, dist_from_corner, hist_size, hist_size], grid_helper=helper)
@@ -179,21 +187,23 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter', palette=Non
     fig.add_axes(inset)
 
     if kind == 'scatter':
-        sns.scatterplot(data, x=xlabel, y=ylabel, hue=hue, palette=palette, alpha=0.5, ax=ax_joint)
-        sns.histplot(data, x=xlabel, hue=hue, palette=palette, ax=ax_marg_x, legend=False, bins=20, stat='density',
-                     common_norm=False, element='step')
-        sns.histplot(data, y=ylabel, hue=hue, palette=palette, ax=ax_marg_y, legend=False, bins=20, stat='density',
-                     common_norm=False, element='step')
-        sns.histplot(data, x='diff', hue=hue, palette=palette, ax=bar_ax, legend=False, bins=20, binrange=bin_range,
+        sns.scatterplot(data, x=xlabel, y=ylabel, hue=hue, ax=ax_joint, **plt_kwargs)
+        sns.histplot(data, x=xlabel, hue=hue, palette=plt_kwargs['palette'], ax=ax_marg_x, legend=False, bins=20,
                      stat='density', common_norm=False, element='step')
+        sns.histplot(data, y=ylabel, hue=hue, palette=plt_kwargs['palette'], ax=ax_marg_y, legend=False, bins=20,
+                     stat='density', common_norm=False, element='step')
+        sns.histplot(data, x='diff', hue=hue, palette=plt_kwargs['palette'], ax=bar_ax, legend=False, bins=20,
+                     binrange=bin_range, stat='density', common_norm=False, element='step')
     elif kind == 'kde':
-        sns.kdeplot(data, x=xlabel, y=ylabel, hue=hue, palette=palette, fill=True, alpha=0.5, ax=ax_joint)
-        sns.kdeplot(data, x=xlabel, hue=hue, palette=palette, ax=ax_marg_x, legend=False)
-        sns.kdeplot(data, y=ylabel, hue=hue, palette=palette, ax=ax_marg_y, legend=False)
-        sns.kdeplot(data, x='diff', hue=hue, palette=palette, ax=bar_ax, legend=False)
+        try:
+            sns.kdeplot(data, x=xlabel, y=ylabel, hue=hue, ax=ax_joint, **plt_kwargs)
+            sns.kdeplot(data, x=xlabel, hue=hue, palette=plt_kwargs['palette'], ax=ax_marg_x, legend=False)
+            sns.kdeplot(data, y=ylabel, hue=hue, palette=plt_kwargs['palette'], ax=ax_marg_y, legend=False)
+            sns.kdeplot(data, x='diff', hue=hue, palette=plt_kwargs['palette'], ax=bar_ax, legend=False)
+        except IndexError:
+            warnings.warn('Not enough data to plot kde distributions')
 
     # setup limits and scaling
-    fig.subplots_adjust(right=subplot_scale, top=subplot_scale)
     ax_joint.plot(lim, lim, c=".7", dashes=(4, 2), zorder=0)
     ax_joint.set(xlim=lim, ylim=lim)
     ax_joint.set(xlabel=xlabel, ylabel=ylabel)
@@ -221,6 +231,6 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter', palette=Non
     plt.setp(ax_marg_x.get_xticklabels(), visible=False)
     plt.setp(ax_marg_y.get_yticklabels(), visible=False)
 
-    plt.show()
+    fig.suptitle(title)
 
-    return fig, axes
+    return fig
