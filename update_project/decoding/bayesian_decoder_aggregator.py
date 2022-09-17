@@ -238,7 +238,7 @@ class BayesianDecoderAggregator:
         trials_to_flip = self.data.test_df['turn_type'] == 100  # set all to false
         time_bins = np.linspace(self.start_time, self.end_time, nbins)  # time bins
         grid_prob = griddata_time_intervals(self.data.decoded_probs, [self.start_loc], [self.end_loc], nbins,
-                                            trials_to_flip, method='linear', time_bins=time_bins)
+                                            trials_to_flip, method='nearest', time_bins=time_bins)
 
         return np.squeeze(grid_prob)
 
