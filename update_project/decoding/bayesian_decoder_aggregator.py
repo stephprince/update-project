@@ -138,6 +138,7 @@ class BayesianDecoderAggregator:
             group_data.update(stats={k: get_fig_stats(v, axis=0) for k, v in group_data.items()})
         else:
             group_data = None
+            data_subset = None
 
         if ret_df:
             return data_subset
@@ -252,72 +253,107 @@ class BayesianDecoderAggregator:
 
     @staticmethod
     def quantify_aligned_data(param_data, aligned_data, ret_df=False):
-        # get bounds to use to quantify choices
-        bins = param_data['bins'].values[0]
-        virtual_track = param_data['virtual_track'].values[0]
-        bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
+        if np.size(aligned_data) and aligned_data is not None:
+            # get bounds to use to quantify choices
+            bins = param_data['bins'].values[0]
+            virtual_track = param_data['virtual_track'].values[0]
+            bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
 
-        if isinstance(aligned_data, dict):
-            prob_map = aligned_data['probability']
+            if isinstance(aligned_data, dict):
+                prob_map = aligned_data['probability']
+            else:
+                prob_map = np.stack(aligned_data['probability'])
+            prob_choice = dict()
+            num_bins = dict()
+            output_list = []
+            for bound_name, bound_values in bounds.items():  # loop through left/right bounds
+                prob_map_bins = (bins[1:] + bins[:-1]) / 2
+                start_bin = np.searchsorted(prob_map_bins, bound_values[0])
+                stop_bin = np.searchsorted(prob_map_bins, bound_values[1])
+
+                threshold = 0.1  # total probability density to call a left/right choice
+                integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
+                num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
+                assert len(bins) - 1 == np.shape(prob_map)[1], 'Bound bins not being sorted on right dimension'
+
+                bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
+                                            thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
+                bound_quantification.update(stats={k: get_fig_stats(v, axis=0) for k, v in bound_quantification.items()})
+                bound_quantification.update(bound_values=bound_values,
+                                            threshold=threshold)
+                prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
+
+                if ret_df:  # if returning dataframe compile data accordingly
+                    bound_quantification.update(dict(choice=bound_name, trial_index=aligned_data.index.to_numpy()))
+                    output_list.append(bound_quantification)
+
+            assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
+
+            if ret_df:
+                list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'bound_values', 'choice']]
+                list_df = list_df.explode(['prob_sum', 'trial_index']).reset_index(drop=True).set_index('trial_index')
+                output_df = pd.merge(aligned_data[['session_id', 'animal', 'time_label', 'times']], list_df, left_index=True,
+                                     right_index=True)
+                output_df['choice'] = output_df['choice'].map(dict(left='initial_stay', right='switch'))
+                return output_df
+            else:
+                return prob_choice
         else:
-            prob_map = np.stack(aligned_data['probability'])
-        prob_choice = dict()
-        num_bins = dict()
-        output_list = []
-        for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-            prob_map_bins = (bins[1:] + bins[:-1]) / 2
-            start_bin = np.searchsorted(prob_map_bins, bound_values[0])
-            stop_bin = np.searchsorted(prob_map_bins, bound_values[1])
+            warnings.warn('No aligned data found')
+            return None
 
-            threshold = 0.1  # total probability density to call a left/right choice
-            integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
-            num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
-            assert len(bins) - 1 == np.shape(prob_map)[1], 'Bound bins not being sorted on right dimension'
+    def calc_trial_by_trial_quant_data(self, param_data, plot_groups):
+        group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
 
-            bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
-                                        thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
-            bound_quantification.update(stats={k: get_fig_stats(v, axis=0) for k, v in bound_quantification.items()})
-            bound_quantification.update(bound_values=bound_values,
-                                        threshold=threshold)
-            prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
+        if np.size(quant_df):
+            # get diff from baseline
+            prob_sum_mat = np.vstack(quant_df['prob_sum'])
+            align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
+            prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
+            quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
-            if ret_df:  # if returning dataframe compile data accordingly
-                bound_quantification.update(dict(choice=bound_name, trial_index=aligned_data.index.to_numpy()))
-                output_list.append(bound_quantification)
+            # get diff from left vs. right bounds
+            quant_df['trial_index'] = quant_df.index
+            quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
+            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(-2.5, 2.5, 6)).apply(lambda x: x.mid)
+            quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
-        assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
+            choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
+                                       columns=['choice'],
+                                       values=['prob_sum', 'diff_baseline']).reset_index()  # had times here before
+            choice_df['diff_switch_stay'] = choice_df[('prob_sum', 'switch')] - choice_df[('prob_sum', 'initial_stay')]
+            choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
 
-        if ret_df:
-            list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'bound_values', 'choice']]
-            list_df = list_df.explode(['prob_sum', 'trial_index']).reset_index(drop=True).set_index('trial_index')
-            output_df = pd.merge(aligned_data[['session_id', 'animal', 'time_label', 'times']], list_df, left_index=True,
-                                 right_index=True)
-            output_df['choice'] = output_df['choice'].map(dict(left='initial_stay', right='switch'))
-            return output_df
+            return quant_df, choice_df
         else:
-            return prob_choice
+            return None, None
 
-    @staticmethod
-    def calc_trial_by_trial_quant_data(quant_df):
-        # get diff from baseline
-        prob_sum_mat = np.vstack(quant_df['prob_sum'])
-        align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
-        prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
-        quant_df['diff_baseline'] = list(prob_sum_diff.T)
+    def calc_correlation_data(self, param_data, plot_groups):
+        trial_data, old_vs_new_data = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups)
 
-        # get diff from left vs. right bounds
-        quant_df['trial_index'] = quant_df.index
-        quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
-        quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(-2.5, 2.5, 6)).apply(lambda x: x.mid)
-        quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
+        if trial_data:  # TODO - add code to calculate correlations between brain regions over time
+            # get diff from baseline
+            prob_sum_mat = np.vstack(quant_df['prob_sum'])
+            align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
+            prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
+            quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
-        choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
-                                   columns=['choice'],
-                                   values=['prob_sum', 'diff_baseline']).reset_index()  # had times here before
-        choice_df['diff_switch_stay'] = choice_df[('prob_sum', 'switch')] - choice_df[('prob_sum', 'initial_stay')]
-        choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
+            # get diff from left vs. right bounds
+            quant_df['trial_index'] = quant_df.index
+            quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
+            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(-2.5, 2.5, 6)).apply(lambda x: x.mid)
+            quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
-        return quant_df, choice_df
+            choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
+                                       columns=['choice'],
+                                       values=['prob_sum', 'diff_baseline']).reset_index()  # had times here before
+            choice_df['diff_switch_stay'] = choice_df[('prob_sum', 'switch')] - choice_df[('prob_sum', 'initial_stay')]
+            choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
+
+            return quant_df, choice_df
+        else:
+            return None
 
     @staticmethod
     def get_tuning_data(param_data):
