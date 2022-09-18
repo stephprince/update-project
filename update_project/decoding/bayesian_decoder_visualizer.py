@@ -56,15 +56,7 @@ class BayesianDecoderVisualizer:
 
             # make plots for different parameters
             for param_name, param_data in self.aggregator.group_df.groupby(self.params):
-                # make plots comparing subgroups (e.g. brain regions and features)
-                # for plot_types in list(itertools.product(*self.plot_groups.values())):
-                #     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
-                #     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-                #     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                #     self.plot_region_correlated_data(data, feat=feat, **kwargs)
-
-                # make plots for each individual subgroup (e.g. brain regions and features)
-                for name, data in param_data.groupby(group_names):
+                for name, data in param_data.groupby(group_names):  # (brain regions and features)
                     print(f'Plotting data for group {name}...')
                     tags = f'{"_".join(["".join(n) for n in name])}_' \
                            f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
@@ -81,11 +73,11 @@ class BayesianDecoderVisualizer:
                         title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                         kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
 
+                        self.plot_group_aligned_data(data, feat=feat, **kwargs)
                         self.plot_scatter_dists_around_update(data, **kwargs)
                         self.plot_trial_by_trial_around_update(data, **kwargs)
                         self.plot_phase_modulation_around_update(data, feat=feat, **kwargs)
                         self.plot_theta_phase_histogram(data, feat=feat, **kwargs)
-                        self.plot_group_aligned_data(data, feat=feat, **kwargs)
         else:
             print(f'No data found to plot')
 
@@ -372,10 +364,9 @@ class BayesianDecoderVisualizer:
         fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
             filter_dict = dict(time_label=[time_label], **plot_groups)
-            p_data = param_data.copy(deep=True)
-            group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict)
-            if np.size(group_aligned_data) and group_aligned_data is not None:
-                quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
+            group_aligned_data = self.aggregator.select_group_aligned_data(param_data, filter_dict)
+            quant_aligned_data = self.aggregator.quantify_aligned_data(param_data, group_aligned_data)
+            if np.size(quant_aligned_data):
                 bounds = [v['bound_values'] for v in quant_aligned_data.values()]
                 self.plot_1d_around_update(group_aligned_data, quant_aligned_data, time_label, feat, axes,
                                            row_id=np.arange(nrows), col_id=[ind] * nrows,
@@ -564,10 +555,9 @@ class BayesianDecoderVisualizer:
             plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
             for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
                 filter_dict = dict(time_label=[time_label], **plot_group_dict)
-                p_data = param_data.copy(deep=True)
-                group_aligned_data = self.aggregator.select_group_aligned_data(p_data, filter_dict)
+                group_aligned_data = self.aggregator.select_group_aligned_data(param_data, filter_dict)
                 if np.size(group_aligned_data) and group_aligned_data is not None:
-                    quant_aligned_data = self.aggregator.quantify_aligned_data(p_data, group_aligned_data)
+                    quant_aligned_data = self.aggregator.quantify_aligned_data(param_data, group_aligned_data)
                     compiled_data.append(dict(data=group_aligned_data, quant=quant_aligned_data,
                                               **{k: v[0] for k, v in
                                                  filter_dict.items()}))  # TODO - separate out the compilation
@@ -753,13 +743,13 @@ class BayesianDecoderVisualizer:
 
     def plot_phase_modulation_around_update(self, param_data, feat, title, plot_groups=None, tags=''):
         # make plots for aligned data (1 row for heatmap, 1 row for modulation index, 1 col for each align time)
+
         print('Plotting phase modulation around update...')
         ncols, nrows = (len(self.aggregator.align_times[:-1]), 4)
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharey='row', sharex='col')
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
             filter_dict = dict(time_label=[time_label], **plot_groups)
-            p_data = param_data.copy(deep=True)
-            theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict, time_bins=21)
+            theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict, time_bins=21)
             scaling_dict = dict(switch=(0.1, 0.35), initial_stay=(0.1, 0.35), home=(0.7, 0.95),
                                 theta_amplitude=(-100, 100))
             if np.size(theta_phase_data):
@@ -800,8 +790,7 @@ class BayesianDecoderVisualizer:
         fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row', sharex='col')
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
             filter_dict = dict(time_label=[time_label], **plot_groups)
-            p_data = param_data.copy(deep=True)
-            theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict)
+            theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict)
             rows = dict(full=0, half=3, theta_amplitude=0, initial_stay=1, switch=1, home=2)
             for g_name, group in theta_phase_data.groupby(['bin_name', 'times']):
                 row_ind = rows[g_name[0]]  # full or half
@@ -843,8 +832,7 @@ class BayesianDecoderVisualizer:
         for plot_types in list(itertools.product(*plot_groups.values())):
             plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
             filter_dict = dict(time_label=['t_update'], **plot_group_dict)
-            p_data = param_data.copy(deep=True)
-            theta_phase_data = self.aggregator.calc_theta_phase_data(p_data, filter_dict)
+            theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict)
             compiled_data.append(dict(data=theta_phase_data, **{k: v[0] for k, v in filter_dict.items()}))
 
         # compile data for comparisons

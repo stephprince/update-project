@@ -20,9 +20,10 @@ class BayesianDecoderAggregator:
     def __init__(self, exclusion_criteria=None):
         self.exclusion_criteria = exclusion_criteria
         self.align_times = ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made', 'stop_time']
-        self.flip_trials_by_turn = False  # default false
+        self.flip_trials_by_turn = True  # default false
+        self.turn_to_flip = 2
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
-        self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df'],  format='pkl'),
+        self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df', 'aligned_df'],  format='pkl'),
                                params=dict(vars=['exclusion_criteria', 'align_times', 'flip_trials_by_turn'], format='npz'))
 
         # times, locs = self._get_example_period()
@@ -56,6 +57,13 @@ class BayesianDecoderAggregator:
             group_df_raw = pd.DataFrame(data)
             self.group_df = group_df_raw[~group_df_raw['excluded_session']]  # only keep non-excluded sessions
             self.group_df.drop('decoder', axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
+
+            # get aligned dataframe:
+            self.group_aligned_df = self._get_aligned_data(self.group_df)
+            if self.flip_trials_by_turn:
+                trials_to_flip = self.group_aligned_df[self.group_aligned_df['turn_type'] == self.turn_to_flip]
+                self.group_aligned_df = self._flip_trials(trials_to_flip, self.turn_to_flip, self.group_aligned_df, self.group_df)
+
             self._export_data()
         else:
             if self.results_io.data_exists(self.data_files) and self._params_match():
@@ -91,6 +99,7 @@ class BayesianDecoderAggregator:
 
     def _flip_trials(self, trials_to_flip, turn_to_flip, data_subset, param_data):
         if np.size(trials_to_flip):
+            assert len(data_subset['feature_name'].unique()) == 1, 'More than one feature detected - not supported'
             if data_subset['feature_name'].values[0] == 'y_position':
                 feat_bins = param_data['bins'].values[0]
                 virtual_track = param_data['virtual_track'].values[0]
@@ -115,18 +124,10 @@ class BayesianDecoderAggregator:
 
         return data_subset
 
-    def select_group_aligned_data(self, param_data, filter_dict, flip_trials=True, ret_df=False):
-        group_aligned_df = self._get_aligned_data(param_data)
-
+    def select_group_aligned_data(self, param_data, filter_dict, ret_df=False):
         # filter for specific features
-        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
-        data_subset = group_aligned_df[mask]
-
-        # flip trials if indicated
-        if flip_trials:
-            turn_to_flip = 2
-            trials_to_flip = data_subset[data_subset['turn_type'] == turn_to_flip]
-            data_subset = self._flip_trials(trials_to_flip, turn_to_flip, data_subset, param_data)
+        mask = pd.concat([param_data[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
+        data_subset = param_data[mask]
 
         if np.size(data_subset):
             times = data_subset['times'].values[0]
@@ -147,11 +148,8 @@ class BayesianDecoderAggregator:
 
     def calc_theta_phase_data(self, param_data, filter_dict, time_bins=3):
         # get aligned df and apply filters
-        group_aligned_df = self._get_aligned_data(param_data)
-        mask = pd.concat([group_aligned_df[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
-        data_subset = group_aligned_df[mask].rename_axis('trial').reset_index()
-        trials_to_flip = data_subset[data_subset['turn_type'] == 2]
-        data_subset = self._flip_trials(trials_to_flip, 2, data_subset, param_data)
+        mask = pd.concat([param_data[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
+        data_subset = param_data[mask].rename_axis('trial').reset_index()
         data_subset['probability'] = data_subset['probability'].apply(lambda x: x.T)
 
         # break down so each row has a single theta phase/amplitude value
@@ -313,10 +311,10 @@ class BayesianDecoderAggregator:
             prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
-            # get diff from left vs. right bounds
+            # get diff from left vs. right bounds (had times_binned as -2.5, 2.5, 6, switched to just post)
             quant_df['trial_index'] = quant_df.index
             quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
-            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(-2.5, 2.5, 6)).apply(lambda x: x.mid)
+            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(0, 2.5, 3)).apply(lambda x: x.mid)
             quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
             choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
@@ -328,32 +326,6 @@ class BayesianDecoderAggregator:
             return quant_df, choice_df
         else:
             return None, None
-
-    def calc_correlation_data(self, param_data, plot_groups):
-        trial_data, old_vs_new_data = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups)
-
-        if trial_data:  # TODO - add code to calculate correlations between brain regions over time
-            # get diff from baseline
-            prob_sum_mat = np.vstack(quant_df['prob_sum'])
-            align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
-            prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
-            quant_df['diff_baseline'] = list(prob_sum_diff.T)
-
-            # get diff from left vs. right bounds
-            quant_df['trial_index'] = quant_df.index
-            quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
-            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(-2.5, 2.5, 6)).apply(lambda x: x.mid)
-            quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
-
-            choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
-                                       columns=['choice'],
-                                       values=['prob_sum', 'diff_baseline']).reset_index()  # had times here before
-            choice_df['diff_switch_stay'] = choice_df[('prob_sum', 'switch')] - choice_df[('prob_sum', 'initial_stay')]
-            choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
-
-            return quant_df, choice_df
-        else:
-            return None
 
     @staticmethod
     def get_tuning_data(param_data):
@@ -538,10 +510,6 @@ class BayesianDecoderAggregator:
                 mid_times = trials_to_agg[time_label]
                 turns = trials_to_agg['turn_type'][~mid_times.isna()].values
                 outcomes = trials_to_agg['correct'][~mid_times.isna()].values
-                if self.flip_trials_by_turn:
-                    trials_to_flip = trials_to_agg['turn_type'][~mid_times.isna()] == 1  # left trials, flip so all values the same way
-                else:
-                    trials_to_flip = trials_to_agg['turn_type'][~mid_times.isna()] == 100  # set all to false
                 mid_times.dropna(inplace=True)
 
                 phase_col = np.argwhere(decoder.theta.columns == 'phase')[0][0]
@@ -558,17 +526,16 @@ class BayesianDecoderAggregator:
                         for key, val in vars.items():
                             if decoder.dim_num == 1 and key == 'probability':
                                 interp_dict[name][key] = griddata_time_intervals(val, locs[key]['start'],
-                                                                                 locs[key]['stop'], nbins,
-                                                                                 trials_to_flip, mid_times)
+                                                                                 locs[key]['stop'], nbins, mid_times)
                             elif decoder.dim_num == 2 and key == 'probability':
                                 interp_dict[name][key] = griddata_2d_time_intervals(val, decoder.bins,
                                                                                decoder.decoding_values.index.values,
                                                                                locs[key]['start'], locs[key]['stop'],
-                                                                               mid_times, nbins, trials_to_flip)
+                                                                               mid_times, nbins)
                             else:
                                 interp_dict[name][key] = interp1d_time_intervals(val, locs[key]['start'],
                                                                                  locs[key]['stop'],
-                                                                                 new_times, mid_times, trials_to_flip)
+                                                                                 new_times, mid_times)
                         interp_dict[name]['error'] = [abs(dec_feat - true_feat) for true_feat, dec_feat in
                                                 zip(interp_dict[name]['feature'], interp_dict[name]['decoded'])]
 

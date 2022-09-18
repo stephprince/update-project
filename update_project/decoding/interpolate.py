@@ -24,36 +24,30 @@ def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=
         time_aligned = np.array(timestamps[idx_start:idx_stop]) - offset
 
         # interpolate data interval to make even sampling rate
-        fxn = interp1d(time_aligned, data_aligned, kind='linear')
+        fxn = interp1d(time_aligned, data_aligned, kind='nearest')
         new_times = np.arange(start + start_window - offset, stop + stop_window - offset, step)  # resample to constant sampling rate
         interpolated_data.append(fxn(new_times))
 
     return interpolated_data, new_times
 
-def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset, trials_to_flip):
+def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset):
     interpolated_position = []
-    for start, stop, offset, flip_bool in zip(start_locs, stop_locs, time_offset, trials_to_flip):
+    for start, stop, offset in zip(start_locs, stop_locs, time_offset):
         times = np.array(data.iloc[start:stop].index) - offset
         values = data.iloc[start:stop].values
 
-        if flip_bool:
-            values = -values
-
-        fxn = interp1d(times, values, kind='linear', bounds_error=False)
+        fxn = interp1d(times, values, kind='nearest', bounds_error=False)
         interpolated_position.append(fxn(new_times))
 
     return interpolated_position
 
 
-def griddata_time_intervals(data, start_locs, stop_locs, nbins, trials_to_flip, time_offset=[0], method='linear',
+def griddata_time_intervals(data, start_locs, stop_locs, nbins, time_offset=[0], method='nearest',
                             time_bins=None):
     grid_prob = []
-    for start, stop, offset, flip_bool in zip(start_locs, stop_locs, time_offset, trials_to_flip):
+    for start, stop, offset in zip(start_locs, stop_locs, time_offset):
         proby = data.iloc[start:stop].stack().reset_index().values
         proby[:, 0] = proby[:, 0] - offset
-
-        if flip_bool:
-            proby[:, 1] = -proby[:, 1]  # flip position values so that prob density mapping is flipped
 
         if time_bins is None:
             x1 = np.linspace(min(proby[:, 0]), max(proby[:, 0]), nbins)  # time bins
@@ -68,11 +62,9 @@ def griddata_time_intervals(data, start_locs, stop_locs, nbins, trials_to_flip, 
     return grid_prob
 
 
-def griddata_2d_time_intervals(data, binsxy, times, start_locs, stop_locs, time_offset, nbins, trials_to_flip):
+def griddata_2d_time_intervals(data, binsxy, times, start_locs, stop_locs, time_offset, nbins):
     grid_prob = []
-    flip_x = trials_to_flip['x'].values
-    flip_y = trials_to_flip['y'].values
-    for start, stop, offset, flip_bool_x, flip_bool_y in zip(start_locs, stop_locs, time_offset, flip_x, flip_y):
+    for start, stop, offset,in zip(start_locs, stop_locs, time_offset):
         times_around_update = times[start:stop] - offset
         data_subset = data[start:stop, :, :]
 
@@ -82,13 +74,6 @@ def griddata_2d_time_intervals(data, binsxy, times, start_locs, stop_locs, time_
             data_around_update = df.stack().reset_index().values
             data_from_timepoint = np.hstack((np.tile(t, len(data_around_update))[:, None], data_around_update))
 
-            if flip_bool_x:
-                data_from_timepoint[:, 1] = -data_from_timepoint[:,
-                                             1]  # flip position values so that prob density mapping is flipped
-
-            if flip_bool_y:
-                data_from_timepoint[:, 2] = -data_from_timepoint[:, 2]
-
             prob_data.append(data_from_timepoint)
 
         all_data = np.vstack(prob_data)
@@ -97,7 +82,7 @@ def griddata_2d_time_intervals(data, binsxy, times, start_locs, stop_locs, time_
         y1 = np.linspace(min(binsxy[1]), max(binsxy[1]), np.shape(data)[2])  # y_position bins
         grid_x, grid_y, grid_t = np.meshgrid(x1, y1, t1)
 
-        grid_prob_trial = griddata(all_data[:, 0:3], all_data[:, 3], (grid_t, grid_x, grid_y), method='linear',
+        grid_prob_trial = griddata(all_data[:, 0:3], all_data[:, 3], (grid_t, grid_x, grid_y), method='nearest',
                                    fill_value=np.nan)
         grid_prob.append(grid_prob_trial)
 
