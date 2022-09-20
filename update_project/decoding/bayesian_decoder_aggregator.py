@@ -7,7 +7,6 @@ from math import sqrt
 from pathlib import Path
 from sklearn.metrics import mean_squared_error
 from scipy.stats import sem
-#from tensorpac.methods import meth_pac
 
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
@@ -23,7 +22,7 @@ class BayesianDecoderAggregator:
         self.flip_trials_by_turn = True  # default false
         self.turn_to_flip = 2
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
-        self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df', 'aligned_df'],  format='pkl'),
+        self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df', 'group_aligned_df'],  format='pkl'),
                                params=dict(vars=['exclusion_criteria', 'align_times', 'flip_trials_by_turn'], format='npz'))
 
         # times, locs = self._get_example_period()
@@ -61,8 +60,7 @@ class BayesianDecoderAggregator:
             # get aligned dataframe:
             self.group_aligned_df = self._get_aligned_data(self.group_df)
             if self.flip_trials_by_turn:
-                trials_to_flip = self.group_aligned_df[self.group_aligned_df['turn_type'] == self.turn_to_flip]
-                self.group_aligned_df = self._flip_trials(trials_to_flip, self.turn_to_flip, self.group_aligned_df, self.group_df)
+                self._flip_aligned_trials()
 
             self._export_data()
         else:
@@ -97,32 +95,34 @@ class BayesianDecoderAggregator:
         return dict(confusion_matrix=confusion_matrix, confusion_matrix_sum=confusion_matrix_sum, locations=locations,
                     bins=bins, vmax=vmax, param_values=param_name)
 
-    def _flip_trials(self, trials_to_flip, turn_to_flip, data_subset, param_data):
+    def _flip_aligned_trials(self):
+        trials_to_flip = self.group_aligned_df[self.group_aligned_df['turn_type'] == self.turn_to_flip]
+
         if np.size(trials_to_flip):
-            assert len(data_subset['feature_name'].unique()) == 1, 'More than one feature detected - not supported'
-            if data_subset['feature_name'].values[0] == 'y_position':
-                feat_bins = param_data['bins'].values[0]
-                virtual_track = param_data['virtual_track'].values[0]
-                bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
+            assert len(self.group_aligned_df['feature_name'].unique()) == 1, 'More than one feature detected - not supported'
+            feat = self.group_aligned_df['feature_name'].values[0]
+            if feat == 'y_position':
+                feat_bins = self.group_aligned_df['bins'].values[0]
+                virtual_track = self.group_aligned_df['virtual_track'].values[0]
+                bounds = virtual_track.choice_boundaries.get(feat, dict())
 
                 trials_to_flip = trials_to_flip.apply(
                     lambda x: self._flip_y_position(x, bounds) if x.name in ['feature', 'decoding'] else x)
                 trials_to_flip = trials_to_flip.apply(
                     lambda x: self._flip_y_position(x, bounds, feat_bins) if x.name in ['probability'] else x)
-                data_subset.loc[data_subset['turn_type'] == turn_to_flip, :] = trials_to_flip
+                self.group_aligned_df.loc[self.group_aligned_df['turn_type'] == self.turn_to_flip, :] = trials_to_flip
             else:
                 feat_before_flip = trials_to_flip['feature'].values[0][0]
                 prob_before_flip = trials_to_flip['probability'].values[0][0][0]
                 trials_to_flip = trials_to_flip.apply(lambda x: x * -1 if x.name in ['feature', 'decoding'] else x)
                 trials_to_flip['probability'] = trials_to_flip['probability'].apply(lambda x: np.flipud(x))
-                data_subset.loc[data_subset['turn_type'] == turn_to_flip, :] = trials_to_flip
+                self.group_aligned_df.loc[self.group_aligned_df['turn_type'] == self.turn_to_flip, :] = trials_to_flip
                 if ~np.isnan(feat_before_flip):
                     assert feat_before_flip == -trials_to_flip['feature'].values[0][0], 'Data not correctly flipped'
                 if ~np.isnan(prob_before_flip):
                     assert prob_before_flip == trials_to_flip['probability'].values[0][-1][
                         0], 'Data not correctly flipped'
 
-        return data_subset
 
     def select_group_aligned_data(self, param_data, filter_dict, ret_df=False):
         # filter for specific features
@@ -154,27 +154,19 @@ class BayesianDecoderAggregator:
 
         # break down so each row has a single theta phase/amplitude value
         data_to_explode = ['feature', 'decoding', 'error', 'probability', 'theta_phase', 'theta_amplitude', 'times']
-        other_cols = [col for col in data_subset.columns.values if col not in data_to_explode]
-        theta_phase_df = pd.concat([data_subset.explode(d).reset_index()[d] if d != 'feature'
-                                 else data_subset[[*other_cols, 'feature']].explode(d).reset_index(drop=True)
-                                 for d in data_to_explode], axis=1)
+        theta_phase_df = data_subset.explode(data_to_explode).reset_index(drop=True)
         theta_phase_df.dropna(axis='rows', inplace=True)  # TODO - get theta phase values aligned to center not start
 
         # get integrated probability densities for each brain region
         virtual_track = param_data['virtual_track'].values[0]
         prob_map_bins = param_data['bins'].values[0]
-        choice_bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
-        home_bounds = virtual_track.home_boundaries.get(param_data['feature'].values[0], dict())
+        choice_bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
+        home_bounds = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
         bounds = dict(**choice_bounds, home=home_bounds)
         bound_mapping = dict(left='initial_stay', right='switch', home='home')
         for b_name, b_value in bounds.items():
             theta_phase_df[bound_mapping[b_name]] = theta_phase_df['probability'].apply(
                 lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
-
-        # get phase-probability density coupling measurements - work in progress
-        # meth_pac.modulation_index(pha=theta_phase_df['theta_phase'].to_numpy()[np.newaxis, :],
-        #                           amp=theta_phase_df[['initial_stay', 'switch', 'home']].to_numpy().T,
-        #                           n_bins=12)
 
         # get histogram, ratio, and mean probability values for different theta phases
         theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), half=np.linspace(-np.pi, np.pi, 3))
@@ -246,7 +238,7 @@ class BayesianDecoderAggregator:
         start_bin = np.searchsorted(prob_map_bins, bounds[0])
         stop_bin = np.searchsorted(prob_map_bins, bounds[1])
         mean_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
-
+        # TODO - switch this to np.nanmean to get prob / chance values when I multiply all by total # of bins
         return mean_prob
 
     @staticmethod
@@ -255,7 +247,7 @@ class BayesianDecoderAggregator:
             # get bounds to use to quantify choices
             bins = param_data['bins'].values[0]
             virtual_track = param_data['virtual_track'].values[0]
-            bounds = virtual_track.choice_boundaries.get(param_data['feature'].values[0], dict())
+            bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
 
             if isinstance(aligned_data, dict):
                 prob_map = aligned_data['probability']
@@ -311,7 +303,7 @@ class BayesianDecoderAggregator:
             prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
-            # get diff from left vs. right bounds (had times_binned as -2.5, 2.5, 6, switched to just post)
+            # get diff from left vs. right bounds
             quant_df['trial_index'] = quant_df.index
             quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
             quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(0, 2.5, 3)).apply(lambda x: x.mid)
@@ -344,25 +336,16 @@ class BayesianDecoderAggregator:
 
     @staticmethod
     def _get_aligned_data(param_data):
-        # compile aligned data
-        num_trials = 0
-        aligned_data_list = []
-        for _, sess_data in param_data.iterrows():
-            for item in sess_data['aligned_data']:
-                aligned_data_list.append(dict(session_id=sess_data['session_id'],
-                                              animal=sess_data['animal'],
-                                              region=sess_data['region'],
-                                              **item))
-                num_trials = num_trials + len(item['turn_type'])
-        aligned_data_df = pd.DataFrame(aligned_data_list)
-        aligned_data_df.drop(['stats'], axis='columns', inplace=True)  # get rid of stats dict bc for session
-        data_to_explode = ['feature', 'decoding', 'error', 'probability', 'turn_type', 'correct', 'theta_phase', 'theta_amplitude']
-        other_cols = [col for col in aligned_data_df.columns.values if col not in data_to_explode]
-        exploded_df = pd.concat([aligned_data_df.explode(d).reset_index()[d] if d != 'feature'
-                                 else aligned_data_df[[*other_cols, 'feature']].explode(d).reset_index(drop=True)
-                                 for d in data_to_explode], axis=1)
+        cols_to_keep = ['session_id', 'animal', 'region', 'bins', 'encoder_bins', 'decoder_bins', 'virtual_track', 'aligned_data']
+        temp_data = param_data[cols_to_keep].explode('aligned_data').reset_index(drop=True)
+        aligned_data = pd.json_normalize(temp_data['aligned_data'], max_level=0).drop(['stats'], axis='columns')
+        aligned_data_df = pd.concat([temp_data, aligned_data], axis=1)
+        aligned_data_df.drop(['aligned_data'], axis='columns', inplace=True)  # remove the extra aligned data column
+
+        data_to_explode = ['feature', 'decoding', 'error', 'probability', 'turn_type', 'correct', 'theta_phase',
+                           'theta_amplitude']
+        exploded_df = aligned_data_df.explode(data_to_explode).reset_index(drop=True)
         exploded_df.dropna(axis='rows', inplace=True)
-        assert len(exploded_df) == num_trials, 'Number of expected trials does not match dataframe'
 
         return exploded_df
 

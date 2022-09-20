@@ -6,7 +6,7 @@ from scipy.interpolate import griddata, interp1d
 
 def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=0.0, stop_window=0.0,
                       step=0.01, time_offset=None):
-    start_times_all = trials[start_label][:]  # TODO - may need to change to DF
+    start_times_all = trials[start_label][:]
     stop_times_all = trials[stop_label][:]
     start_times = start_times_all[np.logical_and(~np.isnan(stop_times_all), ~np.isnan(start_times_all))]
     stop_times = stop_times_all[np.logical_and(~np.isnan(stop_times_all), ~np.isnan(start_times_all))]
@@ -64,7 +64,7 @@ def griddata_time_intervals(data, start_locs, stop_locs, nbins, time_offset=[0],
 
 def griddata_2d_time_intervals(data, binsxy, times, start_locs, stop_locs, time_offset, nbins):
     grid_prob = []
-    for start, stop, offset,in zip(start_locs, stop_locs, time_offset):
+    for start, stop, offset in zip(start_locs, stop_locs, time_offset):
         times_around_update = times[start:stop] - offset
         data_subset = data[start:stop, :, :]
 

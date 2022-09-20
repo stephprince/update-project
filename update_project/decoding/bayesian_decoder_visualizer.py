@@ -54,30 +54,28 @@ class BayesianDecoderVisualizer:
                 self.plot_all_confusion_matrices(data, name)
                 self.plot_parameter_comparison(data, name, thresh_params=True)
 
-            # make plots for different parameters
-            for param_name, param_data in self.aggregator.group_df.groupby(self.params):
-                for name, data in param_data.groupby(group_names):  # (brain regions and features)
-                    print(f'Plotting data for group {name}...')
-                    tags = f'{"_".join(["".join(n) for n in name])}_' \
-                           f'{"_".join([f"{p}_{n}" for p, n in zip(self.params, param_name)])}'
-                    feat = param_data['feature'].values[0]
+            # make plots for different parameters, groups, features
+            groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
+            for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
+                print(f'Plotting data for group {g_name}...')
 
-                    # plot comparisons between plot groups (e.g. correct/incorrect, left/right, update/non-update)
-                    kwargs = dict(feat=feat, plot_groups=self.plot_group_comparisons, tags=tags)
-                    # self.plot_theta_phase_comparisons(param_data, **kwargs)
-                    self.plot_group_aligned_comparisons(data, **kwargs)
+                # plot comparisons between plot groups (e.g. correct/incorrect, left/right, update/non-update)
+                tags = "_".join([str(n) for n in g_name])
+                kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
+                self.plot_group_aligned_comparisons(data, **kwargs)
+                # self.plot_theta_phase_comparisons(param_data, **kwargs)
 
-                    # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
-                    for plot_types in list(itertools.product(*self.plot_groups.values())):
-                        plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
-                        title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-                        kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
+                # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
+                for plot_types in list(itertools.product(*self.plot_groups.values())):
+                    plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
+                    title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+                    kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
 
-                        self.plot_group_aligned_data(data, feat=feat, **kwargs)
-                        self.plot_scatter_dists_around_update(data, **kwargs)
-                        self.plot_trial_by_trial_around_update(data, **kwargs)
-                        self.plot_phase_modulation_around_update(data, feat=feat, **kwargs)
-                        self.plot_theta_phase_histogram(data, feat=feat, **kwargs)
+                    self.plot_group_aligned_data(data, **kwargs)
+                    self.plot_scatter_dists_around_update(data, **kwargs)
+                    self.plot_trial_by_trial_around_update(data, **kwargs)
+                    self.plot_phase_modulation_around_update(data, **kwargs)
+                    self.plot_theta_phase_histogram(data, **kwargs)
         else:
             print(f'No data found to plot')
 
@@ -356,10 +354,11 @@ class BayesianDecoderVisualizer:
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
 
-    def plot_group_aligned_data(self, param_data, feat, title, plot_groups=None, tags=''):
+    def plot_group_aligned_data(self, param_data, title, plot_groups=None, tags=''):
         print('Plotting group aligned data..')
 
         # make plots for aligned data (1 row for each plot, 1 col for each align time)
+        feat = param_data['feature_name'].values[0]
         ncols, nrows = (len(self.aggregator.align_times[:-1]), 6)
         fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
@@ -392,13 +391,14 @@ class BayesianDecoderVisualizer:
                             .query(f"time_label == '{label}'")
                             .groupby([level, 'times_binned'])
                             .mean().reset_index())
-                    plot_scatter_with_distributions(data=data,
-                                                    x='prob_sum_initial_stay', y='prob_sum_switch', hue='times_binned',
-                                                    fig=sfigs[0][i], title=label, kind=kind, plt_kwargs=plt_kwargs)
+                    if np.size(data):
+                        plot_scatter_with_distributions(data=data,
+                                                        x='prob_sum_initial_stay', y='prob_sum_switch', hue='times_binned',
+                                                        fig=sfigs[0][i], title=label, kind=kind, plt_kwargs=plt_kwargs)
 
-                    plot_scatter_with_distributions(data=data, hue='times_binned',
-                                                    x='diff_baseline_initial_stay', y='diff_baseline_switch',
-                                                    fig=sfigs[1][i], title=label, kind=kind, plt_kwargs=plt_kwargs)
+                        plot_scatter_with_distributions(data=data, hue='times_binned',
+                                                        x='diff_baseline_initial_stay', y='diff_baseline_switch',
+                                                        fig=sfigs[1][i], title=label, kind=kind, plt_kwargs=plt_kwargs)
                 fig.subplots_adjust(right=0.95, top=0.95)
 
                 # save figure
@@ -477,79 +477,10 @@ class BayesianDecoderVisualizer:
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_by_trial',
                                      additional_tags=tags, tight_layout=False)
 
-    def plot_region_correlated_data(self, param_data, title, plot_groups=None, tags=''):
-        ncols, nrows = (len(self.aggregator.align_times[:-1]), 11)
-        corr_data = self.aggregator.calc_correlation_data(param_data, plot_groups)
-        if corr_data:
-            fig = plt.figure(figsize=(11, 20), constrained_layout=True)
-            sfigs = fig.subfigures(nrows, 2, height_ratios=[0.23, *([0.11] * 10)], width_ratios=[0.99, 0.01])
-
-            # time traces
-            (  # plot initial - switch difference over time (averages with bar)
-                so.Plot(trial_data, x='times', color='choice')
-                    .facet(col='time_label')
-                    .pair(y=['prob_sum', 'diff_baseline'])
-                    .add(so.Band(), so.Est(errorbar='se'),)
-                    .add(so.Line(linewidth=2), so.Agg(),)
-                    .scale(color=[self.colors[c] for c in trial_data['choice'].unique()])
-                    .theme(rcparams)
-                    .layout(engine='constrained')
-                    .on(sfigs[0][0])
-                    .plot()
-            )
-            sfigs[0][0].suptitle(title)
-            (  # plot diff over time (averages with error bar)
-                so.Plot(old_vs_new_data, x='times', y='diff_switch_stay')
-                    .facet(col='time_label',
-                           order=self.aggregator.align_times[:-1])
-                    .add(so.Line(linewidth=2), so.Agg())
-                    .add(so.Band(), so.Est(errorbar='se'))
-                    .scale(color=self.colors['control'])
-                    .theme(rcparams)
-                    .layout(engine='constrained')
-                    .on(sfigs[7][0])
-                    .plot()
-            )
-
-            # heatmaps of data by session and by trial
-            locations = dict(prob_sum=dict(sfig=1, nrows=2, groupby=['time_label', 'choice'], df=trial_data),
-                             diff_baseline=dict(sfig=4, nrows=2, groupby=['time_label', 'choice'], df=trial_data),
-                             diff_switch_stay=dict(sfig=8, nrows=1, groupby=['time_label'], df=old_vs_new_data))
-            levels = ['animal', 'session_id', 'trial_index']
-            for kind, level in itertools.product(['prob_sum', 'diff_baseline', 'diff_switch_stay'], levels):
-                sfig_ind = locations[kind]['sfig'] + np.argwhere(np.array(levels) == level)[0][0]
-                axes = sfigs[sfig_ind][0].subplots(locations[kind]['nrows'], ncols, sharey='row', squeeze=False)
-                cax = sfigs[sfig_ind][1].subplots(locations[kind]['nrows'], 1, squeeze=False)
-                group_list = locations[kind]['groupby']
-                for name, data in locations[kind]['df'].groupby(group_list, sort=False):
-                    if len(group_list) > 1:
-                        col = np.argwhere(locations[kind]['df'][group_list[0]].unique() == name[0])[0][0]
-                        row = np.argwhere(locations[kind]['df'][group_list[1]].unique() == name[1])[0][0]  # which row to plot
-                        cmap = self.colors[f'{name[1]}_cmap']
-                    else:
-                        row, col = (0, np.argwhere(trial_data[group_list[0]].unique() == name)[0][0])
-                        cmap = self.colors['cmap']
-
-                    matrix = data.groupby([level, 'times'])[kind].mean().unstack().to_numpy()
-                    im = axes[row][col].imshow(matrix, cmap=cmap, vmin=0, vmax=0.4, aspect='auto',
-                                               origin='lower', extent=[data['times'].min(), data['times'].max(),
-                                                                       0, np.shape(matrix)[0]],)
-                    if col == 0:
-                        axes[row][col].set_ylabel(level)
-                    elif col == ncols - 1:
-                        plt.colorbar(im, cax=cax[row][0], label='integral prob')
-                sfigs[sfig_ind][0].supylabel(kind)
-                sfigs[sfig_ind][0].set_facecolor('none')
-
-            # save figure
-            add_lines = [[a.axvline(0, color='k', linestyle='dashed') for a in sf[0].axes] for sf in sfigs]
-            sfigs[-1][0].supxlabel(fig.axes[-1].get_xlabel())
-            self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_by_trial',
-                                     additional_tags=tags, tight_layout=False)
-
-    def plot_group_aligned_comparisons(self, param_data, feat, plot_groups=None, tags=''):
+    def plot_group_aligned_comparisons(self, param_data, plot_groups=None, tags=''):
         print('Plotting group aligned comparisons...')
 
+        feat = param_data['feature_name'].values[0]
         compiled_data = []
         for plot_types in list(itertools.product(*plot_groups.values())):
             plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
@@ -647,7 +578,7 @@ class BayesianDecoderVisualizer:
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data_diff', additional_tags=tags)
 
     def plot_group_aligned_stats(self, data_for_stats, tags=''):
-        # grab data from the first second after the update occurs  TODO - make this more generalized
+        # grab data from the first second after the update occurs
         prob_sum_df = pd.DataFrame(data_for_stats)
         prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
         bins_to_grab = np.floor([len(prob_sum_df['prob_sum'].values[0]) / 2,
@@ -713,7 +644,7 @@ class BayesianDecoderVisualizer:
                 # plot heatmaps
                 y_limits = [0, np.shape(tuning_curve_scaled)[0]]
                 x_limits = [np.round(np.min(tuning_curve_bins), 2), np.round(np.max(tuning_curve_bins), 2)]
-                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['plain_cmap'],
+                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['cmap'],
                                                  origin='lower',
                                                  vmin=0.1,
                                                  aspect='auto',
@@ -741,10 +672,11 @@ class BayesianDecoderVisualizer:
         fig.suptitle(f'Feature tuning curves - {name}')
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=tags)
 
-    def plot_phase_modulation_around_update(self, param_data, feat, title, plot_groups=None, tags=''):
+    def plot_phase_modulation_around_update(self, param_data, title, plot_groups=None, tags=''):
         # make plots for aligned data (1 row for heatmap, 1 row for modulation index, 1 col for each align time)
 
         print('Plotting phase modulation around update...')
+        feat = param_data['feature_name'].values[0]
         ncols, nrows = (len(self.aggregator.align_times[:-1]), 4)
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharey='row', sharex='col')
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
@@ -782,10 +714,11 @@ class BayesianDecoderVisualizer:
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_mod_around_update',
                                  additional_tags=tags)
 
-    def plot_theta_phase_histogram(self, param_data, feat, title, plot_groups=None, tags=''):
+    def plot_theta_phase_histogram(self, param_data, title, plot_groups=None, tags=''):
         print('Plotting theta phase histograms...')
 
         # make plots for aligned data (1 row for hists, half-cycle data, 1 col for each align time)
+        feat = param_data['feature_name'].values[0]
         ncols, nrows = (len(self.aggregator.align_times[:-1]), 6)
         fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row', sharex='col')
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
