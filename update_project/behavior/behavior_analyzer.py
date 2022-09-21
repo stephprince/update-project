@@ -1,7 +1,6 @@
 import numpy as np
 import pickle
 import pandas as pd
-import pynapple as nap
 import warnings
 
 from pathlib import Path
@@ -19,7 +18,7 @@ class BehaviorAnalyzer:
         self.virtual_track = UpdateTrack()
         self.virmen_vars = params.get('behavioral_vars', ['position', 'view_angle', 'rewards'])
         self.analog_vars = params.get('analog_vars', ['rotational_velocity', 'translational_velocity', 'licks'])
-        self.maze_ids = params.get('maze_ids', [4])  # which virtual environments to use for analysis
+        self.maze_ids = params.get('maze_ids', [1, 2, 3, 4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
         self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
         self.align_window_start = params.get('align_window_start', -5.0)  # seconds to add before/after aligning window
@@ -33,14 +32,15 @@ class BehaviorAnalyzer:
 
         # setup I/O
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem)
-        self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories'],
-                                                    format='pkl'))
+        self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories','proportion_correct_by_phase'],
+                                                    format='pkl')) #TODO detect if all variables exist when loading
 
     def run_analysis(self, overwrite=False):
         print(f'Analyzing behavioral data for {self.results_io.session_id}...')
 
         if overwrite:
             self._get_proportion_correct()
+            self._get_proportion_correct_by_phase()
             self._get_trajectories()
             self._align_data()
             self._export_data()  # save output data
@@ -54,6 +54,31 @@ class BehaviorAnalyzer:
     def _setup_trials(self, nwbfile):
         all_trials = nwbfile.trials.to_dataframe()
         trials = all_trials[all_trials['maze_id'].isin(self.maze_ids)]
+        # TODO - add column "phase" that defines what training phase each trial is in
+        delay_locations=UpdateTrack.delay_locations #import delay_locations dic
+        phase=list() # create new empty list
+        for ind in trials.index:
+            if trials['maze_id'][ind]==1:
+                phase.append('linear')
+            elif trials['maze_id'][ind]==2:
+                phase.append('ymaze_short')
+            elif trials['maze_id'][ind]==3:
+                phase.append('ymaze_long')
+            elif trials['update_type'][ind]==2:
+                phase.append('switch_update')
+            elif trials['update_type'][ind]==3:
+                phase.append('stay_update')
+            elif trials['delay_location'][ind]>delay_locations['delay1'][0] and trials['delay_location'][ind]<delay_locations['delay1'][1]:
+                phase.append('latest_delay')
+            elif trials['delay_location'][ind]>delay_locations['delay2'][0] and trials['delay_location'][ind]<delay_locations['delay2'][1]:
+                phase.append('later_delay')
+            elif trials['delay_location'][ind]>delay_locations['delay3'][0] and trials['delay_location'][ind]<delay_locations['delay3'][1]:
+                phase.append('middle_delay')
+            elif trials['delay_location'][ind]>delay_locations['delay4'][0] and trials['delay_location'][ind]<delay_locations['delay4'][1]:
+                phase.append('earlier_delay')
+            else:
+                phase.append('unknown') #can be taken out if needed
+        trials['phase']=phase #add phase list into trials df as column
 
         return trials
 
@@ -89,6 +114,24 @@ class BehaviorAnalyzer:
 
         self.proportion_correct = proportion_correct
 
+    def _get_proportion_correct_by_phase(self):
+        proportion_correct_by_phase = []
+        groups = self.trials.groupby(['phase'])  # TODO - group by phase instead of update_type
+        for name, group_data in groups:
+            data = group_data.reset_index(drop=True)  # TODO - determine if I want to have min bin length to use data
+            rolling = data['correct'].rolling(self.trial_window, min_periods=1).mean()
+            binned = data['correct'].groupby(data['correct'].index // self.trial_window).mean()
+            if len(data['correct']) % self.trial_window:  # if any leftover trials getting included in last bin
+                binned = binned[:-1]
+
+            proportion_correct_by_phase.append(dict(prop_correct=rolling.values,
+                                           type='rolling',
+                                           phase=name))
+            proportion_correct_by_phase.append(dict(prop_correct=binned.values,
+                                           type='binned',
+                                           phase=name))
+
+        self.proportion_correct_by_phase = proportion_correct_by_phase
     def _get_trajectories(self):
         trajectory_df = pd.DataFrame(index=self.data['position'].timestamps, data=self.data['position'].data[:, 1],
                                      columns=['y_position'])

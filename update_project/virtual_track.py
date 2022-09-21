@@ -5,7 +5,7 @@ from track_linearization import make_track_graph, get_linearized_position
 
 class VirtualTrack:
     def __init__(self, coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries, home_boundaries,
-                 mappings=None, linearization=False):
+                 mappings=None, linearization=False, delay_locations=None):
         self.coords = coords
         self.nodes = nodes
         self.edges = edges
@@ -15,6 +15,7 @@ class VirtualTrack:
         self.home_boundaries = home_boundaries
         self.mappings = mappings
         self.linearization = linearization
+        self.delay_locations = delay_locations
 
     def get_track_boundaries(self):
         xs, ys = zip(*self.coords)
@@ -70,9 +71,14 @@ class UpdateTrack(VirtualTrack):
                            view_angle=(2 * np.pi / 9, -2 * np.pi/9),
                            dynamic_choice=(-0.5, 0.5),
                            cue_bias=(-0.4, 0.4))
+    # TODO - add dictionary with delay phase onset locations/ranges
+    delay_locations = dict(delay1=(214,216), # latest delay
+                         delay2=(179,181), # later delay
+                         delay3=(144,146), # middle delay
+                         delay4=(119,121)) # earlier delay
 
     def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_start_locations=cue_start_locations,
                  cue_end_locations=cue_end_locations, choice_boundaries=choice_boundaries,
-                 home_boundaries=home_boundaries, mappings=mappings, linearization=False):
+                 home_boundaries=home_boundaries, mappings=mappings, linearization=False, delay_locations=delay_locations):
         super().__init__(coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries,
-                         home_boundaries, mappings, linearization)
+                         home_boundaries, mappings, linearization, delay_locations)

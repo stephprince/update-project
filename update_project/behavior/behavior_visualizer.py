@@ -28,15 +28,58 @@ class BehaviorVisualizer:
         # get session visualization info
         for sess_dict in self.data:
             sess_dict.update(proportion_correct=sess_dict['behavior'].proportion_correct)
+            sess_dict.update(proportion_correct_by_phase=sess_dict['behavior'].proportion_correct_by_phase)
             sess_dict.update(trajectories=sess_dict['behavior'].trajectories)
             sess_dict.update(aligned_data=sess_dict['behavior'].aligned_data)
 
         self.group_df = pd.DataFrame(data)
 
     def plot(self):
-        self.plot_proportion_correct()
+        self.plot_proportion_correct_by_phase()
         self.plot_trajectories()
         self.plot_aligned_data()
+        #self.plot_proportion_correct()
+    def plot_proportion_correct_by_phase(self):
+        temp_df = self.group_df[['animal', 'proportion_correct_by_phase']].explode('proportion_correct_by_phase').reset_index(drop=True)
+        df_by_phase = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['proportion_correct_by_phase']))], axis=1)
+        df_by_bin = df_by_phase.explode('prop_correct').reset_index(drop=True)
+        df_by_bin = pd.DataFrame(df_by_bin.to_dict())
+
+        nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
+        ncols = 2  # 1 column for binned, 1 for rolling
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 15))
+
+        # rolling proportion correct
+        title = 'Performance - rolling'
+        xlabel = 'proportion correct by phase'
+        rolling_df = df_by_bin[df_by_bin["type"] == 'rolling']
+        if np.size(rolling_df['prop_correct'].dropna()):
+            plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='phase',
+                               row_ids=[0, 1, 2],
+                               col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title)
+            plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
+                               col_ids=[1, 1, 1, 1], xlabel=xlabel, title=title)
+
+        # # binned proportion correct
+        # title = 'Performance - binned'
+        # xlabel = 'proportion correct by phase'
+        # binned_df = df_by_bin[df_by_bin["type"] == 'binned']
+        # if np.size(binned_df['prop_correct'].dropna()):
+        #     plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='phase', row_ids=[0, 1, 2],
+        #                        col_ids=[2, 2, 2, 2], xlabel=xlabel, title=title)
+        #     plot_distributions(binned_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
+        #                        col_ids=[3, 3, 3, 3], xlabel=xlabel, title=title)
+
+        # wrap up and save plot
+        for col in range(ncols):
+            axes[1][col].set_xlim((0, 1))
+            axes[2][col].set_ylim((0, 1))
+            axes[1][col].plot([0.5, 0.5], axes[1][col].get_ylim(), linestyle='dashed', color=[0, 0, 0, 0.5])
+            axes[2][col].plot(axes[2][col].get_xlim(), [0.5, 0.5], linestyle='dashed', color=[0, 0, 0, 0.5])
+
+        # save figure
+        fig.suptitle(f'Behavioral performance by phase - all animals')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance by phase', results_type=self.results_type)
 
     def plot_proportion_correct(self):
         # explode df so each prop correct value has one row (duplicates for each session/animal
