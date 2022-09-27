@@ -50,7 +50,7 @@ class BayesianDecoder:
         self.data_files = dict(bayesian_decoder_output=dict(vars=['encoder_times', 'decoder_times', 'spikes',
                                                                   'features_test', 'features_train', 'train_df',
                                                                   'test_df', 'model', 'bins', 'decoded_values',
-                                                                  'decoded_probs', 'theta'],
+                                                                  'decoded_probs', 'theta', 'velocity'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
@@ -68,7 +68,7 @@ class BayesianDecoder:
 
         # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
-        if self.feature_names[0] in ['choice', 'turn_type']:  # TODO - make this logic better so it's less confusing
+        if self.feature_names[0] in ['choice', 'turn_type']:
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 2
 
@@ -128,7 +128,7 @@ class BayesianDecoder:
                 fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{fname_tag}',
                                                           results_type='session', format='pkl',
                                                           diff_base_path=choice_path)
-                import_data = self.results_io.load_pickled_data(fname)  #  TODO - make this more robust
+                import_data = self.results_io.load_pickled_data(fname)
                 for v, i_data in zip(['output_data', 'agg_data', 'decoder_data', 'params'], import_data):
                     if v == 'decoder_data':
                         choice_data = i_data
@@ -141,7 +141,7 @@ class BayesianDecoder:
         return pd.DataFrame.from_dict(data_dict)
 
     def _get_time_intervals(self, trial_starts, trial_stops):
-        movement = self.velocity > self.speed_threshold
+        movement = self.velocity['combined'] > self.speed_threshold
 
         new_starts = []
         new_stops = []
@@ -242,6 +242,7 @@ class BayesianDecoder:
         # get start/stop times of train and test trials
         self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
         self.decoder_times = self._get_time_intervals(self.test_df['start_time'], self.test_df['stop_time'])
+        # TODO - make decoder bins aligned to update cue (windows around update?)
 
         # select feature
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
@@ -249,6 +250,7 @@ class BayesianDecoder:
 
         # select additional data for post-processing
         self.theta = nap.TsdFrame(self.theta, time_units='s', time_support=self.decoder_times)
+        self.velocity = nap.TsdFrame(self.velocity, time_units='s', time_support=self.decoder_times)
 
         return self
 
