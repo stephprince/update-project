@@ -40,6 +40,15 @@ class BayesianDecoderVisualizer:
 
     def plot(self, group_by=None):
         if self.data_exists:
+            # plot region interactions
+            for name, data in self.aggregator.group_aligned_df.groupby(self.params):
+                for plot_types in list(itertools.product(*self.plot_groups.values())):
+                    plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
+                    tags = "_".join([str(n) for n in name])
+                    title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+                    kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
+                    self.plot_region_interaction_data(data, **kwargs)
+
             # plots decoding errors across all groups
             group_names = list(group_by.keys())
             self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
@@ -57,8 +66,6 @@ class BayesianDecoderVisualizer:
             # make plots for different parameters, groups, features
             groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
             for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
-                print(f'Plotting data for group {g_name}...')
-
                 # plot comparisons between plot groups (e.g. correct/incorrect, left/right, update/non-update)
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
@@ -354,10 +361,48 @@ class BayesianDecoderVisualizer:
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
 
-    def plot_group_aligned_data(self, param_data, title, plot_groups=None, tags=''):
-        print('Plotting group aligned data..')
+    def plot_region_interaction_data(self, param_data, title, plot_groups=None, tags=''):
+        interaction_data = self.aggregator.calc_region_interactions(param_data, plot_groups)
+        interaction_data_by_time = interaction_data.explode(['corr', 'corr_norm', 'corr_lags'])
 
-        # make plots for aligned data (1 row for each plot, 1 col for each align time)
+        ncols, nrows = (len(self.aggregator.align_times[:-1]), 2)
+        fig, axes = plt.subplots(1, 1, figsize=(20, 20))
+        sfigs = fig.subfigures(nrows, 1)
+
+        (  # plot correlations over time
+            so.Plot(interaction_data_by_time, x='corr_lags', y='corr_norm', color='choice')
+                .facet(col='time_label', row='a_vs_b')
+                .add(so.Band(), so.Est(errorbar='se'), )
+                .add(so.Line(linewidth=2), so.Agg(), )
+                .scale(color=[self.colors[c] for c in interaction_data_by_time['choice'].unique()])
+                .limit(x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
+                .theme(rcparams)
+                .layout(engine='constrained')
+                .on(sfigs[0])
+                .plot()
+        )
+
+        (  # plot initial - switch difference over time (averages with bar)
+            so.Plot(interaction_data, x='corr_coeff', color='choice')  # TODO actual corrcoeff with duplictate values bc. explode
+                .facet(col='time_label', row='a_vs_b')
+                .add(so.Bars(alpha=0.3, edgealpha=0.5), so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1), )
+                .scale(color=[self.colors[c] for c in interaction_data['choice'].unique()])
+                .limit(x=(-1, 1))
+                .label(y='proportion')
+                .theme(rcparams)
+                .layout(engine='constrained')
+                .on(sfigs[1])
+                .plot()
+        )
+        leg = fig.legends.pop(0)
+        sfigs[0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right', fontsize='large')
+
+        # save figures
+        fig.suptitle(title)
+        plt.show()
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'region_interactions', additional_tags=tags)
+
+    def plot_group_aligned_data(self, param_data, title, plot_groups=None, tags=''):
         feat = param_data['feature_name'].values[0]
         ncols, nrows = (len(self.aggregator.align_times[:-1]), 6)
         fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
@@ -682,7 +727,7 @@ class BayesianDecoderVisualizer:
         for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
             filter_dict = dict(time_label=[time_label], **plot_groups)
             theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict, time_bins=21)
-            scaling_dict = dict(switch=(0.1, 0.35), initial_stay=(0.1, 0.35), home=(0.7, 0.95),
+            scaling_dict = dict(switch=(0.1, 0.3), initial_stay=(0.1, 0.3), home=(0.7, 0.9),
                                 theta_amplitude=(-100, 100))
             if np.size(theta_phase_data):
                 theta_phase_data_full = theta_phase_data[theta_phase_data['bin_name'] == 'full']
@@ -870,10 +915,11 @@ class BayesianDecoderVisualizer:
                                       np.nanmax(data_around_update['decoding']),
                                       n_position_bins)
 
-            pos_values_after_update = np.sum(
+            pos_values_after_update = np.nansum(
                 data_around_update['feature'][int(len(time_tick_values) / 2):int(len(time_tick_values) / 2) + 10],
                 axis=0)
             sort_index = np.argsort(pos_values_after_update)
+            # TODO - add rotational velocity onset calculations and replace feature plotting with these
 
             im = axes[row_id[0]][col_id[0]].imshow(prob_map, cmap=self.colors['cmap'], origin='lower', aspect='auto',
                                                    # vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
