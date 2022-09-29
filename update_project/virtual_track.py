@@ -16,10 +16,17 @@ class VirtualTrack:
         self.mappings = mappings
         self.linearization = linearization
 
+        # update cue end locations if linearized
+        if linearization:
+            self.cue_end_locations['y_position'].update(dict(left_arm=298, right_arm=341))
+
     def get_track_boundaries(self):
         xs, ys = zip(*self.coords)
 
         return xs, ys
+
+    def get_cue_locations(self):
+        return self.cue_end_locations
 
     def linearize_track_position(self, position):
         track_graph = make_track_graph(self.nodes, self.edges)
