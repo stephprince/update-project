@@ -40,6 +40,8 @@ class BayesianDecoderVisualizer:
 
     def plot(self, group_by=None):
         if self.data_exists:
+            group_names = list(group_by.keys())
+
             # plot region interactions
             for name, data in self.aggregator.group_aligned_df.groupby(self.params):
                 for plot_types in list(itertools.product(*self.plot_groups.values())):
@@ -48,20 +50,19 @@ class BayesianDecoderVisualizer:
                     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
                     self.plot_region_interaction_data(data, **kwargs)
-
-            # plots decoding errors across all groups
-            group_names = list(group_by.keys())
-            self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
-            self.plot_all_groups_error(main_group=group_names, sub_group='animal')
-            self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
-            self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
-
-            # plot model metrics (comparing parameters across brain regions and features)
-            for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
-                self.plot_tuning_curves(data, name,)
-                self.plot_group_confusion_matrices(data, name,)
-                self.plot_all_confusion_matrices(data, name)
-                self.plot_parameter_comparison(data, name, thresh_params=True)
+            #
+            # # plots decoding errors across all groups
+            # self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
+            # self.plot_all_groups_error(main_group=group_names, sub_group='animal')
+            # self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
+            # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
+            #
+            # # plot model metrics (comparing parameters across brain regions and features)
+            # for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
+            #     self.plot_tuning_curves(data, name,)
+            #     self.plot_group_confusion_matrices(data, name,)
+            #     self.plot_all_confusion_matrices(data, name)
+            #     self.plot_parameter_comparison(data, name, thresh_params=True)
 
             # make plots for different parameters, groups, features
             groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
@@ -69,7 +70,7 @@ class BayesianDecoderVisualizer:
                 # plot comparisons between plot groups (e.g. correct/incorrect, left/right, update/non-update)
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-                self.plot_group_aligned_comparisons(data, **kwargs)
+                # self.plot_group_aligned_comparisons(data, **kwargs)
                 # self.plot_theta_phase_comparisons(param_data, **kwargs)
 
                 # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
@@ -78,11 +79,12 @@ class BayesianDecoderVisualizer:
                     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
 
-                    self.plot_group_aligned_data(data, **kwargs)
-                    self.plot_scatter_dists_around_update(data, **kwargs)
-                    self.plot_trial_by_trial_around_update(data, **kwargs)
-                    self.plot_phase_modulation_around_update(data, **kwargs)
-                    self.plot_theta_phase_histogram(data, **kwargs)
+                    self.plot_movement_reaction_times(data, **kwargs)
+                    # self.plot_group_aligned_data(data, **kwargs)
+                    # self.plot_scatter_dists_around_update(data, **kwargs)
+                    # self.plot_trial_by_trial_around_update(data, **kwargs)
+                    # self.plot_phase_modulation_around_update(data, **kwargs)
+                    # self.plot_theta_phase_histogram(data, **kwargs)
         else:
             print(f'No data found to plot')
 
@@ -363,44 +365,47 @@ class BayesianDecoderVisualizer:
 
     def plot_region_interaction_data(self, param_data, title, plot_groups=None, tags=''):
         interaction_data = self.aggregator.calc_region_interactions(param_data, plot_groups)
-        interaction_data_by_time = interaction_data.explode(['corr', 'corr_norm', 'corr_lags'])
+        if np.size(interaction_data):
+            for g_name, g_data in interaction_data.groupby(['a_vs_b']):
+                g_data_by_time = g_data.explode(['corr', 'corr_lags'])
 
-        ncols, nrows = (len(self.aggregator.align_times[:-1]), 2)
-        fig, axes = plt.subplots(1, 1, figsize=(20, 20))
-        sfigs = fig.subfigures(nrows, 1)
+                ncols, nrows = (len(self.aggregator.align_times[:-1]), 2)
+                fig = plt.figure(figsize=(11, 8.5), layout='constrained')
+                sfigs = fig.subfigures(nrows, 1)
 
-        (  # plot correlations over time
-            so.Plot(interaction_data_by_time, x='corr_lags', y='corr_norm', color='choice')
-                .facet(col='time_label', row='a_vs_b')
-                .add(so.Band(), so.Est(errorbar='se'), )
-                .add(so.Line(linewidth=2), so.Agg(), )
-                .scale(color=[self.colors[c] for c in interaction_data_by_time['choice'].unique()])
-                .limit(x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
-                .theme(rcparams)
-                .layout(engine='constrained')
-                .on(sfigs[0])
-                .plot()
-        )
+                (  # plot correlations over time
+                    so.Plot(g_data_by_time, x='corr_lags', y='corr', color='choice')
+                        .facet(col='time_label')
+                        .add(so.Band(), so.Est(errorbar='se'), )
+                        .add(so.Line(linewidth=2), so.Agg(), )
+                        .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
+                        .limit(x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
+                        .theme(rcparams)
+                        .layout(engine='constrained')
+                        .on(sfigs[0])
+                        .plot()
+                )
 
-        (  # plot initial - switch difference over time (averages with bar)
-            so.Plot(interaction_data, x='corr_coeff', color='choice')  # TODO actual corrcoeff with duplictate values bc. explode
-                .facet(col='time_label', row='a_vs_b')
-                .add(so.Bars(alpha=0.3, edgealpha=0.5), so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1), )
-                .scale(color=[self.colors[c] for c in interaction_data['choice'].unique()])
-                .limit(x=(-1, 1))
-                .label(y='proportion')
-                .theme(rcparams)
-                .layout(engine='constrained')
-                .on(sfigs[1])
-                .plot()
-        )
-        leg = fig.legends.pop(0)
-        sfigs[0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right', fontsize='large')
+                (  # plot initial - switch difference over time (averages with bar)
+                    so.Plot(g_data, x='corr_coeff', color='choice')
+                        .facet(col='time_label')
+                        .add(so.Bars(alpha=0.5, edgealpha=0.5), so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1),)
+                        .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
+                        .limit(x=(-1, 1))
+                        .label(y='proportion')
+                        .theme(rcparams)
+                        .layout(engine='constrained')
+                        .on(sfigs[1])
+                        .plot()
+                )
+                add_lines = [[a.axvline(0, color='k', linestyle='dashed') for a in sf.axes] for sf in sfigs]
+                leg = fig.legends.pop(0)
+                sfigs[0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right', fontsize='large')
 
-        # save figures
-        fig.suptitle(title)
-        plt.show()
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'region_interactions', additional_tags=tags)
+                # save figures
+                fig.suptitle(f'{title}_{g_name}')
+                self.results_io.save_fig(fig=fig, filename=f'region_interactions', additional_tags=f'{tags}_{g_name}',
+                                         tight_layout=False)
 
     def plot_group_aligned_data(self, param_data, title, plot_groups=None, tags=''):
         feat = param_data['feature_name'].values[0]
@@ -521,6 +526,87 @@ class BayesianDecoderVisualizer:
             sfigs[-1][0].supxlabel(fig.axes[-1].get_xlabel())
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_by_trial',
                                      additional_tags=tags, tight_layout=False)
+
+    def plot_movement_reaction_times(self, param_data, title, plot_groups=None, tags=''):
+        reaction_data = self.aggregator.calc_movement_reaction_times(param_data, plot_groups)
+        if np.size(reaction_data):
+            reaction_data_by_time = reaction_data.explode(['times', 'rotational_velocity', 'veloc_diff'])
+            lims = dict()
+            for col in ['rotational_velocity', 'veloc_diff']:
+                mag = np.min(np.abs((reaction_data[col].apply(np.min).min(), reaction_data[col].apply(np.max).max())))
+                lims[col] = (-mag, mag)
+
+            ncols, nrows = (len(self.aggregator.align_times[:-1]), 3)
+            fig = plt.figure(figsize=(20, 20))
+            sfigs = fig.subfigures(nrows, 1, height_ratios=[2, 1, 1])
+
+            # plot heatmaps of rotational velocity with derivative overlay
+            axes = sfigs[0].subplots(2, ncols+1, sharex='col', squeeze=False,
+                                     gridspec_kw={'width_ratios':[1, 1, 1, 1, 1, 0.1]})
+            for name, data in reaction_data.groupby(['time_label'], sort=False):
+                col = np.argwhere(reaction_data['time_label'].unique() == name)[0][0]
+                data.sort_values('reaction_time', inplace=True, ascending=False)
+
+                rot = np.stack(data['rotational_velocity'])
+                times = data['times'].to_numpy()[0]
+                im_rot = axes[0][col].imshow(rot, cmap=self.colors['div_cmap'], aspect='auto',
+                                             vmin=lims['rotational_velocity'][0]*0.5, vmax=lims['rotational_velocity'][-1]*0.5,
+                                             origin='lower', extent=[times[0], times[-1], 0, np.shape(rot)[0]], )
+                # axes[0][col].scatter(data['reaction_time'].to_numpy(),  np.array(range(np.shape(rot)[0])) + 0.5,
+                #                      facecolors='none', edgecolors='k', alpha=0.5, s=10)
+                axes[0][col].set(xlim=(times[0], times[-1]), ylim=(0, np.shape(rot)[0]), title=name)
+
+                rot_diff = np.stack(data['veloc_diff'])
+                im_diff = axes[1][col].imshow(rot_diff, cmap=self.colors['div_cmap'], aspect='auto',
+                                              vmin=lims['veloc_diff'][0]*0.5, vmax=lims['veloc_diff'][-1]*0.5,
+                                              origin='lower', extent=[times[0], times[-1], 0, np.shape(rot_diff)[0]], )
+                # axes[1][col].scatter(data['reaction_time'].to_numpy(), np.array(range(np.shape(rot_diff)[0])) + 0.5,
+                #                      facecolors='none', edgecolors='k', alpha=0.5, s=10)
+                axes[1][col].set(xlim=(times[0], times[-1]), ylim=(0, np.shape(rot_diff)[0]), title=name)
+
+                if col == 0:
+                    axes[0][col].set_ylabel('trials')
+                    axes[1][col].set_ylabel('trials')
+            plt.colorbar(im_rot, cax=axes[0][col + 1], label='rotational velocity')
+            plt.colorbar(im_diff, cax=axes[1][col + 1], label='veloc_diff')
+
+            (  # plot average rotational velocity over time
+                so.Plot(reaction_data_by_time, x='times', y='rotational_velocity')
+                    .facet(col='time_label')
+                    .add(so.Band(color='k'), so.Est(errorbar='se'))
+                    .add(so.Line(color='k', linewidth=2), so.Agg(), )
+                    .theme(rcparams)
+                    .layout(engine='constrained')
+                    .on(sfigs[1])
+                    .plot()
+            )
+
+            (  # plot distribution of movement
+                so.Plot(reaction_data, x='reaction_time')
+                    .facet(col='time_label')
+                    .add(so.Bars(color='k'), so.Hist(stat='proportion', binrange=(0, 2.5), binwidth=0.25))
+                    .limit(x=(reaction_data['times'].apply(min).min(), reaction_data['times'].apply(max).max()))
+                    .label(y='proportion')
+                    .theme(rcparams)
+                    .scale(color=self.colors['control'])
+                    .layout(engine='constrained')
+                    .on(sfigs[2])
+                    .plot()
+            )
+
+            medians = reaction_data.groupby('time_label', sort=False)['reaction_time'].median()
+            for ind, sf in enumerate(sfigs):
+                for a in sf.axes:
+                    med = medians.get(a.title.get_text(), np.nan)
+                    a.axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                    a.axvline(med, color='purple', linestyle='dashed')
+                    if ind == len(sfigs) - 1:  # add median number to last plot only
+                        a.annotate(f'median: {med:.3f}', (0.65, 0.7), xycoords='axes fraction', xytext=(0.65, 0.7),
+                                   textcoords='axes fraction',)
+
+            # save figures
+            fig.suptitle(title)
+            self.results_io.save_fig(fig=fig, filename=f'reaction_times', additional_tags=tags)
 
     def plot_group_aligned_comparisons(self, param_data, plot_groups=None, tags=''):
         print('Plotting group aligned comparisons...')
@@ -878,6 +964,7 @@ class BayesianDecoderVisualizer:
     def plot_1d_around_update(self, data_around_update, quantification_data, title, label, axes,
                               row_id, col_id, feature_name=None, prob_map_axis=0, bounds=[]):
         # get color mappings
+        prob_name = 'prob_over_chance'  # was prob sum
         data_split = dict(initial_stay=dict(data=quantification_data['left'],
                                             color=self.colors['stay'],
                                             cmap=self.colors['stay_cmap']),
@@ -894,7 +981,6 @@ class BayesianDecoderVisualizer:
         elif feature_name in ['y_position']:  # sequential color map for seq data
             cmap_pos = 'Greys'
             balanced = False
-
         if np.size(data_around_update['probability']):  # skip if there is no data
             prob_map = np.nanmean(data_around_update['probability'], axis=prob_map_axis)
             if prob_map_axis == 1:
@@ -903,11 +989,11 @@ class BayesianDecoderVisualizer:
             stats = data_around_update['stats']
             limits = get_limits_from_data([data_around_update['feature']], balanced=balanced)
             err_limits = get_limits_from_data(
-                [(v['data']['stats']['prob_sum'][f'{error_bars}lower'],
-                  v['data']['stats']['prob_sum'][f'{error_bars}upper'])
+                [(v['data']['stats'][prob_name][f'{error_bars}lower'],
+                  v['data']['stats'][prob_name][f'{error_bars}upper'])
                  for k, v in data_split.items()], balanced=False)
             err_limits[0] = 0
-            all_limits_balanced = get_limits_from_data([v['data']['prob_sum'] for v in data_split.values()])
+            all_limits_balanced = get_limits_from_data([v['data'][prob_name] for v in data_split.values()])
             times = data_around_update['times']
             time_tick_values = times.astype(int)
             n_position_bins = np.shape(prob_map)[0]
@@ -921,9 +1007,10 @@ class BayesianDecoderVisualizer:
             sort_index = np.argsort(pos_values_after_update)
             # TODO - add rotational velocity onset calculations and replace feature plotting with these
 
-            im = axes[row_id[0]][col_id[0]].imshow(prob_map, cmap=self.colors['cmap'], origin='lower', aspect='auto',
+            im = axes[row_id[0]][col_id[0]].imshow(prob_map*n_position_bins, cmap=self.colors['cmap'], origin='lower',
+                                                   aspect='auto',
                                                    # vmin=0.25 * np.nanmin(prob_map), vmax=0.75 * np.nanmax(prob_map),
-                                                   vmin=0.015, vmax=0.07,  # other options are (0.01, 0.25 to 0.1()
+                                                   vmin=0.6, vmax=2.8,  # other options are (0.01, 0.25 to 0.1()
                                                    extent=[times[0], times[-1], data_values[0], data_values[-1]])
             axes[row_id[0]][col_id[0]].plot([0, 0], [data_values[0], data_values[-1]], linestyle='dashed',
                                             color=[0, 0, 0, 0.5])
@@ -971,25 +1058,25 @@ class BayesianDecoderVisualizer:
                 stats = value['data']['stats']
 
                 # line plots
-                axes[row_id[3]][col_id[3]].plot(times, stats['prob_sum']['mean'], color=value['color'], label=key)
-                axes[row_id[3]][col_id[3]].fill_between(times, stats['prob_sum'][f'{error_bars}lower'],
-                                                        stats['prob_sum'][f'{error_bars}upper'],
+                axes[row_id[3]][col_id[3]].plot(times, stats[prob_name]['mean'], color=value['color'], label=key)
+                axes[row_id[3]][col_id[3]].fill_between(times, stats[prob_name][f'{error_bars}lower'],
+                                                        stats[prob_name][f'{error_bars}upper'],
                                                         alpha=0.2, color=value['color'], label='95% CI')
                 axes[row_id[3]][col_id[3]].plot([0, 0], err_limits, linestyle='dashed', color='k', alpha=0.25)
                 axes[row_id[3]][col_id[3]].set(xlim=[times[0], times[-1]], ylim=err_limits, ylabel=key)
                 axes[row_id[3]][col_id[3]].legend(loc='upper left')
-                axes[row_id[3]][col_id[3]].set_title(f'{title} trials - {label} - prob_sum', fontsize=14)
+                axes[row_id[3]][col_id[3]].set_title(f'{title} trials - {label} - {prob_name}', fontsize=14)
 
                 # heat maps by trial
-                im = axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].imshow(value['data']['prob_sum'],
+                im = axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].imshow(value['data'][prob_name],
                                                                                cmap=value['cmap'], origin='lower',
                                                                                aspect='auto',
                                                                                extent=[times[0], times[-1], 0,
-                                                                                       len(value['data']['prob_sum'])],
+                                                                                       len(value['data'][prob_name])],
                                                                                vmin=0 * all_limits_balanced[0],
                                                                                vmax=0.4 * all_limits_balanced[1])
                 axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].invert_yaxis()
-                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].plot([0, 0], [0, len(value['data']['prob_sum'])],
+                axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].plot([0, 0], [0, len(value['data'][prob_name])],
                                                                         linestyle='dashed', color=[0, 0, 0, 0.5])
                 axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]].set(xlim=[times[0], times[-1]], ylabel=f'trials')
                 plt.colorbar(im, ax=axes[row_id[4 + bound_ind]][col_id[4 + bound_ind]], label='probability', pad=0.01,

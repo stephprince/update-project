@@ -111,6 +111,7 @@ class BayesianDecoderAggregator:
                         lambda x: self._flip_y_position(x, bounds) if x.name in ['feature', 'decoding'] else x)
                     trials_to_flip = trials_to_flip.apply(
                         lambda x: self._flip_y_position(x, bounds, feat_bins) if x.name in ['probability'] else x)
+                    trials_to_flip = trials_to_flip.apply(lambda x: x * -1 if x.name in ['rotational_velocity'] else x)
                     feat_df.loc[feat_df['turn_type'] == self.turn_to_flip, :] = trials_to_flip
                 else:
                     cols_to_flip = ['feature', 'decoding', 'rotational_velocity']
@@ -124,6 +125,7 @@ class BayesianDecoderAggregator:
                     if ~np.isnan(prob_before_flip):
                         assert prob_before_flip == trials_to_flip['probability'].values[0][-1][
                             0], 'Data not correctly flipped'
+
             flipped_data.append(feat_df)
 
         self.group_aligned_df = pd.concat(flipped_data, axis=0)
@@ -269,9 +271,11 @@ class BayesianDecoderAggregator:
                 threshold = 0.1  # total probability density to call a left/right choice
                 integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
                 num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
+                prob_over_chance = integrated_prob*len(bins)/num_bins[bound_name]  # integrated prob * bins / goal bins
                 assert len(bins) - 1 == np.shape(prob_map)[1], 'Bound bins not being sorted on right dimension'
 
                 bound_quantification = dict(prob_sum=integrated_prob,  # (trials x window_bins)
+                                            prob_over_chance=prob_over_chance,
                                             thresh_crossing=integrated_prob > threshold)  # (trials x window_bins)
                 bound_quantification.update(stats={k: get_fig_stats(v, axis=0) for k, v in bound_quantification.items()})
                 bound_quantification.update(bound_values=bound_values,
@@ -285,7 +289,8 @@ class BayesianDecoderAggregator:
             assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
 
             if ret_df:
-                list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'bound_values', 'choice']]
+                list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'prob_over_chance', 'bound_values',
+                                                     'choice']]
                 list_df = list_df.explode(['prob_sum', 'trial_index']).reset_index(drop=True).set_index('trial_index')
                 output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'feature_name',
                                                    'time_label', 'times']],
@@ -300,51 +305,94 @@ class BayesianDecoderAggregator:
 
     def calc_region_interactions(self, param_data, plot_groups):
         # get quantification data
+        df_list = []
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
-        quant_df['times'] = quant_df['times'].apply(tuple)
-        quant_df['time_label'] = pd.Categorical(quant_df['time_label'],
-                                                ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
+        if quant_df is not None:
+            quant_df['times'] = quant_df['times'].apply(tuple)
+            quant_df['time_label'] = pd.Categorical(quant_df['time_label'],
+                                                    ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
 
-        # pivot data to compare between regions
-        index_cols = ['session_id', 'animal', 'trial_id', 'time_label', 'choice', 'times']
-        region_df = quant_df.pivot(index=index_cols,
-                                   columns=['region', 'feature_name'],
-                                   values=['prob_sum']).reset_index()
-        region_df.columns = ['_'.join(['_'.join(s) if isinstance(s, tuple) else s for s in c])
-                             if c[1] != '' else c[0] for c in region_df.columns.to_flat_index()]
-        region_df.sort_values('time_label', inplace=True)
+            # pivot data to compare between regions
+            index_cols = ['session_id', 'animal', 'trial_id', 'time_label', 'choice', 'times']
+            region_df = quant_df.pivot(index=index_cols,
+                                       columns=['region', 'feature_name'],
+                                       values=['prob_sum']).reset_index()
+            region_df.columns = ['_'.join(['_'.join(s) if isinstance(s, tuple) else s for s in c])
+                                 if c[1] != '' else c[0] for c in region_df.columns.to_flat_index()]
+            region_df.sort_values('time_label', inplace=True)
 
-        # loop through brain region/feature to calculate correlations
-        df_list = []
-        name_mapping = dict(y_position='pos', x_position='pos', dynamic_choice='choice')
-        for feat1, feat2 in itertools.product(quant_df['feature_name'].unique(), repeat=2):
-            corr_df = region_df.apply(lambda x: self.calc_correlation_metrics(x[f'prob_sum_CA1_{feat1}'],
-                                                                              x[f'prob_sum_PFC_{feat2}'],
-                                                                              x['times']), axis=1)
-            corr_df['signal_a'] = f'CA1_{name_mapping[feat1]}'
-            corr_df['signal_b'] = f'PFC_{name_mapping[feat2]}'
-            corr_df['a_vs_b'] = corr_df[['signal_a', 'signal_b']].agg('_'.join, axis=1)
-            df_list.append(pd.concat([region_df[index_cols], corr_df], axis='columns'))  # readd metadata
+            # loop through brain region/feature to calculate correlations
+            name_mapping = dict(y_position='pos', x_position='pos', dynamic_choice='choice')
+            for feat1, feat2 in itertools.product(quant_df['feature_name'].unique(), repeat=2):
+                if set([f'prob_sum_CA1_{feat1}', f'prob_sum_PFC_{feat2}']).issubset(region_df.columns):
+                    corr_df = region_df.apply(lambda x: self.calc_correlation_metrics(x[f'prob_sum_CA1_{feat1}'],
+                                                                                      x[f'prob_sum_PFC_{feat2}'],
+                                                                                      x['times']), axis=1)
+                    corr_df['signal_a'] = f'CA1_{name_mapping[feat1]}'
+                    corr_df['signal_b'] = f'PFC_{name_mapping[feat2]}'
+                    corr_df['a_vs_b'] = corr_df[['signal_a', 'signal_b']].agg('_'.join, axis=1)
+                    df_list.append(pd.concat([region_df[index_cols], corr_df], axis='columns'))  # readd metadata
 
-        return pd.concat(df_list, axis='rows')
+        if np.size(df_list):
+            return pd.concat(df_list, axis='rows')
+        else:
+            return []
 
     def calc_correlation_metrics(self, a, b, times, mode='full'):
+        # prep a and b vectors (fill in nans, mean subtract, normalize)
+        if np.isnan(a).all():
+            a = np.empty(np.shape(times))
+            a[:] = np.nan
+
+        if np.isnan(b).all():
+            b = np.empty(np.shape(times))
+            b[:] = np.nan
+
+        a = a - np.nanmean(a)  # mean subtract so average is around 0
+        b = b - np.nanmean(b)  # mean subtract so average is around 0
+
+        a = a / np.linalg.norm(a)  # normalize so output values interpretable
+        b = b / np.linalg.norm(b)  # normalize so output values interpretable
+
+        if np.isnan(a).all() or np.isnan(b).all():
+            corr_coeff = np.nan
+        else:
+            corr_coeff = pearsonr(a, b)[0]
+
         corr = signal.correlate(a, b, mode=mode)
         corr_lags = signal.correlation_lags(len(a), len(b), mode=mode) * np.diff(times)[0]
-        corr_coeff = pearsonr(a, b)[0]
 
-        a_norm = a / np.linalg.norm(a)
-        b_norm = b / np.linalg.norm(b)
-        corr_norm = signal.correlate(a_norm, b_norm, mode=mode)
+        return pd.Series([corr, corr_coeff, corr_lags], index=['corr', 'corr_coeff', 'corr_lags'])
 
-        return pd.Series([corr, corr_norm, corr_coeff, corr_lags],
-                         index=['corr', 'corr_norm', 'corr_coeff', 'corr_lags'])
+    def calc_movement_reaction_times(self, param_data, plot_groups):
+        group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
+        reaction_df = group_aligned_data.apply(lambda x: self.get_reaction_time(x['rotational_velocity'],
+                                                                                x['times']), axis=1)
 
-    def correlate_normalized(self, a, b):
+        cols = ['session_id', 'animal', 'region', 'trial_id', 'time_label', 'feature_name', 'bins', 'times',
+                'rotational_velocity']
+        reaction_df = pd.concat([group_aligned_data[cols], reaction_df], axis='columns')
 
+        return reaction_df
 
-        return signal.correlate(a_norm, b_norm, mode='full')
+    def get_reaction_time(self, velocity, times):
+        # get slope of velocity over time
+        veloc_diff = np.diff(velocity, prepend=velocity[0])
+
+        # only calc reaction times post-event for aligned times
+        reaction_time = np.max(times)  # default value is max time
+        if any(times > 0):
+            event_time = np.argwhere(times >= 0)[0][0]
+            post_event = veloc_diff[event_time:]
+
+            # calc reaction time
+            slope_sign = np.sign(post_event)
+            reaction_time_post = np.where(np.diff(slope_sign, prepend=slope_sign[0]))[0] # get elements immediately after sign switch
+            if np.size(reaction_time_post):  # if any slope changes, otherwise keep default
+                reaction_time = times[event_time:][reaction_time_post[0]]
+
+        return pd.Series([veloc_diff, reaction_time], index=['veloc_diff', 'reaction_time'])
 
     def calc_trial_by_trial_quant_data(self, param_data, plot_groups):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
