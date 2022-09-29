@@ -13,6 +13,8 @@ def clean_plot(fig, axes, tight_layout):
         ax_list = axes.flat
     elif hasattr(axes, 'values'):
         ax_list = list(axes.values())
+    elif isinstance(axes, list):
+        ax_list = axes
     else:
         ax_list = [axes]
 
@@ -70,6 +72,7 @@ def get_color_theme():
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
+    color_theme_dict['div_cmap'] = sns.diverging_palette(240, 10, s=75, l=60, n=5, center='light', as_cmap=True)
     color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
     color_theme_dict['home_cmap'] = sns.color_palette("Greys", as_cmap=True)
     color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)

@@ -81,11 +81,14 @@ class ResultsIO:
 
         return kwargs
 
-    def save_fig(self, fig, axes, filename, results_type='group', additional_tags='', results_name='', format='pdf',
+    def save_fig(self, fig, filename, axes=None, results_type='group', additional_tags='', results_name='', format='pdf',
                  tight_layout=True):
 
         # clean up plot
-        clean_plot(fig, axes, tight_layout)
+        if axes is not None:
+            clean_plot(fig, axes, tight_layout)
+        else:
+            clean_plot(fig, fig.axes, tight_layout)
 
         # save and close
         kwargs = self.get_figure_args(filename, results_type, additional_tags, results_name, format)
