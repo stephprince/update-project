@@ -291,7 +291,7 @@ class BayesianDecoderAggregator:
             if ret_df:
                 list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'prob_over_chance', 'bound_values',
                                                      'choice']]
-                list_df = list_df.explode(['prob_sum', 'trial_index']).reset_index(drop=True).set_index('trial_index')
+                list_df = list_df.explode(['prob_sum', 'prob_over_chance', 'trial_index']).reset_index(drop=True).set_index('trial_index')
                 output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'feature_name',
                                                    'time_label', 'times']],
                                      list_df, left_index=True, right_index=True)
@@ -363,7 +363,15 @@ class BayesianDecoderAggregator:
         corr = signal.correlate(a, b, mode=mode)
         corr_lags = signal.correlation_lags(len(a), len(b), mode=mode) * np.diff(times)[0]
 
-        return pd.Series([corr, corr_coeff, corr_lags], index=['corr', 'corr_coeff', 'corr_lags'])
+        window_size = int(np.round(1/np.diff(times)[0]))  # approximately 1s window
+        a_windowed = np.lib.stride_tricks.sliding_window_view(a, window_size)
+        b_windowed = np.lib.stride_tricks.sliding_window_view(b, window_size)
+        times_sliding = np.lib.stride_tricks.sliding_window_view(times, window_size).mean(axis=1)
+        corr_sliding = np.stack([signal.correlate(aw, bw, mode=mode) for aw, bw in zip(a_windowed, b_windowed)])
+        lags_sliding = signal.correlation_lags(len(a_windowed[0]), len(b_windowed[0]), mode=mode) * np.diff(times)[0]
+
+        return pd.Series([corr, corr_coeff, corr_lags, corr_sliding, lags_sliding, times_sliding],
+                         index=['corr', 'corr_coeff', 'corr_lags', 'corr_sliding', 'lags_sliding', 'times_sliding'])
 
     def calc_movement_reaction_times(self, param_data, plot_groups):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
@@ -373,6 +381,7 @@ class BayesianDecoderAggregator:
         cols = ['session_id', 'animal', 'region', 'trial_id', 'time_label', 'feature_name', 'bins', 'times',
                 'rotational_velocity']
         reaction_df = pd.concat([group_aligned_data[cols], reaction_df], axis='columns')
+        # TODO - get reaction times from the full data trace so not influenced by nbins
 
         return reaction_df
 
@@ -394,27 +403,27 @@ class BayesianDecoderAggregator:
 
         return pd.Series([veloc_diff, reaction_time], index=['veloc_diff', 'reaction_time'])
 
-    def calc_trial_by_trial_quant_data(self, param_data, plot_groups):
+    def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance'):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
 
         if np.size(quant_df):
             # get diff from baseline
-            prob_sum_mat = np.vstack(quant_df['prob_sum'])
+            prob_sum_mat = np.vstack(quant_df[prob_value])
             align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
             prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
             # get diff from left vs. right bounds
             quant_df['trial_index'] = quant_df.index
-            quant_df = quant_df.explode(['times', 'prob_sum', 'diff_baseline']).reset_index()
+            quant_df = quant_df.explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline']).reset_index()
             quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(0, 2.5, 3)).apply(lambda x: x.mid)
             quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
             choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
                                        columns=['choice'],
-                                       values=['prob_sum', 'diff_baseline']).reset_index()  # had times here before
-            choice_df['diff_switch_stay'] = choice_df[('prob_sum', 'switch')] - choice_df[('prob_sum', 'initial_stay')]
+                                       values=[prob_value, 'diff_baseline']).reset_index()  # had times here before
+            choice_df['diff_switch_stay'] = choice_df[(prob_value, 'switch')] - choice_df[(prob_value, 'initial_stay')]
             choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
 
             return quant_df, choice_df
