@@ -81,7 +81,6 @@ class BayesianDecoderVisualizer:
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
 
                     # self.plot_movement_reaction_times(data, **kwargs)
-                    self.plot_group_aligned_data_updated(data, **kwargs)
                     self.plot_group_aligned_data(data, **kwargs)
                     # self.plot_scatter_dists_around_update(data, **kwargs)
                     # self.plot_trial_by_trial_around_update(data, **kwargs)
@@ -370,7 +369,7 @@ class BayesianDecoderVisualizer:
         if np.size(interaction_data):
             for g_name, g_data in interaction_data.groupby(['a_vs_b']):
                 g_data_by_time = g_data.explode(['corr', 'corr_lags'])
-                corr_maps = (g_data.groupby(['time_label', 'choice'])['corr_sliding'].apply(lambda x: np.mean(np.stack(x), axis=0)))
+                corr_maps = (g_data.groupby(['time_label', 'choice'])['corr_sliding'].apply(lambda x: np.nanmean(np.stack(x), axis=0)))
                 times_sliding = g_data.groupby(['time_label', 'choice'])['times_sliding'].mean()
                 lags_sliding = g_data.groupby(['time_label', 'choice'])['lags_sliding'].mean()
 
@@ -386,13 +385,13 @@ class BayesianDecoderVisualizer:
                     lags = lags_sliding[t_name]['initial_stay']
 
                     im1 = axes[0][col].imshow(t_data[t_name]['initial_stay'].T, aspect='auto',
-                                              cmap=self.colors['initial_stay_cmap'], vmin=-0.3, vmax=0.7,
+                                              cmap=self.colors['div_cmap'], vmin=-0.02, vmax=0.02,
                                               origin='lower', extent=[times[0], times[-1], lags[0], lags[-1]])
                     axes[0][col].set(xlim=(times[0], times[-1]), ylim=(lags[0], lags[-1]), title=t_name,
                                      ylabel='corr lags')
                     axes[0][col].invert_yaxis()
                     im2 = axes[1][col].imshow(t_data[t_name]['switch'].T, aspect='auto',
-                                              cmap=self.colors['switch_cmap'], vmin=-0.3, vmax=0.7,
+                                              cmap=self.colors['div_cmap'], vmin=-0.02, vmax=0.02,
                                               origin='lower', extent=[times[0], times[-1], lags[0], lags[-1]])
                     axes[1][col].set(xlim=(times[0], times[-1]), ylim=(lags[0], lags[-1]),
                                      xlabel='Time around cue', ylabel='corr lags')
@@ -437,24 +436,6 @@ class BayesianDecoderVisualizer:
                                          tight_layout=False)
 
     def plot_group_aligned_data(self, param_data, title, plot_groups=None, tags=''):
-        feat = param_data['feature_name'].values[0]
-        ncols, nrows = (len(self.aggregator.align_times[:-1]), 6)
-        fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
-        for ind, time_label in enumerate(self.aggregator.align_times[:-1]):
-            filter_dict = dict(time_label=[time_label], **plot_groups)
-            group_aligned_data = self.aggregator.select_group_aligned_data(param_data, filter_dict)
-            quant_aligned_data = self.aggregator.quantify_aligned_data(param_data, group_aligned_data)
-            if np.size(quant_aligned_data):
-                bounds = [v['bound_values'] for v in quant_aligned_data.values()]
-                self.plot_1d_around_update(group_aligned_data, quant_aligned_data, time_label, feat, axes,
-                                           row_id=np.arange(nrows), col_id=[ind] * nrows,
-                                           feature_name=feat, prob_map_axis=0, bounds=bounds)
-
-        # save figure
-        fig.suptitle(title)
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_aligned_data', additional_tags=tags)
-
-    def plot_group_aligned_data_updated(self, param_data, title, plot_groups=None, tags=''):
         # load up data
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups)
         reaction_data = self.aggregator.calc_movement_reaction_times(param_data, plot_groups)
@@ -485,10 +466,10 @@ class BayesianDecoderVisualizer:
                 axes[0][col].axhline(b[0], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
                 axes[0][col].axhline(b[1], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
 
-            im_goal1 = axes[1][col].imshow(stay_mat, cmap=self.colors['stay_cmap'], aspect='auto', vmin=0, vmax=0.275,
+            im_goal1 = axes[1][col].imshow(stay_mat, cmap=self.colors['stay_cmap'], aspect='auto', vmin=0, vmax=2.5,
                                            origin='lower', extent=[times[0], times[-1], 0, np.shape(stay_mat)[0]])
             im_goal2 = axes[2][col].imshow(switch_mat, cmap=self.colors['switch_cmap'], aspect='auto',
-                                           vmin=0, vmax=0.275, origin='lower',
+                                           vmin=0, vmax=2.5, origin='lower',
                                            extent=[times[0], times[-1], 0, np.shape(switch_mat)[0]], )
 
             axes[3][col].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['switch'], label='switch')
@@ -499,6 +480,7 @@ class BayesianDecoderVisualizer:
             axes[3][col].fill_between(times, np.nanmean(stay_mat, axis=0) + sem(stay_mat),
                                       np.nanmean(stay_mat, axis=0) - sem(stay_mat), color=self.colors['initial_stay'],
                                       alpha=0.2)
+            axes[3][col].axhline(1, linestyle='dashed', color='k', alpha=0.5)
             axes[0][col].set(ylim=(prob_lims[0], prob_lims[-1]), ylabel=param_data['feature_name'].values[0],
                              title=name, xlim=time_lims)
             axes[1][col].set(ylim=(0, np.shape(stay_mat)[0]), ylabel='trials', title=name, xlim=time_lims)
@@ -536,7 +518,7 @@ class BayesianDecoderVisualizer:
         fig.suptitle(title)
         plt.show()
 
-        self.results_io.save_fig(fig=fig, filename=f'group_aligned_data_updated', additional_tags=tags,
+        self.results_io.save_fig(fig=fig, filename=f'group_aligned_data', additional_tags=tags,
                                  tight_layout=False)
 
     def plot_scatter_dists_around_update(self, param_data, title, plot_groups=None, tags=''):
