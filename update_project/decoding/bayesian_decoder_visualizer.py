@@ -58,7 +58,7 @@ class BayesianDecoderVisualizer:
             # self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
             # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
             #
-            # # plot model metrics (comparing parameters across brain regions and features)
+            # plot model metrics (comparing parameters across brain regions and features)
             # for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
             #     self.plot_tuning_curves(data, name,)
             #     self.plot_group_confusion_matrices(data, name,)
@@ -368,10 +368,12 @@ class BayesianDecoderVisualizer:
         interaction_data = self.aggregator.calc_region_interactions(param_data, plot_groups)
         if np.size(interaction_data):
             for g_name, g_data in interaction_data.groupby(['a_vs_b']):
-                g_data_by_time = g_data.explode(['corr', 'corr_lags'])
                 corr_maps = (g_data.groupby(['time_label', 'choice'])['corr_sliding'].apply(lambda x: np.nanmean(np.stack(x), axis=0)))
                 times_sliding = g_data.groupby(['time_label', 'choice'])['times_sliding'].mean()
                 lags_sliding = g_data.groupby(['time_label', 'choice'])['lags_sliding'].mean()
+                g_data_by_time = (g_data
+                                  .drop(['corr', 'corr_sliding', 'corr_lags', 'lags_sliding'], axis=1)
+                                  .explode(['corr_coeff_sliding', 'times_sliding']))
 
                 ncols, nrows = (len(self.aggregator.align_times[:-1]), 3)
                 fig = plt.figure(figsize=(11, 8.5), constrained_layout=True)
@@ -400,8 +402,8 @@ class BayesianDecoderVisualizer:
                 plt.colorbar(im1, cax=caxes[0], label='initial corr', pad=0.01, fraction=0.04,)
                 plt.colorbar(im2, cax=caxes[1], label='switch corr', pad=0.01, fraction=0.04,)
 
-                (  # plot correlations over time
-                    so.Plot(g_data_by_time, x='corr_lags', y='corr', color='choice')
+                (  # plot corr coeffs over time
+                    so.Plot(g_data_by_time, x='times_sliding', y='corr_coeff_sliding', color='choice')
                         .facet(col='time_label')
                         .add(so.Band(), so.Est(errorbar='se'), )
                         .add(so.Line(linewidth=2), so.Agg(), )
@@ -413,6 +415,7 @@ class BayesianDecoderVisualizer:
                         .plot()
                 )
 
+                g_data['corr_coeff'][g_data['corr_coeff'].isna()] = 0
                 (  # plot initial - switch difference over time (averages with bar)
                     so.Plot(g_data, x='corr_coeff', color='choice')
                         .facet(col='time_label')
@@ -428,7 +431,7 @@ class BayesianDecoderVisualizer:
                 add_lines = [[a.axvline(0, color='k', linestyle='dashed') for a in sf.axes]
                              for sf in [sfigs[2][0], sfigs[1][0], sfigs[0][0]]]
                 leg = fig.legends.pop(0)
-                sfigs[2][0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right', fontsize='large')
+                sfigs[1][0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right', fontsize='large')
 
                 # save figures
                 fig.suptitle(f'{title}_{g_name}')
@@ -516,8 +519,6 @@ class BayesianDecoderVisualizer:
 
         # save figure
         fig.suptitle(title)
-        plt.show()
-
         self.results_io.save_fig(fig=fig, filename=f'group_aligned_data', additional_tags=tags,
                                  tight_layout=False)
 

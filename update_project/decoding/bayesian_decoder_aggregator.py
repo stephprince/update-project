@@ -339,7 +339,8 @@ class BayesianDecoderAggregator:
         else:
             return []
 
-    def calc_correlation_metrics(self, a, b, times, mode='full'):
+    @staticmethod
+    def calc_correlation_metrics(a, b, times, mode='full'):
         # prep a and b vectors (fill in nans, mean subtract, normalize)
         if np.isnan(a).all():
             a = np.empty(np.shape(times))
@@ -355,11 +356,6 @@ class BayesianDecoderAggregator:
         a = a / np.linalg.norm(a)  # normalize so output values interpretable
         b = b / np.linalg.norm(b)  # normalize so output values interpretable
 
-        if np.isnan(a).all() or np.isnan(b).all():
-            corr_coeff = np.nan
-        else:
-            corr_coeff = pearsonr(a, b)[0]
-
         corr = signal.correlate(a, b, mode=mode)
         corr_lags = signal.correlation_lags(len(a), len(b), mode=mode) * np.diff(times)[0]
 
@@ -370,8 +366,19 @@ class BayesianDecoderAggregator:
         corr_sliding = np.stack([signal.correlate(aw, bw, mode=mode) for aw, bw in zip(a_windowed, b_windowed)])
         lags_sliding = signal.correlation_lags(len(a_windowed[0]), len(b_windowed[0]), mode=mode) * np.diff(times)[0]
 
-        return pd.Series([corr, corr_coeff, corr_lags, corr_sliding, lags_sliding, times_sliding],
-                         index=['corr', 'corr_coeff', 'corr_lags', 'corr_sliding', 'lags_sliding', 'times_sliding'])
+        # using pearson r will mean subtract the windowed data (better for getting at signal shapes vs. values?)
+        corr_coeff = np.nan  # default value
+        corr_coeff_sliding = np.empty(np.shape(a_windowed)[0])
+        corr_coeff_sliding[:] = np.nan
+        if (~np.isnan(a)).all() and (~np.isnan(b)).all():
+            corr_coeff_sliding = np.stack([pearsonr(aw, bw)[0] for aw, bw in zip(a_windowed, b_windowed)])
+            post_start = np.argwhere(np.array(times) > 0)
+            if np.size(post_start):
+                corr_coeff = pearsonr(a[post_start[0][0]:], b[post_start[0][0]:])[0]
+
+        return pd.Series([corr, corr_coeff, corr_lags, corr_sliding, corr_coeff_sliding, lags_sliding, times_sliding],
+                         index=['corr', 'corr_coeff', 'corr_lags', 'corr_sliding',
+                                'corr_coeff_sliding', 'lags_sliding', 'times_sliding'])
 
     def calc_movement_reaction_times(self, param_data, plot_groups):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
