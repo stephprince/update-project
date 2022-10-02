@@ -2,18 +2,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import seaborn.objects as so
+import matplotlib as mpl
 
 from pathlib import Path
+from scipy.stats import sem
 
 from update_project.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, get_color_theme
 
+plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
+rcparams = mpl.rcParams
 
 class DynamicChoiceVisualizer:
 
     def __init__(self, data, session_id=None, grid_search=False, target_var='choice'):
         self.data = data
         self.grid_search = grid_search
+        self.colors = get_color_theme()
 
         if session_id:
             self.results_type = 'session'
@@ -30,6 +36,7 @@ class DynamicChoiceVisualizer:
                 sess_dict.update(dict(grid_search_data=sess_dict['rnn'].grid_search_data,
                                       grid_search_params=sess_dict['rnn'].grid_search_params))
             sess_dict.update(dict(agg_data=sess_dict['rnn'].agg_data,
+                                  # vis_data=sess_dict['rnn'].vis_data,
                                   output_data=sess_dict['rnn'].output_data))
 
         self.group_df = pd.DataFrame(self.data)
@@ -42,16 +49,31 @@ class DynamicChoiceVisualizer:
             self.plot_grid_search_results()
 
     def _get_group_prediction(self):
+        # df_list = []
+        # for ind, sess in self.group_df.iterrows():
+        #     sess['vis_data']['session_id'] = self.group_df['session_id']
+        #     sess['vis_data']['animal'] = self.group_df['animal']
+        #     df_list.append(sess['vis_data'])
+        # predict_df = pd.concat(df_list, axis=1)
+        #
+        # data_to_explode = [col for col in predict_df.columns.values if col not in ['session_id', 'animal', 'target']]
+        # predict_df = predict_df.explode(data_to_explode)
+        # self.group_df.drop(['vis_data'], axis=1)
+
         predict_df = pd.concat([self.group_df[['session_id', 'animal']], pd.json_normalize(self.group_df['agg_data'])],
                                axis=1)
+        predict_df.drop(['update_timestamps', 'update_predict_data'], axis=1, inplace=True)
+        try:  # TODO - fix later that target data is being stored differently sometimes
+            data_to_explode = [col for col in predict_df.columns.values if col not in ['session_id', 'animal']]
+            predict_df = predict_df.explode(data_to_explode)
+        except ValueError:
+            data_to_explode = [col for col in predict_df.columns.values if col not in ['session_id', 'animal', 'target']]
+            predict_df = predict_df.explode(data_to_explode)
 
-        data_to_explode = [col for col in predict_df.columns.values if col not in ['session_id', 'animal']]
-        predict_df = pd.concat([predict_df.explode(d).reset_index()[d] if d != 'predict'
-                                else predict_df[['session_id', 'animal', 'predict']].explode(d).reset_index(drop=True)
-                                for d in data_to_explode], axis=1)
-
-        # think below only works with multiple animals/sessions so using above
-        # predict_df = predict_df.set_index(['session_id', 'animal']).apply(pd.Series.explode).reset_index()
+        # TODO - update explosion once I have the update data input correctly
+        # predict_df = pd.concat([predict_df.explode(d).reset_index()[d] if d != 'predict'
+        #                         else predict_df[['session_id', 'animal', 'predict']].explode(d).reset_index(drop=True)
+        #                         for d in data_to_explode], axis=1)
 
         return predict_df
 
@@ -78,76 +100,81 @@ class DynamicChoiceVisualizer:
     def plot_dynamic_choice_by_position(self):
         predict_df = self._get_group_prediction()
         predict_df = predict_df.rename_axis('trial').reset_index()
-        data_to_not_explode = ['session_id', 'animal', 'trial', 'target']
-        data_to_explode = [col for col in predict_df.columns.values if col not in data_to_not_explode]
-        pos_summary_df = pd.concat([predict_df.explode(d).reset_index()[d] if d != 'predict'
-                                else predict_df[[*data_to_not_explode, 'predict']].explode(d).reset_index(drop=True)
-                                for d in data_to_explode], axis=1)
+        predict_df_by_time = (predict_df
+                              .explode(['predict', 'y_position', 'timestamps', 'log_likelihood']))
+        # TODO - readd update data when I have it saved correctly
+        y_position_bins = pd.cut(predict_df_by_time['y_position'], np.linspace(0, 1.01, 30))
+        predict_df_by_time['y_position_binned'] = y_position_bins.apply(lambda x: x.mid)
+        quadrant_bins = pd.cut(predict_df_by_time['y_position'], np.linspace(0, 1.01, 5))
+        predict_df_by_time['quadrant'] = quadrant_bins.apply(lambda x: x.left)
+        predict_df_by_time['target'] = predict_df_by_time['target'].map({0: 'left', 1: 'right'})
 
-        y_position_bins = pd.cut(pos_summary_df['y_position'], np.linspace(0, 1.01, 30))
-        pos_summary_df['y_position_binned'] = y_position_bins.apply(lambda x: x.mid)
-        trial_cols = ['trial', 'y_position_binned', 'target', 'predict', 'log_likelihood', 'update_predict_data']
-        palette = sns.color_palette(n_colors=len(pos_summary_df['target'].unique()))
+        group_avg = (predict_df_by_time
+                     .groupby(['y_position_binned', 'target'])[['predict', 'log_likelihood']]
+                     .agg(['mean', 'sem'])).reset_index()
+        group_avg.columns = ['_'.join(c) if c[1] != '' else c[0] for c in group_avg.columns.to_flat_index()]
+        sess_avg = (predict_df_by_time
+                    .groupby(['session_id', 'y_position_binned', 'target'])[['predict', 'log_likelihood']]
+                    .agg(['mean', 'sem'])).reset_index()
+        sess_avg.columns = ['_'.join(c) if c[1] != '' else c[0] for c in sess_avg.columns.to_flat_index()]
+        sess_indiv = (predict_df_by_time
+                      .groupby(['session_id', 'trial', 'target', 'y_position_binned'])[['predict', 'log_likelihood']]
+                      .mean().reset_index())
 
-        # plot averages for whole group
-        fig, axes = plt.subplots(nrows=1, ncols=3, squeeze=False)
-        axes[0][0] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='predict', hue='target',
-                                  estimator='mean', ci=None, ax=axes[0][0], palette=palette)
-        axes[0][0].set(title='LSTM prediction - non-update trials')
-        axes[0][1] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='log_likelihood', hue='target',
-                                  estimator='mean', ci=None, ax=axes[0][1], palette=palette)
-        axes[0][1].set(title='Log likelihood - non-update trials')
-        axes[0][2] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='update_predict_data', hue='target',
-                                  estimator='mean', ci=None, ax=axes[0][2], palette=palette)
-        axes[0][2].set(title='LSTM prediction - update trials')
+        fig = plt.figure(figsize=(11, 8.5), constrained_layout=True)
+        sfigs = fig.subfigures(1, 3)
 
-        for a, l in {'0': (0.9, 0.1), '1': (0, -1), '2': (0.9, 0.1)}.items():  # threshold labels for each plot
-            axes[0][int(a)].axhline(l[0], linestyle='dashed', color='k')
-            axes[0][int(a)].axhline(l[1], linestyle='dashed', color='k')
+        axes = sfigs[0].subplots(2, 1)
+        axes_s = sfigs[1].subplots(2, 1)
+        for mi, m in enumerate(['predict', 'log_likelihood']):
+            for g_name, g_data in group_avg.groupby('target'):
+                axes[mi].plot(g_data['y_position_binned'], g_data[f'{m}_mean'], color=self.colors[g_name])
+                axes[mi].fill_between(g_data['y_position_binned'], g_data[f'{m}_mean'] + g_data[f'{m}_sem'],
+                                 g_data[f'{m}_mean'] - g_data[f'{m}_sem'], color=self.colors[g_name], alpha=0.5)
+                axes[mi].set(title=f'Group {m} average', xlabel='fracton of track', ylabel=m)
 
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_group')
+            for g_name, g_data in sess_avg.groupby(['target', 'session_id']):
+                axes_s[mi].plot(g_data['y_position_binned'], g_data[f'{m}_mean'], color=self.colors[g_name[0]])
+                axes_s[mi].set(title=f'Group {m} average', xlabel='fracton of track', ylabel=m)
 
-        for name, session_df in pos_summary_df.groupby(['session_id']):
-            spatial_map_trials = session_df[trial_cols].groupby(['trial', 'y_position_binned']).mean()
-            palette = sns.color_palette(n_colors=len(session_df['target'].unique()))
+        sess_performance = predict_df_by_time.groupby(['quadrant', 'session_id'])['log_likelihood'].mean().reset_index()
+        (  # plot averages for log likelihood and overall position by trial
+            so.Plot(sess_performance, x='quadrant', y='log_likelihood')
+                .add(so.Line(marker="o"), so.Agg())
+                .add(so.Range(), so.Est(errorbar="sd"))
+                .theme(rcparams)
+                .layout(engine='constrained')
+                .label(title='Session averages of estimated choice')
+                .on(sfigs[2])
+                .plot()
+        )
+        sfigs[2].axes[0].axhline(-1, linestyle='dashed', color='k')
+        sfigs[2].axes[0].axhline(0, linestyle='dashed', color='k')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_group', tight_layout=False)
 
-            # plot overall predictions  # TODO - fix target plotting using new seaborn visualization objects
-            fig, axes = plt.subplots(nrows=2, ncols=3, squeeze=False)
-            axes[0][0] = sns.lineplot(data=session_df, x='y_position_binned', y='predict', hue='target',
-                                      estimator='mean', ci=None, ax=axes[0][0], palette=palette)
-            axes[0][0].set(title='LSTM prediction - non-update trials')
-            axes[1][0] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='predict', hue='target',
-                                      style='trial', estimator=None, ci=None, ax=axes[1][0], alpha=0.2,
-                                      palette=palette)
-            axes[1][0].legend([], [], frameon=False)
-            axes[1][0].set(xlabel='position in track', ylabel='p(left)')
+        for s_name, s_data in sess_indiv.groupby(['session_id']):
+            fig = plt.figure(figsize=(11, 8.5), constrained_layout=True)
+            sfigs = fig.subfigures(1, 2)
+            axes = sfigs[0].subplots(2, 1)
+            axes_indiv = sfigs[1].subplots(2, 1)
+            for mi, m in enumerate(['predict', 'log_likelihood']):
+                for g_name, g_data in s_data.groupby(['target']):
+                    indiv_mat = g_data.pivot(index=['session_id', 'trial'], columns=['y_position_binned'],
+                                             values=m).dropna(axis=0) # drop extra trial/target grouping artifacts
+                    if np.size(indiv_mat):
+                        pos_bins = indiv_mat.columns.to_numpy()
+                        sess_mean = np.nanmean(np.stack(indiv_mat.to_numpy()), axis=0)
+                        sess_err = sem(np.stack(indiv_mat.to_numpy()), axis=0)
+                        axes[mi].plot(pos_bins, sess_mean, color=self.colors[g_name])
+                        axes[mi].fill_between(pos_bins, sess_mean + sess_err, sess_mean - sess_err, color=self.colors[g_name],
+                                              alpha=0.5)
+                        axes[mi].set(title=f'Group {m} average', xlabel='fracton of track', ylabel=m)
 
-            # plot log likelihood performance
-            axes[0][1] = sns.lineplot(data=session_df, x='y_position_binned', y='log_likelihood', hue='target',
-                                      estimator='mean', ci=None, ax=axes[0][1], palette=palette)
-            axes[0][1].set(title='Log likelihood - non-update trials')
-            axes[1][1] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='log_likelihood', hue='target',
-                                      style='trial', estimator=None, ci=None, ax=axes[1][1], alpha=0.2,
-                                      palette=palette)
-            axes[1][1].legend([], [], frameon=False)
-            axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-2, 0])
+                        axes_indiv[mi].plot(pos_bins, np.stack(indiv_mat.to_numpy()).T,
+                                            color=self.colors[g_name])
+                        axes_indiv[mi].set(title=f'Individual {m} trials', xlabel='fracton of track', ylabel=m)
 
-            # plot update trials prediction
-            axes[0][2] = sns.lineplot(data=session_df, x='y_position_binned', y='update_predict_data', hue='target',
-                                      estimator='mean', ci=None, ax=axes[0][2], palette=palette)
-            axes[0][2].set(title='LSTM prediction - update trials')
-            axes[1][2] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='update_predict_data', hue='target',
-                                      style='trial', estimator=None, ci=None, ax=axes[1][2], alpha=0.2,
-                                      palette=palette)
-            axes[1][2].legend([], [], frameon=False)
-            axes[1][2].set(xlabel='position in track', ylabel='p(left)')
-            for r in [0, 1]:  # for each row
-                for a, l in {'0': (0.9, 0.1), '1': (0, -1), '2': (0.9, 0.1)}.items():  # threshold labels for each plot
-                    axes[r][int(a)].axhline(l[0], linestyle='dashed', color='k')
-                    axes[r][int(a)].axhline(l[1], linestyle='dashed', color='k')
-            fig.suptitle(f'LSTM predictions and performance - {name}')
-
-            self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_{name}')
+            self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_{s_name}', tight_layout=False)
 
     def plot_grid_search_results(self):
         grid_search_df = self._get_group_grid_search()

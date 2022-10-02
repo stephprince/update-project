@@ -14,13 +14,14 @@ from update_project.general.timeseries import align_by_time_intervals as align_b
 
 class DynamicChoiceRNN:
 
-    def __init__(self, nwbfile, session_id, target_var='choice'):
+    def __init__(self, nwbfile, session_id, target_var='choice', velocity_only=False):
         # based on grid search of subset of sessions (210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115),
         # best parameters were regularizer = None, learning_rate = 0.1, batch_size = 20-50, epochs = 20-30
         # extra 10 epochs buys 1-2% improvement in accuracy so probably will stick with 20
         # batch size will go with 32 between the two good options since it also seems recommended to keep at power of 2
 
         # setup params
+        self.velocity_only = velocity_only
         self.mask_value = -9999
         self.params = dict(batch_size=32, epochs=20, regularizer=None, learning_rate=0.1, predict_update=True)
         self.grid_search_params = dict(batch_size=[20, 50, 100],
@@ -49,10 +50,12 @@ class DynamicChoiceRNN:
             self.update_index = []
             self.max_pad_length = np.max([len(i) for i in self.input_data])
 
-        # get results to sav
+        # get results to save
+        add_tags = '_velocity_only' if self.velocity_only else ''
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic_choice',
-                                    tags=target_var)
-        self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'decoder_data', 'params'],
+                                    tags=f'{target_var}{add_tags}')
+        self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'decoder_data', 'params',
+                                                                ],
                                                           format='pkl'))
 
     def run(self, overwrite=False, grid_search=False):
@@ -179,7 +182,10 @@ class DynamicChoiceRNN:
 
         # compile data into input matrix
         pos_data = [p/np.nanmax(p) for p in pos_data]  # max of y_position
-        input_data = [np.vstack([p[:, 1], t, r, v]).T for p, t, r, v in zip(pos_data, trans_data, rot_data, view_data)]
+        if self.velocity_only:
+            input_data = [np.vstack([t, r]).T for t, r in zip(trans_data, rot_data)]
+        else:
+            input_data = [np.vstack([p[:, 1], t, r, v]).T for p, t, r, v in zip(pos_data, trans_data, rot_data, view_data)]
 
         # get target sequence (binary, reported choice OR initial cue)
         longest_length = np.max([np.shape(k)[0] for k in input_data])
@@ -240,20 +246,36 @@ class DynamicChoiceRNN:
         predict_data = self._get_repeated_fold_average(self.output_data, label='prediction')
         update_predict_data = self._get_repeated_fold_average(self.output_data, label='update_prediction',
                                                               trial_index='update_test_index')
-        target_data = self._get_repeated_fold_average(self.output_data, label='target_test_fold')[:, 0].astype(int)
+        target_data = self._get_repeated_fold_average(self.output_data, label='target_test_fold')[:, -1]
         log_likelihood = np.array([self._log2_likelihood(np.tile(t, len(p)), p) for t, p in zip(target_data, predict_data)])
 
-        y_position = self._get_repeated_fold_average(self.output_data, label='input_test_fold')[:, :, 0]
-        y_position[y_position < -9000] = np.nan  # remove mask values
         timestamps = self._get_repeated_fold_average(self.output_data, label='timestamp_test')
         timestamps[timestamps < -9000] = np.nan  # remove mask values
         update_timestamps = self._get_repeated_fold_average(self.output_data, label='timestamp_update',
                                                             trial_index='update_test_index')
         update_timestamps[update_timestamps < -9000] = np.nan  # remove mask values
+        # TODO - right now update data is linked incorrectly to the rest of the data, need to fix
+
+        if self.velocity_only:
+            y_position = np.empty(np.shape(timestamps))
+            y_position[:] = np.nan
+        else:
+            y_position = self._get_repeated_fold_average(self.output_data, label='input_test_fold')[:, :, 0]
+            y_position[y_position < -9000] = np.nan  # remove mask values
+            # update_y_position = self._get_repeated_fold_average(self.output_data, label='input_test_fold')[:, :, 0]
+            # update_y_position[update_y_position < -9000] = np.nan  # remove mask values
 
         self.agg_data = dict(predict=predict_data, update_predict_data=update_predict_data, target=target_data,
                              y_position=y_position, timestamps=timestamps, update_timestamps=update_timestamps,
                              log_likelihood=log_likelihood, )
+
+        # vis_df = pd.json_normalize(dict(predict=predict_data, target=target_data, y_position=y_position,
+        #                                 timestamps=timestamps, log_likelihood=log_likelihood, ))
+        # self.vis_data = vis_df.explode(list(vis_df.columns))
+
+        # update_df = pd.json_normalize(dict(update_predict_data=update_predict_data, update_timestamps=update_timestamps,
+        #                                    update_y_position=update_y_position),)
+        # self.update_data = update_df.explode(list(update_df.columns))
 
     def _get_decoder_data(self):
         # input to decoder is just a long series of
@@ -269,7 +291,7 @@ class DynamicChoiceRNN:
                 idx_stop = bisect(session_timestamps, np.round(trial_timestamps[-1], 6), lo=idx_start)
                 data[idx_start:idx_stop] = trial_prediction  # fill in values with the choice value
 
-        self.decoder_data = data  # TODO - test this works ok with the decoder
+        self.decoder_data = data
 
     @staticmethod
     def _log2_likelihood(y_true, y_pred, eps=1e-15):
