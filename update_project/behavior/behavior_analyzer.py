@@ -1,7 +1,6 @@
 import numpy as np
 import pickle
 import pandas as pd
-import pynapple as nap
 import warnings
 
 from pathlib import Path
@@ -10,6 +9,7 @@ from pynwb import NWBFile
 from update_project.results_io import ResultsIO
 from update_project.virtual_track import UpdateTrack
 from update_project.general.timeseries import get_series_from_timeseries
+from update_project.general.trials import get_trials_dataframe
 from update_project.decoding.interpolate import interp_timeseries
 
 
@@ -22,8 +22,8 @@ class BehaviorAnalyzer:
         self.maze_ids = params.get('maze_ids', [4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
         self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
-        self.align_window_start = params.get('align_window_start', -5.0)  # seconds to add before/after aligning window
-        self.align_window_stop = params.get('align_window_stop', 5.0)  # seconds to add before/after aligning window
+        self.align_window_start = params.get('align_window_start', -2.5)  # seconds to add before/after aligning window
+        self.align_window_stop = params.get('align_window_stop', 2.5)  # seconds to add before/after aligning window
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',
                                                       'stop_time'])
 
@@ -52,7 +52,7 @@ class BehaviorAnalyzer:
                 self.run_analysis(overwrite=True)
 
     def _setup_trials(self, nwbfile):
-        all_trials = nwbfile.trials.to_dataframe()
+        all_trials = get_trials_dataframe(nwbfile, with_pseudoupdate=True)
         trials = all_trials[all_trials['maze_id'].isin(self.maze_ids)]
 
         return trials
