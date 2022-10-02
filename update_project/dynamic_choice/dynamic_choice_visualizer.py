@@ -78,8 +78,6 @@ class DynamicChoiceVisualizer:
     def plot_dynamic_choice_by_position(self):
         predict_df = self._get_group_prediction()
         predict_df = predict_df.rename_axis('trial').reset_index()
-        # pos_summary_df = predict_df.set_index(['session_id', 'animal', 'trial', 'target']).apply(
-        #     pd.Series.explode).reset_index()
         data_to_not_explode = ['session_id', 'animal', 'trial', 'target']
         data_to_explode = [col for col in predict_df.columns.values if col not in data_to_not_explode]
         pos_summary_df = pd.concat([predict_df.explode(d).reset_index()[d] if d != 'predict'
@@ -88,50 +86,68 @@ class DynamicChoiceVisualizer:
 
         y_position_bins = pd.cut(pos_summary_df['y_position'], np.linspace(0, 1.01, 30))
         pos_summary_df['y_position_binned'] = y_position_bins.apply(lambda x: x.mid)
-        spatial_map_trials = pos_summary_df.groupby(['trial', 'y_position_binned']).apply(lambda x: np.mean(x))
+        trial_cols = ['trial', 'y_position_binned', 'target', 'predict', 'log_likelihood', 'update_predict_data']
+        palette = sns.color_palette(n_colors=len(pos_summary_df['target'].unique()))
 
-        # plot overall predictions
-        fig, axes = plt.subplots(nrows=2, ncols=3, squeeze=False)
+        # plot averages for whole group
+        fig, axes = plt.subplots(nrows=1, ncols=3, squeeze=False)
         axes[0][0] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='predict', hue='target',
-                                  estimator='mean', ci=95, ax=axes[0][0], palette=sns.color_palette(n_colors=2))
+                                  estimator='mean', ci=None, ax=axes[0][0], palette=palette)
         axes[0][0].set(title='LSTM prediction - non-update trials')
-        axes[1][0] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='predict', hue='target',
-                                  style='trial', estimator=None, ax=axes[1][0], alpha=0.2,
-                                  palette=sns.color_palette(n_colors=2))
-        axes[1][0].legend([], [], frameon=False)
-        axes[1][0].set(xlabel='position in track', ylabel='p(left)')
-        for a in [0, 1]:
-            axes[a][0].axhline(0.9, linestyle='dashed', color='k')
-            axes[a][0].axhline(0.1, linestyle='dashed', color='k')
-
-        # plot log likelihood performance
         axes[0][1] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='log_likelihood', hue='target',
-                                  estimator='mean', ci=95, ax=axes[0][1], palette=sns.color_palette(n_colors=2))
+                                  estimator='mean', ci=None, ax=axes[0][1], palette=palette)
         axes[0][1].set(title='Log likelihood - non-update trials')
-        axes[1][1] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='log_likelihood', hue='target',
-                                  style='trial', estimator=None, ax=axes[1][1], alpha=0.2,
-                                  palette=sns.color_palette(n_colors=2))
-        axes[1][1].legend([], [], frameon=False)
-        axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-2, 0])
-        for a in [0, 1]:
-            axes[a][1].axhline(0, linestyle='dashed', color='k')
-            axes[a][1].axhline(-1, linestyle='dashed', color='k')
-        fig.suptitle('LSTM predictions and performance')
-
-        # plot update trials prediction
         axes[0][2] = sns.lineplot(data=pos_summary_df, x='y_position_binned', y='update_predict_data', hue='target',
-                                  estimator='mean', ci=95, ax=axes[0][2], palette=sns.color_palette(n_colors=2))
+                                  estimator='mean', ci=None, ax=axes[0][2], palette=palette)
         axes[0][2].set(title='LSTM prediction - update trials')
-        axes[1][2] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='update_predict_data', hue='target',
-                                  style='trial', estimator=None, ax=axes[1][2], alpha=0.2,
-                                  palette=sns.color_palette(n_colors=2))
-        axes[1][2].legend([], [], frameon=False)
-        axes[1][2].set(xlabel='position in track', ylabel='p(left)')
-        for a in [0, 1]:
-            axes[a][2].axhline(0.9, linestyle='dashed', color='k')
-            axes[a][2].axhline(0.1, linestyle='dashed', color='k')
 
-        self.results_io.save_fig(fig=fig, axes=axes, filename='prediction')
+        for a, l in {'0': (0.9, 0.1), '1': (0, -1), '2': (0.9, 0.1)}.items():  # threshold labels for each plot
+            axes[0][int(a)].axhline(l[0], linestyle='dashed', color='k')
+            axes[0][int(a)].axhline(l[1], linestyle='dashed', color='k')
+
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_group')
+
+        for name, session_df in pos_summary_df.groupby(['session_id']):
+            spatial_map_trials = session_df[trial_cols].groupby(['trial', 'y_position_binned']).mean()
+            palette = sns.color_palette(n_colors=len(session_df['target'].unique()))
+
+            # plot overall predictions  # TODO - fix target plotting using new seaborn visualization objects
+            fig, axes = plt.subplots(nrows=2, ncols=3, squeeze=False)
+            axes[0][0] = sns.lineplot(data=session_df, x='y_position_binned', y='predict', hue='target',
+                                      estimator='mean', ci=None, ax=axes[0][0], palette=palette)
+            axes[0][0].set(title='LSTM prediction - non-update trials')
+            axes[1][0] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='predict', hue='target',
+                                      style='trial', estimator=None, ci=None, ax=axes[1][0], alpha=0.2,
+                                      palette=palette)
+            axes[1][0].legend([], [], frameon=False)
+            axes[1][0].set(xlabel='position in track', ylabel='p(left)')
+
+            # plot log likelihood performance
+            axes[0][1] = sns.lineplot(data=session_df, x='y_position_binned', y='log_likelihood', hue='target',
+                                      estimator='mean', ci=None, ax=axes[0][1], palette=palette)
+            axes[0][1].set(title='Log likelihood - non-update trials')
+            axes[1][1] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='log_likelihood', hue='target',
+                                      style='trial', estimator=None, ci=None, ax=axes[1][1], alpha=0.2,
+                                      palette=palette)
+            axes[1][1].legend([], [], frameon=False)
+            axes[1][1].set(xlabel='position in track', ylabel='log_likelihood', ylim=[-2, 0])
+
+            # plot update trials prediction
+            axes[0][2] = sns.lineplot(data=session_df, x='y_position_binned', y='update_predict_data', hue='target',
+                                      estimator='mean', ci=None, ax=axes[0][2], palette=palette)
+            axes[0][2].set(title='LSTM prediction - update trials')
+            axes[1][2] = sns.lineplot(data=spatial_map_trials, x='y_position_binned', y='update_predict_data', hue='target',
+                                      style='trial', estimator=None, ci=None, ax=axes[1][2], alpha=0.2,
+                                      palette=palette)
+            axes[1][2].legend([], [], frameon=False)
+            axes[1][2].set(xlabel='position in track', ylabel='p(left)')
+            for r in [0, 1]:  # for each row
+                for a, l in {'0': (0.9, 0.1), '1': (0, -1), '2': (0.9, 0.1)}.items():  # threshold labels for each plot
+                    axes[r][int(a)].axhline(l[0], linestyle='dashed', color='k')
+                    axes[r][int(a)].axhline(l[1], linestyle='dashed', color='k')
+            fig.suptitle(f'LSTM predictions and performance - {name}')
+
+            self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_{name}')
 
     def plot_grid_search_results(self):
         grid_search_df = self._get_group_grid_search()
