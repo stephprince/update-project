@@ -39,8 +39,11 @@ class VirtualTrack:
         return self.choice_locations
 
     def get_limits(self, dim='y_position'):
-        limits = dict()
         xs, ys = self.get_track_boundaries()
+        if self.linearization:
+            ys = ys + (np.max(list(self.cue_end_locations['y_position'].values())),)
+
+        limits = dict()
         limits['x_position'] = [np.min(xs), np.max(xs)]
         limits['y_position'] = [np.min(ys), np.max(ys)]
 
