@@ -20,7 +20,6 @@ def align_by_times(units: pynwb.misc.Units, index, starts, stops):
     for start, istart, istop in zip(starts, istarts, istops):
         yield unit_spike_data[istart:istop] - start
 
-
 def align_by_time_intervals(
     units: pynwb.misc.Units,
     index,
