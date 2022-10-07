@@ -221,8 +221,8 @@ class SingleUnitAnalyzer:
         goal_selective_cells = self.tuning_curves.loc[:, goal_selective_bool]
 
         # get left/right selective (goal selective + how much prefer one goal location to the other)
-        selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, bounds)).mean()
-        selectivity_index.name = 'selectivity_index'
+        selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, bounds))
+        selectivity_index = selectivity_index.transpose()
 
         self.unit_selectivity = pd.merge(self.units[['region', 'cell_type']], selectivity_index,
                                          left_index=True, right_index=True, how='left')
@@ -240,7 +240,8 @@ class SingleUnitAnalyzer:
         max_selectivity_index = (max_fr[0] - max_fr[1]) / (max_fr[0] + max_fr[1])
 
         return pd.Series([mean_selectivity_index, max_selectivity_index],
-                         index=['mean_selectivity_index', 'max_selectivity_index'])
+                         name='selectivity_index',
+                         index=['mean_selectivity_index', 'max_selectivity_index']).transpose()
 
     def _get_aligned_spikes(self):
         units_aligned = []
@@ -269,11 +270,14 @@ class SingleUnitAnalyzer:
                                                                      start_window=window_start, stop_window=window_stop)
             ts_aligned.append(dict(**dig_data, timestamps=timestamps, new_times=new_times, time_label=time_label,
                                    turn_type=self.trials['turn_type'].to_numpy(),
-                                   outcomes=self.trials['correct'].to_numpy()))
+                                   outcomes=self.trials['correct'].to_numpy(),
+                                   update_type=self.trials['update_type'].to_numpy()))
 
         aligned_data = (pd.merge(pd.DataFrame(units_aligned), pd.DataFrame(ts_aligned), on='time_label')
-                        .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'outcomes'])
+                        .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'outcomes',
+                                  'update_type'])
                         .reset_index(drop=True))
+        aligned_data['update_type'] = aligned_data['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
 
         self.aligned_data = pd.merge(aligned_data, self.unit_selectivity, on='unit_id')
 
