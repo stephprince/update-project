@@ -29,7 +29,7 @@ class SingleUnitAnalyzer:
         self.encoder_bin_num = params.get('encoder_bin_num', 40)  # number of bins to build encoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
-        self.limits = self.virtual_track.get_limits(feature)  # TODO - add limits for other features
+        self.limits = self.virtual_track.get_limits(feature)
         self.align_times = ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made']
         self.window = 2.5  # sec to look at aligned psth
         self.align_nbins = np.round((self.window * 2) / 25)  # hardcoded to match binsize of decoder too
@@ -61,6 +61,7 @@ class SingleUnitAnalyzer:
         self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
+        self.bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
 
     def run(self, overwrite=False):
         print(f'Analyzing single unit data for session {self.results_io.session_id}...')
@@ -201,7 +202,7 @@ class SingleUnitAnalyzer:
             feat_input = self.features_train[self.feature_name]
             self.bins = np.linspace(self.limits[0], self.limits[-1], self.encoder_bin_num + 1)
             self.tuning_curves = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
-                                              ep=self.encoder_times)
+                                              ep=self.encoder_times, minmax=self.limits)
         else:  # if there were no units/spikes to use for encoding, create empty dataframe
             self.model = pd.DataFrame()
             self.bins = []
@@ -216,12 +217,14 @@ class SingleUnitAnalyzer:
         bins_shifted.iloc[-1, :] = place_fields_2_bins.iloc[-1, :]
         place_fields = np.logical_or(place_fields_2_bins, bins_shifted).astype(bool)
 
-        bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
-        goal_selective_bool = place_fields.apply(lambda x: x.loc[bounds[0][0]:bounds[1][1]].any())  # get all goal
+        bounds_bool_1 = place_fields.apply(lambda x: x.loc[self.bounds[0][0]:self.bounds[0][1]].any())  # get all goal
+        bounds_bool_2 = place_fields.apply(lambda x: x.loc[self.bounds[1][0]:self.bounds[1][1]].any())  # get all goal
+        goal_selective_bool = np.logical_or(bounds_bool_1, bounds_bool_2).astype(bool)
+
         goal_selective_cells = self.tuning_curves.loc[:, goal_selective_bool]
 
         # get left/right selective (goal selective + how much prefer one goal location to the other)
-        selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, bounds))
+        selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, self.bounds))
         selectivity_index = selectivity_index.transpose()
 
         self.unit_selectivity = pd.merge(self.units[['region', 'cell_type']], selectivity_index,
@@ -233,8 +236,8 @@ class SingleUnitAnalyzer:
 
     @staticmethod
     def _calc_selectivity_index(x, bounds):
-        mean_fr = [np.nanmean(x.loc[b[0]:b[1]]) for b in bounds]
-        max_fr = [np.nanmax(x.loc[b[0]:b[1]]) for b in bounds]
+        mean_fr = [np.nanmean(x.loc[b[0]:b[1]]) if np.size(x.loc[b[0]:b[1]]) else np.nan for b in bounds]
+        max_fr = [np.nanmax(x.loc[b[0]:b[1]]) if np.size(x.loc[b[0]:b[1]]) else np.nan for b in bounds]
 
         mean_selectivity_index = (mean_fr[0] - mean_fr[1]) / (mean_fr[0] + mean_fr[1])
         max_selectivity_index = (max_fr[0] - max_fr[1]) / (max_fr[0] + max_fr[1])
