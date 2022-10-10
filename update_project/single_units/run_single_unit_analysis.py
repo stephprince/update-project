@@ -14,6 +14,8 @@ session_names = session_db.load_session_names()
 overwrite = True
 plot = True
 feature = 'y_position'
+params = dict(units_types=dict(region=['CA1'],
+                               cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
 
 group_data = []
 for name in session_names:
@@ -21,14 +23,16 @@ for name in session_names:
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
-    analyzer = SingleUnitAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature)
+    analyzer = SingleUnitAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature,
+                                  params=params)
     analyzer.run(overwrite=overwrite)
 
     # save to group output
     session_data = dict(session_id=session_db.get_session_id(name),
                         animal=session_db.get_animal_id(name),
                         analyzer=analyzer,
-                        feature_name=feature)
+                        feature_name=feature,
+                        **params)
     group_data.append(session_data)
 
 if plot:

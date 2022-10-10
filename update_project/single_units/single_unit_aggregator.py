@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from scipy.stats import sem
+from scipy.stats import sem, zscore
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
 
@@ -18,7 +18,6 @@ class SingleUnitAggregator:
                                   unit_selectivity=sess_dict['analyzer'].unit_selectivity,
                                   aligned_data=sess_dict['analyzer'].aligned_data,
                                   tuning_bins=sess_dict['analyzer'].bins))
-
         self.group_df = pd.DataFrame(data)
         self.group_df.drop('analyzer', axis='columns', inplace=True)
 
@@ -72,49 +71,92 @@ class SingleUnitAggregator:
         cols_to_group = ['animal', 'session_id', 'feature_name', 'region', 'update_type', 'time_label', 'cell_type',
                          'unit_id', 'max_selectivity_type', 'mean_selectivity_type']
 
-        psth_data_list = []
-        for g_name, g_data in data.groupby('time_label'):
-            start, stop = g_data['new_times'].to_numpy()[0][0], g_data['new_times'].to_numpy()[0][-1]
+        if np.size(data):
+            # get mean and std firing rates for all units
+            start_time = np.nanmin(np.hstack(data['new_times']))
+            stop_time = np.nanmax(np.hstack(data['new_times']))
+            zscore_info = (data
+                           .groupby(['session_id', 'unit_id'])
+                           .apply(lambda x: self._get_mean_std_firing_rate(x['spikes'].to_list(), start_time, stop_time))
+                           .reset_index())
+            data = data.merge(zscore_info, on=['session_id', 'unit_id'], how='left')
 
-            # calc psth for each unit
-            psth_data = (g_data
-                         .groupby(cols_to_group, sort=False, dropna=False)
-                         .agg(psth=('spikes', lambda x: self._calc_psth(x.to_list(), start, stop)),
-                              times=('new_times', np.mean),
-                              turn_type=('turn_type', 'mean'),
-                              outcomes=('outcomes', 'mean'),
-                              mean_selectivity=('mean_selectivity_index', 'mean'),
-                              max_selectivity=('max_selectivity_index', 'mean'),)
-                         .reset_index())
-            psth_data = pd.concat([psth_data, pd.json_normalize(psth_data['psth'])], axis='columns')
-            psth_data.drop('psth', axis='columns', inplace=True)
-            psth_data_list.append(psth_data)
+            # calc psth for each aligned time
+            psth_data_list = []
+            for g_name, g_data in data.groupby('time_label'):
+                start, stop = g_data['new_times'].to_numpy()[0][0], g_data['new_times'].to_numpy()[0][-1]
+                psth_data = (g_data
+                             .groupby(cols_to_group, sort=False, dropna=False)
+                             .apply(lambda x: pd.Series({'psth': self._calc_psth(x['spikes'].to_list(), start, stop,
+                                                                                 zscore_mean=np.mean(x['mean_fr']),
+                                                                                 zscore_std=np.mean(x['std_fr']))}))
+                             .reset_index())
 
-        return pd.concat(psth_data_list, axis=0)
+                # calc psth for each unit
+                grouped_data = (g_data
+                                 .groupby(cols_to_group, sort=False, dropna=False)
+                                 .agg(spikes=('spikes', lambda x: x.to_list()),
+                                      times=('new_times', np.mean),
+                                      turn_type=('turn_type', 'mean'),
+                                      outcomes=('outcomes', 'mean'),
+                                      mean_selectivity=('mean_selectivity_index', 'mean'),
+                                      max_selectivity=('max_selectivity_index', 'mean'),)
+                                 .reset_index())
+                psth_data = pd.concat([grouped_data, pd.json_normalize(psth_data['psth'])], axis='columns')
+                psth_data_list.append(psth_data)
+
+            return pd.concat(psth_data_list, axis=0)
+        else:
+            return []
 
     @staticmethod
-    def _calc_psth(data, start, stop):
+    def _calc_firing_rate(data, start, stop, ret_timestamps=False):
         sigma_in_secs = 0.05
         ntt = 500
         tt = np.linspace(start, stop, ntt)
 
         all_data = np.hstack(data)
         if len(all_data):  # if any spikes
-            smoothed = np.array([compute_smoothed_firing_rate(x, tt, sigma_in_secs) for x in data])
-
-            mean = np.mean(smoothed, axis=0)
-            err = sem(smoothed, axis=0)
+            firing_rate = np.array([compute_smoothed_firing_rate(x, tt, sigma_in_secs) for x in data])
         else:
-            mean, err = np.empty(np.shape(tt)),  np.empty(np.shape(tt))
-            mean[:] = np.nan
-            err[:] = np.nan
+            firing_rate = np.empty(np.shape(tt))
+            firing_rate[:] = np.nan
+
+        if ret_timestamps:
+            return firing_rate, tt
+        else:
+            return firing_rate
+
+    def _get_mean_std_firing_rate(self, data, start, stop):
+        firing_rate = self._calc_firing_rate(data, start, stop)
+        mean = np.mean(firing_rate)
+        std = np.std(firing_rate)
+
+        return pd.Series([mean, std], index=['mean_fr', 'std_fr'])
+
+    def _calc_psth(self, data, start, stop, apply_zscore=True, zscore_mean=None, zscore_std=None):
+        firing_rate, tt = self._calc_firing_rate(data, start, stop, ret_timestamps=True)
+
+        if firing_rate.any():  # if any spikes
+            if apply_zscore:
+                if zscore_mean and zscore_std:
+                    out = (firing_rate - zscore_mean) / zscore_std
+                else:
+                    out = zscore(firing_rate, axis=None, nan_policy='omit')
+                mean = np.mean(out, axis=0)
+                err = sem(out, axis=0)
+            else:
+                mean = np.mean(firing_rate, axis=0)
+                err = sem(firing_rate, axis=0)
+        else:
+            mean, err = firing_rate, firing_rate  # just filled with nan values
 
         return dict(psth_mean=mean, psth_err=err, psth_times=tt)
 
     def _flip_aligned_trials(self):
         # flip the data based on turn type
         flipped_data = []
-        for feat, feat_df in self.group_aligned_data.groupby('feature_name'):
+        for feat, feat_df in self.group_aligned_data.groupby('feature_name', sort=False):
             trials_to_flip = feat_df[feat_df['turn_type'] == self.turn_to_flip]
             if np.size(trials_to_flip):
                 cols_to_flip = ['rotational_velocity', 'mean_selectivity_index', 'max_selectivity_index']
@@ -123,10 +165,9 @@ class SingleUnitAggregator:
             flipped_data.append(feat_df)
 
         self.group_aligned_data = pd.concat(flipped_data, axis=0)
-        self.group_aligned_data.sort_index(inplace=True)
 
-        # add initial/new goal information  TODO - check this labelling is correct
-        self.group_aligned_data['max_selectivity_type'] = ['stay' if x < 0 else 'switch' if x > 0 else np.nan
+        # add initial/new goal information
+        self.group_aligned_data['max_selectivity_type'] = ['switch' if x < 0 else 'stay' if x > 0 else np.nan
                                                            for x in self.group_aligned_data['max_selectivity_index']]
-        self.group_aligned_data['mean_selectivity_type'] = ['stay' if x < 0 else 'switch' if x > 0 else np.nan
+        self.group_aligned_data['mean_selectivity_type'] = ['switch' if x < 0 else 'stay' if x > 0 else np.nan
                                                             for x in self.group_aligned_data['mean_selectivity_index']]
