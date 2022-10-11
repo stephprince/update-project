@@ -10,15 +10,18 @@ class SingleUnitAggregator:
     def __init__(self, exclusion_criteria=None):
         self.flip_trials_by_turn = True  # default false
         self.turn_to_flip = 2
+        self.exclusion_criteria = exclusion_criteria
 
-    def run_aggregation(self, data, overwrite=False, window=5):
+    def run_aggregation(self, data):
         # aggregate session data
         for sess_dict in data:
             sess_dict.update(dict(tuning_curves=sess_dict['analyzer'].tuning_curves,
                                   unit_selectivity=sess_dict['analyzer'].unit_selectivity,
                                   aligned_data=sess_dict['analyzer'].aligned_data,
-                                  tuning_bins=sess_dict['analyzer'].bins))
+                                  tuning_bins=sess_dict['analyzer'].bins,))
+                                  # excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer'])),)
         self.group_df = pd.DataFrame(data)
+        # self.group_df = group_df[~group_df['excluded_session']]  # only keep non-excluded sessions
         self.group_df.drop('analyzer', axis='columns', inplace=True)
 
         # get aligned dataframe:
@@ -29,6 +32,20 @@ class SingleUnitAggregator:
 
         # save memory once information is extracted
         self.group_df.drop(['tuning_curves', 'unit_selectivity', 'aligned_data'], axis=1, inplace=True)
+
+    def _meets_exclusion_criteria(self, data):
+        exclude_session = False  # default to include session
+
+        # apply exclusion criteria
+        units_threshold = self.exclusion_criteria.get('units', 0)
+        if len(data.spikes) < units_threshold:
+            exclude_session = True
+
+        trials_threshold = self.exclusion_criteria.get('trials', 0)
+        if len(data.train_df) < trials_threshold:
+            exclude_session = True
+
+        return exclude_session
 
     def select_group_aligned_data(self, param_data, filter_dict):
         # filter for specific features
@@ -65,6 +82,21 @@ class SingleUnitAggregator:
         aligned_data_df = pd.concat(aligned_data_list, axis=0)
 
         return aligned_data_df
+
+    def get_peak_sorting_index(self):
+
+        cols_to_skip = ['session_id', 'animal', 'feature_name', 'unit_id', 'region', 'cell_type',
+                        'mean_selectivity_index', 'max_selectivity_index', 'place_field_threshold']
+        tuning_curve_mat = np.stack(self.group_tuning_curves[self.group_tuning_curves.columns.difference(cols_to_skip)]
+                                    .to_numpy())
+        tuning_curve_scaled = tuning_curve_mat / np.nanmax(tuning_curve_mat, axis=1)[:, None]
+        sort_index = np.argsort(np.argmax(tuning_curve_scaled, axis=1))
+
+        metadata = (self.group_tuning_curves[['session_id', 'animal', 'feature_name', 'unit_id', 'region']]
+                    .reset_index(drop=True))
+        sorting_df = pd.concat([metadata, pd.Series(sort_index, name='peak_sort_index')], axis=1)
+
+        return sorting_df
 
     def get_aligned_psth(self, data):
         # really just grouping by session and unit id but keep rest of data bc same
@@ -119,7 +151,7 @@ class SingleUnitAggregator:
         if len(all_data):  # if any spikes
             firing_rate = np.array([compute_smoothed_firing_rate(x, tt, sigma_in_secs) for x in data])
         else:
-            firing_rate = np.empty(np.shape(tt))
+            firing_rate = np.empty((np.shape(data)[0], ntt))
             firing_rate[:] = np.nan
 
         if ret_timestamps:
@@ -137,19 +169,16 @@ class SingleUnitAggregator:
     def _calc_psth(self, data, start, stop, apply_zscore=True, zscore_mean=None, zscore_std=None):
         firing_rate, tt = self._calc_firing_rate(data, start, stop, ret_timestamps=True)
 
-        if firing_rate.any():  # if any spikes
-            if apply_zscore:
-                if zscore_mean and zscore_std:
-                    out = (firing_rate - zscore_mean) / zscore_std
-                else:
-                    out = zscore(firing_rate, axis=None, nan_policy='omit')
-                mean = np.mean(out, axis=0)
-                err = sem(out, axis=0)
+        if apply_zscore:
+            if zscore_mean and zscore_std:
+                out = (firing_rate - zscore_mean) / zscore_std
             else:
-                mean = np.mean(firing_rate, axis=0)
-                err = sem(firing_rate, axis=0)
+                out = zscore(firing_rate, axis=None, nan_policy='omit')
+            mean = np.nanmean(out, axis=0)
+            err = sem(out, axis=0)
         else:
-            mean, err = firing_rate, firing_rate  # just filled with nan values
+            mean = np.nanmean(firing_rate, axis=0)
+            err = sem(firing_rate, axis=0)  # just filled with nan values
 
         return dict(psth_mean=mean, psth_err=err, psth_times=tt)
 

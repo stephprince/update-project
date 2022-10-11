@@ -11,10 +11,10 @@ dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
-overwrite = True
+overwrite = False
 plot = True
 feature = 'y_position'
-params = dict(units_types=dict(region=['CA1'],
+params = dict(units_types=dict(region=['CA1', 'PFC'],
                                cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
 
 group_data = []

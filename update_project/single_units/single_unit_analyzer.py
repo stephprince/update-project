@@ -46,7 +46,7 @@ class SingleUnitAnalyzer:
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
         self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'unit_selectivity',
-                                                             'aligned_data', 'bins'],
+                                                             'aligned_data', 'bins', ],  # TODO - add 'train_df' after finishes plotting
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'feature_name',
@@ -204,33 +204,36 @@ class SingleUnitAnalyzer:
             self.tuning_curves = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
                                               ep=self.encoder_times, minmax=self.limits)
         else:  # if there were no units/spikes to use for encoding, create empty dataframe
-            self.model = pd.DataFrame()
+            self.tuning_curves = pd.DataFrame()
             self.bins = []
 
         return self
 
     def _get_unit_selectivity(self):
-        # get goal selective cells (cells with a place field in at least one of the choice locations)
-        place_field_thresholds = self.tuning_curves.apply(lambda x: x > (np.mean(x) + np.std(x)))
-        place_fields_2_bins = place_field_thresholds.rolling(window=2).mean() > 0.5
-        bins_shifted = place_fields_2_bins.shift(periods=-1, axis=0,)
-        bins_shifted.iloc[-1, :] = place_fields_2_bins.iloc[-1, :]
-        place_fields = np.logical_or(place_fields_2_bins, bins_shifted).astype(bool)
+        if np.size(self.tuning_curves):
+            # get goal selective cells (cells with a place field in at least one of the choice locations)
+            place_field_thresholds = self.tuning_curves.apply(lambda x: x > (np.mean(x) + np.std(x)))
+            place_fields_2_bins = place_field_thresholds.rolling(window=2).mean() > 0.5
+            bins_shifted = place_fields_2_bins.shift(periods=-1, axis=0,)
+            bins_shifted.iloc[-1, :] = place_fields_2_bins.iloc[-1, :]
+            place_fields = np.logical_or(place_fields_2_bins, bins_shifted).astype(bool)
 
-        bounds_bool_1 = place_fields.apply(lambda x: x.loc[self.bounds[0][0]:self.bounds[0][1]].any())  # get all goal
-        bounds_bool_2 = place_fields.apply(lambda x: x.loc[self.bounds[1][0]:self.bounds[1][1]].any())  # get all goal
-        goal_selective_bool = np.logical_or(bounds_bool_1, bounds_bool_2).astype(bool)
+            bounds_bool_1 = place_fields.apply(lambda x: x.loc[self.bounds[0][0]:self.bounds[0][1]].any())  # get all goal
+            bounds_bool_2 = place_fields.apply(lambda x: x.loc[self.bounds[1][0]:self.bounds[1][1]].any())  # get all goal
+            goal_selective_bool = np.logical_or(bounds_bool_1, bounds_bool_2).astype(bool)
 
-        goal_selective_cells = self.tuning_curves.loc[:, goal_selective_bool]
+            goal_selective_cells = self.tuning_curves.loc[:, goal_selective_bool]
 
-        # get left/right selective (goal selective + how much prefer one goal location to the other)
-        selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, self.bounds))
-        selectivity_index = selectivity_index.transpose()
+            # get left/right selective (goal selective + how much prefer one goal location to the other)
+            selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, self.bounds))
+            selectivity_index = selectivity_index.transpose()
 
-        self.unit_selectivity = pd.merge(self.units[['region', 'cell_type']], selectivity_index,
-                                         left_index=True, right_index=True, how='left')
-        self.unit_selectivity['unit_id'] = self.unit_selectivity.index
-        self.unit_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
+            self.unit_selectivity = pd.merge(self.units[['region', 'cell_type']], selectivity_index,
+                                             left_index=True, right_index=True, how='left')
+            self.unit_selectivity['unit_id'] = self.unit_selectivity.index
+            self.unit_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
+        else:
+            self.unit_selectivity = pd.DataFrame()
 
         return self
 
@@ -254,7 +257,7 @@ class SingleUnitAnalyzer:
             new_times = np.linspace(window_start, window_stop,
                                     int(np.round(self.theta['phase'].rate * (window_stop - window_start))))
 
-            for unit_index in range(len(self.nwb_units)):
+            for unit_index in range(len(self.nwb_units)):  # TODO - also filter nwb units with unit filtering
                 units_aligned.append(dict(trial_ids=self.trials.index.to_numpy(),
                                           time_label=time_label,
                                           unit_id=self.nwb_units.id[unit_index],

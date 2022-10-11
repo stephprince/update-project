@@ -24,7 +24,7 @@ class SingleUnitVisualizer:
         self.align_times = data[0]['analyzer'].align_times
         self.plot_groups = dict(update_type=[['non_update'], ['switch'], ['stay']],
                                 turn_type=[[1], [2], [1, 2]],
-                                outcomes=[[0], [1], [0, 1]])
+                                outcomes=[[0], [1]])
 
         self.aggregator = SingleUnitAggregator()
         self.aggregator.run_aggregation(data)
@@ -132,13 +132,16 @@ class SingleUnitVisualizer:
 
     def plot_units_aligned(self, g_data, plot_groups, tags):
         aligned_data = self.aggregator.select_group_aligned_data(g_data, plot_groups)
+        sorting_data = self.aggregator.get_peak_sorting_index()
         psth_data = self.aggregator.get_aligned_psth(aligned_data)
+        combined_data = psth_data.merge(sorting_data, on=['session_id', 'unit_id', 'feature_name'], how='left')
+        combined_data.sort_values(by=['peak_sort_index'], inplace=True)
 
-        if np.size(psth_data):
+        if np.size(combined_data):
             for s_type in ['mean_selectivity_type', 'max_selectivity_type']:
                 fig, axes = plt.subplots(9, len(g_data['time_label'].unique()), figsize=(17, 22), layout='constrained',
                                          sharex=True, sharey='row')
-                for t_name, t_data in psth_data.groupby('time_label'):
+                for t_name, t_data in combined_data.groupby('time_label', sort=False):
                     col = np.argwhere(g_data['time_label'].unique() == t_name)[0][0]
                     psth_times = t_data['psth_times'].to_numpy()[0]
                     selectivity_dict = dict(all=dict(filter=[np.nan, 'switch', 'stay'], rows=[0, 1], color='all'),
@@ -162,10 +165,10 @@ class SingleUnitVisualizer:
                                                          color=self.colors[value['color']])
                         axes[value['rows'][0]][col].fill_between(psth_times, psth_mean + psth_sem, psth_mean - psth_sem,
                                                                  color=self.colors[value['color']], alpha=0.3)
-                        axes[value['rows'][0]][col].set(ylabel='mean fr', ylim=[-1, 2])
+                        axes[value['rows'][0]][col].set(ylabel='mean fr', ylim=[-0.1, 0.5])
 
                         im = axes[value['rows'][1]][col].imshow(psth_mat_all, cmap=self.colors[f'{value["color"]}_cmap'],
-                                                                origin='lower', aspect='auto', vmin=-1, vmax=3,
+                                                                origin='lower', aspect='auto', vmin=-0.25, vmax=1.75,
                                                                 extent=[psth_times[0], psth_times[-1],
                                                                         0, np.shape(psth_mat_all)[0]])
                         axes[value['rows'][1]][col].set(ylabel='units', ylim=(0, np.shape(psth_mat_all)[0]))
