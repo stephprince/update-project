@@ -57,6 +57,9 @@ class BehaviorAnalyzer:
         # TODO - add column "phase" that defines what training phase each trial is in
         delay_locations=UpdateTrack.delay_locations #import delay_locations dic
         phase=list() # create new empty list
+        phase_dict = dict(linear=dict(maze_id=1, update_type=1),
+                          ymaze_short=dict(maze_id=1, update_type=1),
+                          later_delay=dict(maz_id=4, update_type=1, delay_bounds=delay_locations['delay1'])) #needs other phases
         for ind in trials.index:
             if trials['maze_id'][ind]==1:
                 phase.append('linear')
@@ -69,17 +72,17 @@ class BehaviorAnalyzer:
             elif trials['update_type'][ind]==3:
                 phase.append('stay_update')
             elif trials['delay_location'][ind]>delay_locations['delay1'][0] and trials['delay_location'][ind]<delay_locations['delay1'][1]:
-                phase.append('latest_delay')
+                phase.append('delay1')
             elif trials['delay_location'][ind]>delay_locations['delay2'][0] and trials['delay_location'][ind]<delay_locations['delay2'][1]:
-                phase.append('later_delay')
+                phase.append('delay2')
             elif trials['delay_location'][ind]>delay_locations['delay3'][0] and trials['delay_location'][ind]<delay_locations['delay3'][1]:
-                phase.append('middle_delay')
+                phase.append('delay3')
             elif trials['delay_location'][ind]>delay_locations['delay4'][0] and trials['delay_location'][ind]<delay_locations['delay4'][1]:
-                phase.append('earlier_delay')
+                phase.append('delay4')
             else:
                 phase.append('unknown') #can be taken out if needed
         trials['phase']=phase #add phase list into trials df as column
-
+        trials['phase']=pd.Categorical(trials['phase'], categories=['linear','ymaze_short','ymaze_long','delay1','delay2','delay3','delay4','stay_update','switch_update'],ordered=True)
         return trials
 
     def _setup_data(self, nwbfile):
@@ -94,6 +97,9 @@ class BehaviorAnalyzer:
                 data[vr] = nwbfile.processing['behavior'][vr].get_spatial_series(vr)
 
         return data
+
+    def _get_proportion_correct_by_trial(self):
+        self.trials['prop_correct'] = self.trials['correct'].rolling(self.trial_window, min_periods=0).mean()
 
     def _get_proportion_correct(self):
         proportion_correct = []
@@ -116,7 +122,8 @@ class BehaviorAnalyzer:
 
     def _get_proportion_correct_by_phase(self):
         proportion_correct_by_phase = []
-        groups = self.trials.groupby(['phase'])  # TODO - group by phase instead of update_type
+        self.trials.sort_values('phase', inplace=True)
+        groups = self.trials.groupby(['phase'], sort=False)
         for name, group_data in groups:
             data = group_data.reset_index(drop=True)  # TODO - determine if I want to have min bin length to use data
             rolling = data['correct'].rolling(self.trial_window, min_periods=1).mean()
