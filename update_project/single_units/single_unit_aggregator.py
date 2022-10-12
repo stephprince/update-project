@@ -144,7 +144,7 @@ class SingleUnitAggregator:
     @staticmethod
     def _calc_firing_rate(data, start, stop, ret_timestamps=False):
         sigma_in_secs = 0.05
-        ntt = 500
+        ntt = 100
         tt = np.linspace(start, stop, ntt)
 
         all_data = np.hstack(data)

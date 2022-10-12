@@ -23,7 +23,7 @@ class SingleUnitVisualizer:
         self.virtual_track = data[0]['analyzer'].virtual_track
         self.align_times = data[0]['analyzer'].align_times
         self.plot_groups = dict(update_type=[['non_update'], ['switch'], ['stay']],
-                                turn_type=[[1], [2], [1, 2]],
+                                turn_type=[[1], [2], [1, 2]],  # combined trial types with 2x as many samples
                                 outcomes=[[0], [1]])
 
         self.aggregator = SingleUnitAggregator()
@@ -141,7 +141,7 @@ class SingleUnitVisualizer:
             for s_type in ['mean_selectivity_type', 'max_selectivity_type']:
                 fig, axes = plt.subplots(9, len(g_data['time_label'].unique()), figsize=(17, 22), layout='constrained',
                                          sharex=True, sharey='row')
-                for t_name, t_data in combined_data.groupby('time_label', sort=False):
+                for t_name, t_data in combined_data.groupby('time_label'):
                     col = np.argwhere(g_data['time_label'].unique() == t_name)[0][0]
                     psth_times = t_data['psth_times'].to_numpy()[0]
                     selectivity_dict = dict(all=dict(filter=[np.nan, 'switch', 'stay'], rows=[0, 1], color='all'),
@@ -168,7 +168,7 @@ class SingleUnitVisualizer:
                         axes[value['rows'][0]][col].set(ylabel='mean fr', ylim=[-0.1, 0.5])
 
                         im = axes[value['rows'][1]][col].imshow(psth_mat_all, cmap=self.colors[f'{value["color"]}_cmap'],
-                                                                origin='lower', aspect='auto', vmin=-0.25, vmax=1.75,
+                                                                origin='lower', aspect='auto', vmin=-0.15, vmax=1,
                                                                 extent=[psth_times[0], psth_times[-1],
                                                                         0, np.shape(psth_mat_all)[0]])
                         axes[value['rows'][1]][col].set(ylabel='units', ylim=(0, np.shape(psth_mat_all)[0]))
