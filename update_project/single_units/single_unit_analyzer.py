@@ -30,8 +30,8 @@ class SingleUnitAnalyzer:
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
         self.limits = self.virtual_track.get_limits(feature)
-        self.align_times = ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made']
-        self.window = 2.5  # sec to look at aligned psth
+        self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
+        self.window = params.get('align_window', 2.5)  # number of bins to build encoder  # sec to look at aligned psth
         self.align_nbins = np.round((self.window * 2) / 25)  # hardcoded to match binsize of decoder too
         self.downsample_factor = 10  # downsample signal from 2000Hz to 200Hz
 
@@ -46,7 +46,7 @@ class SingleUnitAnalyzer:
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
         self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'unit_selectivity',
-                                                             'aligned_data', 'bins', ],  # TODO - add 'train_df' after finishes plotting
+                                                             'aligned_data', 'bins', 'train_df'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'feature_name',
@@ -63,14 +63,15 @@ class SingleUnitAnalyzer:
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
 
-    def run(self, overwrite=False):
+    def run(self, overwrite=False, export_data=True):
         print(f'Analyzing single unit data for session {self.results_io.session_id}...')
 
         if overwrite:
             self._preprocess()._encode()  # get tuning curves
             self._get_unit_selectivity()  # get selectivity index
             self._get_aligned_spikes()  # get spiking aligned to task events
-            self._export_data()  # save output data
+            if export_data:
+                self._export_data()  # save output data
         else:
             if self._data_exists() and self._params_match():
                 self._load_data()  # load data structure if it exists and matches the params
@@ -178,8 +179,8 @@ class SingleUnitAnalyzer:
     def _preprocess(self):
         # get spikes
         units_mask = pd.concat([self.units[k].isin(v) for k, v in self.units_types.items()], axis=1).all(axis=1)
-        units_subset = self.units[units_mask]
-        spikes_dict = {n: nap.Ts(t=units_subset.loc[n, 'spike_times'], time_units='s') for n in units_subset.index}
+        self.units_subset = self.units[units_mask]
+        spikes_dict = {n: nap.Ts(t=self.units_subset.loc[n, 'spike_times'], time_units='s') for n in self.units_subset.index}
         if spikes_dict:
             self.spikes = nap.TsGroup(spikes_dict, time_units='s')
         else:
@@ -228,7 +229,7 @@ class SingleUnitAnalyzer:
             selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, self.bounds))
             selectivity_index = selectivity_index.transpose()
 
-            self.unit_selectivity = pd.merge(self.units[['region', 'cell_type']], selectivity_index,
+            self.unit_selectivity = pd.merge(self.units_subset[['region', 'cell_type']], selectivity_index,
                                              left_index=True, right_index=True, how='left')
             self.unit_selectivity['unit_id'] = self.unit_selectivity.index
             self.unit_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
@@ -258,14 +259,15 @@ class SingleUnitAnalyzer:
                                     int(np.round(self.theta['phase'].rate * (window_stop - window_start))))
 
             for unit_index in range(len(self.nwb_units)):  # TODO - also filter nwb units with unit filtering
-                units_aligned.append(dict(trial_ids=self.trials.index.to_numpy(),
-                                          time_label=time_label,
-                                          unit_id=self.nwb_units.id[unit_index],
-                                          spikes=align_by_time_intervals_units(self.nwb_units, unit_index, self.trials,
-                                                                               start_label=time_label,
-                                                                               stop_label=time_label,
-                                                                               start=window_start, end=window_stop),
-                                          ))
+                if self.nwb_units.id[unit_index] in self.units_subset.index.to_list():
+                    units_aligned.append(dict(trial_ids=self.trials.index.to_numpy(),
+                                              time_label=time_label,
+                                              unit_id=self.nwb_units.id[unit_index],
+                                              spikes=align_by_time_intervals_units(self.nwb_units, unit_index, self.trials,
+                                                                                   start_label=time_label,
+                                                                                   stop_label=time_label,
+                                                                                   start=window_start, end=window_stop),
+                                              ))
 
             vars = dict(theta_phase=self.theta['phase'], theta_amplitude=self.theta['amplitude'],
                         rotational_velocity=self.velocity['rotational'])
@@ -276,11 +278,11 @@ class SingleUnitAnalyzer:
                                                                      start_window=window_start, stop_window=window_stop)
             ts_aligned.append(dict(**dig_data, timestamps=timestamps, new_times=new_times, time_label=time_label,
                                    turn_type=self.trials['turn_type'].to_numpy(),
-                                   outcomes=self.trials['correct'].to_numpy(),
+                                   correct=self.trials['correct'].to_numpy(),
                                    update_type=self.trials['update_type'].to_numpy()))
 
         aligned_data = (pd.merge(pd.DataFrame(units_aligned), pd.DataFrame(ts_aligned), on='time_label')
-                        .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'outcomes',
+                        .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'correct',
                                   'update_type'])
                         .reset_index(drop=True))
         aligned_data['update_type'] = aligned_data['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
