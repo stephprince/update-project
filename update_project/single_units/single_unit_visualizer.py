@@ -24,7 +24,7 @@ class SingleUnitVisualizer:
         self.align_times = data[0]['analyzer'].align_times
         self.plot_groups = dict(update_type=[['non_update'], ['switch'], ['stay']],
                                 turn_type=[[1], [2], [1, 2]],  # combined trial types with 2x as many samples
-                                outcomes=[[0], [1]])
+                                correct=[[0], [1]])
 
         self.aggregator = SingleUnitAggregator()
         self.aggregator.run_aggregation(data)

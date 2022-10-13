@@ -17,21 +17,21 @@ from update_project.general.trials import get_trials_dataframe
 
 
 class BayesianDecoder:
-    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params: dict):
+    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
         # setup parameters
         self.units_types = params.get('units_types',
                                       dict(region=['CA1', 'PFC'],  # dict of filters to apply to units table
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
         self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
-        self.decoder_test_size = params.get('decoder_test_size', 0.25)  # prop of trials for testing on train/test split
+        self.decoder_test_size = params.get('decoder_test_size', 0.2)  # prop of trials for testing on train/test split
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],
                                                                           correct=[0, 1]))  # trial filters
-        self.encoder_bin_num = params.get('encoder_bin_num', 30)  # number of bins to build encoder
+        self.encoder_bin_num = params.get('encoder_bin_num', 40)  # number of bins to build encoder
         self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
                                                                           correct=[0, 1]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
-        self.decoder_bin_size = params.get('decoder_bin_size', 0.25)  # time/fraction of theta phase to use for decoder
+        self.decoder_bin_size = params.get('decoder_bin_size', 0.2)  # time to use for decoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
@@ -65,6 +65,7 @@ class BayesianDecoder:
         self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
+        self.limits = {feat: self.virtual_track.get_limits(feat) for feat in self.feature_names}
 
         # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
@@ -72,12 +73,13 @@ class BayesianDecoder:
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 2
 
-    def run_decoding(self, overwrite=False):
+    def run_decoding(self, overwrite=False, export_data=True):
         print(f'Decoding data for session {self.results_io.session_id}...')
 
         if overwrite:
             self._preprocess()._encode()._decode()  # build model
-            self._export_data()  # save output data
+            if export_data:
+                self._export_data()  # save output data
         else:
             if self._data_exists() and self._params_match():
                 self._load_data()  # load data structure if it exists and matches the params
@@ -260,7 +262,7 @@ class BayesianDecoder:
                 feat_input = self.features_train[self.feature_names[0]]
                 self.bins = np.linspace(np.min(feat_input), np.max(feat_input), self.encoder_bin_num + 1)
                 self.model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
-                                          ep=self.encoder_times)
+                                          ep=self.encoder_times, minmax=self.limits[self.feature_names[0]])
             elif self.dim_num == 2:
                 self.model, self.bins = self.encoder(group=self.spikes, feature=self.features_train,
                                                      nb_bins=self.encoder_bin_num,

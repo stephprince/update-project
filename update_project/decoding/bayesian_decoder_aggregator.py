@@ -18,59 +18,46 @@ from update_project.statistics import get_fig_stats, get_comparative_stats
 
 class BayesianDecoderAggregator:
 
-    def __init__(self, exclusion_criteria=None):
+    def __init__(self, exclusion_criteria=None, align_times=None):
         self.exclusion_criteria = exclusion_criteria
-        self.align_times = ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made', 'stop_time']
+        self.align_times = align_times or ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made']
         self.flip_trials_by_turn = True  # default false
         self.turn_to_flip = 2
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
         self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df', 'group_aligned_df'],  format='pkl'),
                                params=dict(vars=['exclusion_criteria', 'align_times', 'flip_trials_by_turn'], format='npz'))
 
-        # times, locs = self._get_example_period()
-        # self.start_time, self.end_time = times
-        # self.start_loc, self.end_loc = locs
-        # self.prob_density_grid = self._get_prob_density_grid()  # prob density plot for example period
-
     def run_df_aggregation(self, data, overwrite=False, window=5):
-        if overwrite:
-            # aggregate session data
-            for sess_dict in data:
-                # get aggregate data and add to session dictionary
-                bins = [[-1, 0, 1] if sess_dict['decoder'].convert_to_binary else sess_dict['decoder'].bins][0]
-                summary_df = self._summarize(sess_dict['decoder'])
-                session_error = self._get_session_error(sess_dict['decoder'], summary_df)
-                session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['decoder'], window=window),
-                                              summary_df=summary_df,
-                                              confusion_matrix=self._get_confusion_matrix(summary_df, bins),
-                                              confusion_matrix_sum=session_error['confusion_matrix_sum'],
-                                              rmse=session_error['rmse'],
-                                              raw_error=session_error['raw_error_median'],
-                                              num_units=len(sess_dict['decoder'].spikes),
-                                              num_trials=len(sess_dict['decoder'].train_df),
-                                              excluded_session=self._meets_exclusion_criteria(sess_dict['decoder']),)
-                metadata_keys = ['encoder_bin_num', 'bins', 'virtual_track', 'model', 'results_io', 'results_tags',
-                                 'convert_to_binary',]
-                metadata_dict = {k: getattr(sess_dict['decoder'], k) for k in metadata_keys}
-                sess_dict.update({**session_aggregate_dict, **metadata_dict})
+        # aggregate session data
+        self.window = window
+        for sess_dict in data:
+            # get aggregate data and add to session dictionary
+            bins = [[-1, 0, 1] if sess_dict['decoder'].convert_to_binary else sess_dict['decoder'].bins][0]
+            summary_df = self._summarize(sess_dict['decoder'])
+            session_error = self._get_session_error(sess_dict['decoder'], summary_df)
+            session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['decoder'], window=window),
+                                          summary_df=summary_df,
+                                          confusion_matrix=self._get_confusion_matrix(summary_df, bins),
+                                          confusion_matrix_sum=session_error['confusion_matrix_sum'],
+                                          rmse=session_error['rmse'],
+                                          raw_error=session_error['raw_error_median'],
+                                          num_units=len(sess_dict['decoder'].spikes),
+                                          num_trials=len(sess_dict['decoder'].train_df),
+                                          excluded_session=self._meets_exclusion_criteria(sess_dict['decoder']),)
+            metadata_keys = ['encoder_bin_num', 'decoder_bin_size', 'bins', 'virtual_track', 'model', 'results_io',
+                             'results_tags', 'convert_to_binary',]
+            metadata_dict = {k: getattr(sess_dict['decoder'], k) for k in metadata_keys}
+            sess_dict.update({**session_aggregate_dict, **metadata_dict})
 
-            # get group dataframe
-            group_df_raw = pd.DataFrame(data)
-            self.group_df = group_df_raw[~group_df_raw['excluded_session']]  # only keep non-excluded sessions
-            self.group_df.drop('decoder', axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
+        # get group dataframe
+        group_df_raw = pd.DataFrame(data)
+        self.group_df = group_df_raw[~group_df_raw['excluded_session']]  # only keep non-excluded sessions
+        self.group_df.drop('decoder', axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
 
-            # get aligned dataframe:
-            self.group_aligned_df = self._get_aligned_data(self.group_df)
-            if self.flip_trials_by_turn:
-                self._flip_aligned_trials()
-
-            self._export_data()
-        else:
-            if self.results_io.data_exists(self.data_files) and self._params_match():
-                self._load_data()  # load data structure if it exists and matches the params
-            else:
-                warnings.warn('Data with those group parameters does not exist, setting overwrite to True')
-                self.run_df_aggregation(data, overwrite=True)
+        # get aligned dataframe:
+        self.group_aligned_df = self._get_aligned_data(self.group_df)
+        if self.flip_trials_by_turn:
+            self._flip_aligned_trials()
 
     def _params_match(self):
         params_path = self.results_io.get_data_filename(f'params', format='npz')
@@ -177,7 +164,7 @@ class BayesianDecoderAggregator:
 
         # get histogram, ratio, and mean probability values for different theta phases
         theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), half=np.linspace(-np.pi, np.pi, 3))
-        time_bins = np.linspace(-3, 3, time_bins)  # TODO - change to grab from window periods
+        time_bins = np.linspace(-self.window, self.window, time_bins)
         data_to_average = [*list(bound_mapping.values()), 'theta_amplitude']
         theta_phase_list = []
         for t_name, t_bins in theta_bins.items():
@@ -245,7 +232,6 @@ class BayesianDecoderAggregator:
         start_bin = np.searchsorted(prob_map_bins, bounds[0])
         stop_bin = np.searchsorted(prob_map_bins, bounds[1])
         mean_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
-        # TODO - switch this to np.nanmean to get prob / chance values when I multiply all by total # of bins
         return mean_prob
 
     @staticmethod
@@ -292,8 +278,8 @@ class BayesianDecoderAggregator:
                 list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'prob_over_chance', 'bound_values',
                                                      'choice']]
                 list_df = list_df.explode(['prob_sum', 'prob_over_chance', 'trial_index']).reset_index(drop=True).set_index('trial_index')
-                output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'feature_name',
-                                                   'time_label', 'times']],
+                output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'update_type',
+                                                   'correct', 'feature_name','time_label', 'times', ]],
                                      list_df, left_index=True, right_index=True)
                 output_df['choice'] = output_df['choice'].map(dict(left='initial_stay', right='switch'))
                 return output_df
@@ -388,7 +374,7 @@ class BayesianDecoderAggregator:
         cols = ['session_id', 'animal', 'region', 'trial_id', 'time_label', 'feature_name', 'bins', 'times',
                 'rotational_velocity']
         reaction_df = pd.concat([group_aligned_data[cols], reaction_df], axis='columns')
-        # TODO - get reaction times from the full data trace so not influenced by nbins
+        # TODO - move reaction times to single unit analysis so not restricted by bins
 
         return reaction_df
 
@@ -410,21 +396,21 @@ class BayesianDecoderAggregator:
 
         return pd.Series([veloc_diff, reaction_time], index=['veloc_diff', 'reaction_time'])
 
-    def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance'):
+    def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
 
         if np.size(quant_df):
             # get diff from baseline
             prob_sum_mat = np.vstack(quant_df[prob_value])
-            align_time = np.argwhere(quant_df['times'].values[0] == 0)[0][0]
+            align_time = np.argwhere(quant_df['times'].values[0] >= 0)[0][0]
             prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
             # get diff from left vs. right bounds
             quant_df['trial_index'] = quant_df.index
             quant_df = quant_df.explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline']).reset_index()
-            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(0, 2.5, 3)).apply(lambda x: x.mid)
+            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(0, 2.5, n_time_bins)).apply(lambda x: x.mid)
             quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
             choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
@@ -454,7 +440,7 @@ class BayesianDecoderAggregator:
 
     @staticmethod
     def _get_aligned_data(param_data):
-        cols_to_keep = ['session_id', 'animal', 'region', 'bins', 'encoder_bins', 'decoder_bins', 'virtual_track', 'aligned_data']
+        cols_to_keep = ['session_id', 'animal', 'region', 'bins', 'encoder_bin_num', 'decoder_bin_size', 'virtual_track', 'aligned_data']
         temp_data = param_data[cols_to_keep].explode('aligned_data').reset_index(drop=True)
         aligned_data = pd.json_normalize(temp_data['aligned_data'], max_level=0).drop(['stats'], axis='columns')
         aligned_data_df = pd.concat([temp_data, aligned_data], axis=1)
@@ -600,7 +586,7 @@ class BayesianDecoderAggregator:
         for trial_name in ['non_update', 'switch', 'stay']:
             trials_to_agg = decoder.test_df[decoder.test_df['update_type'] == trial_type_dict[trial_name]]
 
-            for time_label in self.align_times[:-1]:  # skip last align times so only until stop of trial
+            for time_label in self.align_times:  # skip last align times so only until stop of trial
                 window_start, window_stop = window, window
                 if time_label == 't_choice_made':
                     window_stop = 0  # if choice made, don't grab data past bc could be end of trial

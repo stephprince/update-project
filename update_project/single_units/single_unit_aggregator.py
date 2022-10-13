@@ -18,10 +18,10 @@ class SingleUnitAggregator:
             sess_dict.update(dict(tuning_curves=sess_dict['analyzer'].tuning_curves,
                                   unit_selectivity=sess_dict['analyzer'].unit_selectivity,
                                   aligned_data=sess_dict['analyzer'].aligned_data,
-                                  tuning_bins=sess_dict['analyzer'].bins,))
-                                  # excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer'])),)
+                                  tuning_bins=sess_dict['analyzer'].bins,
+                                  excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer'])),)
         self.group_df = pd.DataFrame(data)
-        # self.group_df = group_df[~group_df['excluded_session']]  # only keep non-excluded sessions
+        self.group_df = self.group_df[~self.group_df['excluded_session']]  # only keep non-excluded sessions
         self.group_df.drop('analyzer', axis='columns', inplace=True)
 
         # get aligned dataframe:
@@ -130,7 +130,7 @@ class SingleUnitAggregator:
                                  .agg(spikes=('spikes', lambda x: x.to_list()),
                                       times=('new_times', np.mean),
                                       turn_type=('turn_type', 'mean'),
-                                      outcomes=('outcomes', 'mean'),
+                                      correct=('correct', 'mean'),
                                       mean_selectivity=('mean_selectivity_index', 'mean'),
                                       max_selectivity=('max_selectivity_index', 'mean'),)
                                  .reset_index())
