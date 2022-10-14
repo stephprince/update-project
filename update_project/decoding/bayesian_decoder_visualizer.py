@@ -1073,7 +1073,7 @@ class BayesianDecoderVisualizer:
         for t_ind, t in enumerate(time_bins):
             time_included = list(time_bins[:(t_ind + 1)])  # get all data up to this point in time
             data_subset = trial_data.query(f'times_binned.isin({time_included})')
-            fig = plt.figure(figsize=(10, 10), constrained_layout=True)
+            fig = plt.figure(figsize=(8.5, 11), constrained_layout=True)
             sfigs = fig.subfigures(3, 3, hspace=0.1, wspace=0.1)
             for g_name, g_data in data_subset.groupby('update_type', sort=False):
                 # bin trials for percent correct calculations
@@ -1086,11 +1086,11 @@ class BayesianDecoderVisualizer:
                     plot_data = g_data.groupby([level, 'choice', 'region']).mean().reset_index()
 
                     (  # plot scatters with estimates
-                        so.Plot(plot_data, x='correct', y='diff_baseline', color='choice')
+                        so.Plot(plot_data, x='correct', color='choice')
                             .pair(y=['diff_baseline', 'prob_over_chance'])
                             .add(so.Dot(alpha=0.3))
                             .add(so.Line(), so.PolyFit(order=1),)
-                            .share(y=True)
+                            .share(y='row')
                             .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
                             .theme(rcparams)
                             .layout(engine='constrained')
