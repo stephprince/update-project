@@ -19,9 +19,6 @@ class ExampleTrialAggregator:
         self.single_unit_agg.run_aggregation(data)
         spikes = self.single_unit_agg.select_group_aligned_data(self.single_unit_agg.group_aligned_data,
                                                                 self.plot_groups)
-        unit_order = self.single_unit_agg.get_peak_sorting_index()
-        spikes = spikes.merge(unit_order, on=['session_id', 'animal', 'feature_name', 'region', 'unit_id'],
-                              how='left', validate="many_to_one")
         spikes.rename(columns={'trial_ids': 'trial_id'}, inplace=True)
 
         # get bayesian decoder aggregated data

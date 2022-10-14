@@ -258,7 +258,7 @@ def plot_grouped_events(
         if show_legend:
             ax.legend(
                 handles=handles[::-1],
-                labels=list(labels[ugroup_inds[0]][::-1]),
+                labels=list(labels[ugroup_inds][::-1]),
                 loc="upper left",
                 bbox_to_anchor=(0.6, 1), #(1.01, 1),
                 **legend_kwargs,

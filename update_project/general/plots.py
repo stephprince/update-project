@@ -61,6 +61,7 @@ def get_color_theme():
     color_theme_dict['PFC'] = '#F77669'
 
     color_theme_dict['control'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
+    color_theme_dict['nan'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['home'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['left'] = '#2594f6'  # 250 in degrees, 95 saturation, 60 light
     color_theme_dict['right'] = '#da3b46'  # 12 in degrees, 95 saturation, 60 light
