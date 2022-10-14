@@ -3,6 +3,7 @@ import pickle
 import pandas as pd
 import pynapple as nap
 import warnings
+import more_itertools as mit
 
 from bisect import bisect, bisect_left
 from pathlib import Path
@@ -46,7 +47,7 @@ class SingleUnitAnalyzer:
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
         self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'unit_selectivity',
-                                                             'aligned_data', 'bins', 'train_df'],
+                                                             'aligned_data', 'bins', 'trials'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'feature_name',
@@ -210,6 +211,21 @@ class SingleUnitAnalyzer:
 
         return self
 
+    @staticmethod
+    def _get_largest_field_loc(place_field_bool):
+        result = list(mit.run_length.encode(place_field_bool))
+        biggest_field = np.nanmax([count if f else np.nan for f, count in result])
+
+        field_ind = 0
+        largest_field_ind = np.nan
+        for f, count in result:
+            if f and (count == int(biggest_field)):
+                largest_field_ind = field_ind + 1
+            else:
+                field_ind = field_ind + count
+
+        return largest_field_ind
+
     def _get_unit_selectivity(self):
         if np.size(self.tuning_curves):
             # get goal selective cells (cells with a place field in at least one of the choice locations)
@@ -233,6 +249,8 @@ class SingleUnitAnalyzer:
                                              left_index=True, right_index=True, how='left')
             self.unit_selectivity['unit_id'] = self.unit_selectivity.index
             self.unit_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
+            self.unit_selectivity['place_field_peak_ind'] = place_fields.apply(lambda x: self._get_largest_field_loc(x),
+                                                                               axis=0)
         else:
             self.unit_selectivity = pd.DataFrame()
 
@@ -270,7 +288,7 @@ class SingleUnitAnalyzer:
                                               ))
 
             vars = dict(theta_phase=self.theta['phase'], theta_amplitude=self.theta['amplitude'],
-                        rotational_velocity=self.velocity['rotational'])
+                        rotational_velocity=self.velocity['rotational'], translational_velocity=self.velocity['translational'])
             dig_data = dict()
             for v_name, v_data in vars.items():
                 dig_data[v_name], timestamps = align_by_time_intervals_ts(v_data, self.trials, return_timestamps=True,

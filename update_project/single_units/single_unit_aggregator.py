@@ -19,6 +19,7 @@ class SingleUnitAggregator:
                                   unit_selectivity=sess_dict['analyzer'].unit_selectivity,
                                   aligned_data=sess_dict['analyzer'].aligned_data,
                                   tuning_bins=sess_dict['analyzer'].bins,
+                                  trial_info=sess_dict['analyzer'].trials,
                                   excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer'])),)
         self.group_df = pd.DataFrame(data)
         self.group_df = self.group_df[~self.group_df['excluded_session']]  # only keep non-excluded sessions
@@ -75,6 +76,9 @@ class SingleUnitAggregator:
         aligned_data_list = []
         for _, sess_data in self.group_df.iterrows():
             aligned_data = sess_data['aligned_data']
+            event_times = ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made', 'stop_time']
+            trial_data = sess_data['trial_info'][event_times]
+            aligned_data = pd.merge(aligned_data, trial_data, left_on='trial_ids', right_index=True)
             aligned_data.insert(loc=0, column='feature_name', value=sess_data['feature_name'])
             aligned_data.insert(loc=0, column='session_id', value=sess_data['session_id'])
             aligned_data.insert(loc=0, column='animal', value=sess_data['animal'])
