@@ -22,8 +22,8 @@ class BehaviorAnalyzer:
         self.maze_ids = params.get('maze_ids', [4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
         self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
-        self.align_window_start = params.get('align_window_start', -2.5)  # seconds to add before/after aligning window
-        self.align_window_stop = params.get('align_window_stop', 2.5)  # seconds to add before/after aligning window
+        self.align_window_start = params.get('align_window_start', -3)  # seconds to add before/after aligning window
+        self.align_window_stop = params.get('align_window_stop', 3)  # seconds to add before/after aligning window
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',
                                                       'stop_time'])
 
@@ -43,6 +43,7 @@ class BehaviorAnalyzer:
             self._get_proportion_correct()
             self._get_trajectories()
             self._align_data()
+            self._get_event_durations()
             self._export_data()  # save output data
         else:
             if self.results_io.data_exists(self.data_files):
@@ -150,6 +151,20 @@ class BehaviorAnalyzer:
                                                  turn_type=self.virtual_track.mappings['turn_type'][str(name[1])]))
 
         self.aligned_data = aligned_data
+
+    def _get_event_durations(self):
+        initial_cue = self.trials['t_delay'] - self.trials['start_time']
+        delay1 = self.trials['t_update'] - self.trials['t_delay']
+        update = self.trials['t_delay2'] - self.trials['t_update']
+        delay2 = self.trials['t_choice_made'] - self.trials['t_delay2']
+        total_trial = self.trials['t_choice_made'] - self.trials['start_time']  # go to choice_made to not include 3s freeze after reward on correct trials
+
+        durations = pd.concat([initial_cue, delay1, update, delay2, total_trial], axis=1)
+        durations.columns = ['initial_cue', 'delay1', 'update', 'delay2', 'total_trial']
+        durations['update'][self.trials['update_type'] == 1] = np.nan
+
+        self.event_durations = pd.concat([self.trials[['maze_id', 'turn_type', 'update_type', 'correct']], durations],
+                                         axis=1)
 
     def _load_data(self):
         print(f'Loading existing data for session {self.results_io.session_id}...')

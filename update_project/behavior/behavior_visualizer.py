@@ -1,8 +1,9 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import warnings
+import seaborn.objects as so
 
 from pathlib import Path
 
@@ -10,6 +11,9 @@ from update_project.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, get_color_theme
 from update_project.statistics import get_fig_stats
 from update_project.virtual_track import UpdateTrack
+
+plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
+rcparams = mpl.rcParams
 
 
 class BehaviorVisualizer:
@@ -30,10 +34,12 @@ class BehaviorVisualizer:
             sess_dict.update(proportion_correct=sess_dict['behavior'].proportion_correct)
             sess_dict.update(trajectories=sess_dict['behavior'].trajectories)
             sess_dict.update(aligned_data=sess_dict['behavior'].aligned_data)
+            sess_dict.update(event_durations=sess_dict['behavior'].event_durations)
 
         self.group_df = pd.DataFrame(data)
 
     def plot(self):
+        self.plot_event_durations()
         self.plot_proportion_correct()
         self.plot_trajectories()
         self.plot_aligned_data()
@@ -171,3 +177,35 @@ class BehaviorVisualizer:
             # save figure
             fig.suptitle(f'Aligned data')
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', results_type=self.results_type)
+
+    def plot_event_durations(self):
+        durations = pd.melt(self.event_durations, var_name='event', value_name='duration', id_vars='update_type',
+                            value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'total_trial'])
+        durations.dropna(subset='duration', axis=0, inplace=True)
+        durations['update_type'] = durations['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
+        summary = durations.groupby(['update_type', 'event'], sort=False).agg(['median', 'std'])
+        summary.columns = summary.columns.droplevel()
+        summary.reset_index(inplace=True)
+
+        fig = plt.figure(figsize=(10, 5))
+        (
+            so.Plot(durations, x='event', y='duration')
+            .facet(col='update_type')
+            .add(so.Dots(marker="o", pointsize=10, fillalpha=1), so.Agg())
+            .add(so.Range(), so.Est(errorbar="sd"))
+            .share(y=True)
+            .theme(rcparams)
+            .on(fig)
+            .plot()
+        )
+
+        # add text of medians + sd of
+        new_line = '\n'
+        plus_minus = '\u00B1'
+        for ax in fig.axes:
+            data = summary.query(f'update_type == "{ax.get_title()}"')
+            text = [f'{r["event"]}: {r["median"]:.2f} {plus_minus} {r["std"]:.2f} {new_line}' for _, r in data.iterrows()]
+            ax.text(0.05, 0.75, ''.join(text), transform=ax.transAxes)
+
+        fig.suptitle('Task event durations')
+        self.results_io.save_fig(fig=fig, filename=f'event_durations', results_type=self.results_type)
