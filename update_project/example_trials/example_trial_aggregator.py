@@ -43,6 +43,7 @@ class ExampleTrialAggregator:
                                   on=['animal', 'session_id', 'feature_name', 'region', 'trial_id', 'time_label'])
         assert not (agg_data['turn_type'] - agg_data['turn_type_r']).to_numpy().any()  # check trials aligned
         agg_data.drop(labels=list(agg_data.filter(regex='_r')), axis='columns', inplace=True)
+        agg_data['trial_id'] = agg_data['trial_id'].astype(str)
 
         self.agg_data = agg_data
 
