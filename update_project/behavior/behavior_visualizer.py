@@ -179,7 +179,8 @@ class BehaviorVisualizer:
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', results_type=self.results_type)
 
     def plot_event_durations(self):
-        durations = pd.melt(self.event_durations, var_name='event', value_name='duration', id_vars='update_type',
+        group_durations = pd.concat(self.group_df['event_durations'].to_list(), axis=0)
+        durations = pd.melt(group_durations, var_name='event', value_name='duration', id_vars='update_type',
                             value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'total_trial'])
         durations.dropna(subset='duration', axis=0, inplace=True)
         durations['update_type'] = durations['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})

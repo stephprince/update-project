@@ -153,6 +153,7 @@ class BehaviorAnalyzer:
         self.aligned_data = aligned_data
 
     def _get_event_durations(self):
+        # get event durations from trials table
         initial_cue = self.trials['t_delay'] - self.trials['start_time']
         delay1 = self.trials['t_update'] - self.trials['t_delay']
         update = self.trials['t_delay2'] - self.trials['t_update']
@@ -161,7 +162,12 @@ class BehaviorAnalyzer:
 
         durations = pd.concat([initial_cue, delay1, update, delay2, total_trial], axis=1)
         durations.columns = ['initial_cue', 'delay1', 'update', 'delay2', 'total_trial']
-        durations['update'][self.trials['update_type'] == 1] = np.nan
+
+        # replace delay times with full delay length for non-update trials since actually no update cue
+        non_update_bool = (self.trials['update_type'] == 1)
+        durations['delay1'][non_update_bool] = delay1 + update + delay2
+        durations['update'][non_update_bool] = np.nan
+        durations['delay2'][non_update_bool] = np.nan
 
         self.event_durations = pd.concat([self.trials[['maze_id', 'turn_type', 'update_type', 'correct']], durations],
                                          axis=1)
