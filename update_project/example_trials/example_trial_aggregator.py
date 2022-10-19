@@ -45,7 +45,11 @@ class ExampleTrialAggregator:
         agg_data.drop(labels=list(agg_data.filter(regex='_r')), axis='columns', inplace=True)
         agg_data['trial_id'] = agg_data['trial_id'].astype(str)
 
-        self.agg_data = agg_data
+        # remove trials that are not full delay length (e.g. delay occurs after update point
+        monotonic_bools = (agg_data
+                           .loc[:, 'start_time':'t_choice_made']
+                           .apply(lambda x: x.is_monotonic_increasing, axis=1))
+        self.agg_data = agg_data[monotonic_bools]
 
     def select_group_aligned_data(self, data=None, filter_dict=None):
         data = data or self.agg_data  # default to all data if none indicated
