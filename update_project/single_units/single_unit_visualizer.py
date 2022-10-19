@@ -2,6 +2,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
+import seaborn.objects as so
 
 from pathlib import Path
 from scipy.stats import sem
@@ -36,7 +37,9 @@ class SingleUnitVisualizer:
             for plot_types in list(itertools.product(*self.plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                 tags = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+                self.plot_theta_phase_modulation(g_data,  plot_group_dict, f'{title}_{tags}')
                 self.plot_units_aligned(g_data, plot_group_dict, f'{title}_{tags}')
+                self.plot_movement_reaction_times(g_data, plot_group_dict, f'{title}_{tags}')
                 # self.plot_unit_selectivity(g_data, plot_group_dict, f'{title}_{tags}')
 
         for g_name, g_data in self.aggregator.group_tuning_curves.groupby(['region', 'feature_name']):
@@ -130,6 +133,43 @@ class SingleUnitVisualizer:
                     sfigs = fig.subfigures(nrows, ncols).flatten()
                     i = 0
 
+    def plot_theta_phase_modulation(self, data, plot_groups, tags):
+        # NOTE - Kay et al doesn't look at single unit spiking on different theta phases I think,
+        # they just look at decoded probability densities
+        # plot theta modulation for this trial
+        theta_phase_data = self.aggregator.calc_theta_phase_data(data)
+        time_labels = ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made']
+
+        fig, axes = plt.subplots(2, len(theta_phase_data['time_label'].unique()), figsize=(10, 5),
+                                 layout='constrained', gridspec_kw={'height_ratios': [1, 2]})
+        for g_name, g_data in theta_phase_data.groupby(['time_label', 'new_times', 'max_selectivity_type'], dropna=False):
+            col_ind = np.where(np.array(time_labels) == g_name[0])[0][0]
+            axes[0][col_ind].plot(g_data['phase_mid'] / np.pi, g_data['theta_amplitude'], color='k', label='theta')
+            axes[0][col_ind].fill_between((g_data['phase_mid'] / np.pi),
+                                 g_data['theta_amplitude'] + g_data['theta_amplitude_err'],
+                                 g_data['theta_amplitude'] - g_data['theta_amplitude_err'],
+                                 color='k', alpha=0.2)
+            axes[0][col_ind].set(ylabel='theta amplitude', title=g_name[0])
+
+            lstyles = ['dashed', 'solid']
+            lstyle = lstyles[np.where(np.array(['pre-update', 'post-update']) == g_name[1])[0][0]]
+            axes[1][col_ind].plot((g_data['phase_mid'] / np.pi), g_data['spike_counts'],
+                                                color=self.colors[str(g_name[2])], label=g_name[1:], linestyle=lstyle)
+            axes[1][col_ind].fill_between((g_data['phase_mid'] / np.pi),
+                                                        g_data['spike_counts'] + g_data['spike_counts_err'],
+                                                        g_data['spike_counts'] - g_data['spike_counts_err'],
+                                                        color=self.colors[str(g_name[2])], alpha=0.2)
+            axes[1][col_ind].xaxis.set_major_formatter(mpl.ticker.FormatStrFormatter('%g $\pi$'))
+            axes[1][col_ind].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+            axes[1][col_ind].relim()
+            axes[1][col_ind].set(ylabel='mean spikes', xlabel='theta phase', )
+            if col_ind == (len(theta_phase_data['time_label'].unique()) - 1):
+                axes[1][col_ind].legend()
+
+        fig.suptitle(f'Theta modulation of goal selective cells - {plot_groups}')
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'spiking_theta_modulation',
+                                 additional_tags=tags, tight_layout=False)
+
     def plot_units_aligned(self, g_data, plot_groups, tags):
         aligned_data = self.aggregator.select_group_aligned_data(g_data, plot_groups)
         sorting_data = self.aggregator.get_peak_sorting_index()
@@ -186,3 +226,85 @@ class SingleUnitVisualizer:
                 fig.suptitle(f'Aligned goal selective activity - {plot_groups}')
                 self.results_io.save_fig(fig=fig, axes=axes, filename=f'spiking_aligned_{s_type}',
                                          additional_tags=tags, tight_layout=False)
+
+    def plot_movement_reaction_times(self, param_data, plot_groups=None, tags=''):
+        reaction_data = self.aggregator.calc_movement_reaction_times(param_data, {'time_label': ['t_update'], **plot_groups})
+        if np.size(reaction_data):
+            reaction_data_by_time = reaction_data.explode(['new_times', 'rotational_velocity', 'veloc_diff'])
+            lims = dict()
+            for col in ['rotational_velocity', 'veloc_diff']:
+                mag = np.min(np.abs((reaction_data[col].apply(np.min).min(), reaction_data[col].apply(np.max).max())))
+                lims[col] = (-mag, mag)
+
+            ncols, nrows = (1, 3)
+            fig = plt.figure(figsize=(20, 20))
+            sfigs = fig.subfigures(nrows, 1, height_ratios=[2, 1, 1])
+
+            # plot heatmaps of rotational velocity with derivative overlay
+            axes = sfigs[0].subplots(2, ncols + 1, sharex='col', squeeze=False,
+                                     gridspec_kw={'width_ratios': [1, 0.1]})
+            for name, data in reaction_data.groupby(['time_label'], sort=False):
+                col = np.argwhere(reaction_data['time_label'].unique() == name)[0][0]
+                data.sort_values('reaction_time', inplace=True, ascending=False)
+
+                rot = np.stack(data['rotational_velocity'])
+                times = data['new_times'].to_numpy()[0]
+                im_rot = axes[0][col].imshow(rot, cmap=self.colors['div_cmap'], aspect='auto',
+                                             vmin=lims['rotational_velocity'][0] * 0.5,
+                                             vmax=lims['rotational_velocity'][-1] * 0.5,
+                                             origin='lower', extent=[times[0], times[-1], 0, np.shape(rot)[0]], )
+                # axes[0][col].scatter(data['reaction_time'].to_numpy(),  np.array(range(np.shape(rot)[0])) + 0.5,
+                #                      facecolors='none', edgecolors='k', alpha=0.5, s=10)
+                axes[0][col].set(xlim=(times[0], times[-1]), ylim=(0, np.shape(rot)[0]), title=name)
+
+                rot_diff = np.stack(data['veloc_diff'])
+                im_diff = axes[1][col].imshow(rot_diff, cmap=self.colors['div_cmap'], aspect='auto',
+                                              vmin=lims['veloc_diff'][0] * 0.5, vmax=lims['veloc_diff'][-1] * 0.5,
+                                              origin='lower', extent=[times[0], times[-1], 0, np.shape(rot_diff)[0]], )
+                # axes[1][col].scatter(data['reaction_time'].to_numpy(), np.array(range(np.shape(rot_diff)[0])) + 0.5,
+                #                      facecolors='none', edgecolors='k', alpha=0.5, s=10)
+                axes[1][col].set(xlim=(times[0], times[-1]), ylim=(0, np.shape(rot_diff)[0]), title=name)
+
+                if col == 0:
+                    axes[0][col].set_ylabel('trials')
+                    axes[1][col].set_ylabel('trials')
+            plt.colorbar(im_rot, cax=axes[0][col + 1], label='rotational velocity')
+            plt.colorbar(im_diff, cax=axes[1][col + 1], label='veloc_diff')
+
+            (  # plot average rotational velocity over time
+                so.Plot(reaction_data_by_time, x='new_times', y='rotational_velocity')
+                    .facet(col='time_label')
+                    .add(so.Band(color='k'), so.Est(errorbar='se'))
+                    .add(so.Line(color='k', linewidth=2), so.Agg(), )
+                    .theme(rcparams)
+                    .layout(engine='constrained')
+                    .on(sfigs[1])
+                    .plot()
+            )
+
+            (  # plot distribution of movement
+                so.Plot(reaction_data, x='reaction_time')
+                    .facet(col='time_label')
+                    .add(so.Bars(color='k'), so.Hist(stat='proportion', binrange=(0, 2.5), binwidth=0.25))
+                    .limit(x=(reaction_data['new_times'].apply(min).min(), reaction_data['new_times'].apply(max).max()))
+                    .label(y='proportion')
+                    .theme(rcparams)
+                    .scale(color=self.colors['control'])
+                    .layout(engine='constrained')
+                    .on(sfigs[2])
+                    .plot()
+            )
+
+            medians = reaction_data.groupby('time_label', sort=False)['reaction_time'].median()
+            for ind, sf in enumerate(sfigs):
+                for a in sf.axes:
+                    med = medians.get(a.title.get_text(), np.nan)
+                    a.axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                    a.axvline(med, color='purple', linestyle='dashed')
+                    if ind == len(sfigs) - 1:  # add median number to last plot only
+                        a.annotate(f'median: {med:.3f}', (0.65, 0.7), xycoords='axes fraction', xytext=(0.65, 0.7),
+                                   textcoords='axes fraction', )
+
+            # save figures
+            fig.suptitle(tags)
+            self.results_io.save_fig(fig=fig, filename=f'reaction_times', additional_tags=tags)

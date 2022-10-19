@@ -47,7 +47,7 @@ class SingleUnitAnalyzer:
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
         self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'unit_selectivity',
-                                                             'aligned_data', 'bins', 'trials'],
+                                                             'aligned_data', 'bins', 'trials', 'train_df'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'feature_name',
@@ -78,7 +78,7 @@ class SingleUnitAnalyzer:
                 self._load_data()  # load data structure if it exists and matches the params
             else:
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
-                self.run(overwrite=True)
+                self.run(overwrite=True, export_data=export_data)
 
         return self
 
@@ -235,10 +235,13 @@ class SingleUnitAnalyzer:
             bins_shifted.iloc[-1, :] = place_fields_2_bins.iloc[-1, :]
             place_fields = np.logical_or(place_fields_2_bins, bins_shifted).astype(bool)
 
+            # get cells with place fields in goal arms but no fields in other parts of the track
+            all_bounds = np.hstack([place_fields.loc[self.bounds[0][0]:self.bounds[0][1]].index,
+                                    place_fields.loc[self.bounds[1][0]:self.bounds[1][1]].index])
+            out_of_bounds_bool = place_fields.apply(lambda x: x[~x.index.isin(all_bounds)].any())
             bounds_bool_1 = place_fields.apply(lambda x: x.loc[self.bounds[0][0]:self.bounds[0][1]].any())  # get all goal
             bounds_bool_2 = place_fields.apply(lambda x: x.loc[self.bounds[1][0]:self.bounds[1][1]].any())  # get all goal
-            goal_selective_bool = np.logical_or(bounds_bool_1, bounds_bool_2).astype(bool)
-
+            goal_selective_bool = np.logical_and(np.logical_or(bounds_bool_1, bounds_bool_2), ~out_of_bounds_bool).astype(bool)
             goal_selective_cells = self.tuning_curves.loc[:, goal_selective_bool]
 
             # get left/right selective (goal selective + how much prefer one goal location to the other)
@@ -299,13 +302,16 @@ class SingleUnitAnalyzer:
                                    correct=self.trials['correct'].to_numpy(),
                                    update_type=self.trials['update_type'].to_numpy()))
 
-        aligned_data = (pd.merge(pd.DataFrame(units_aligned), pd.DataFrame(ts_aligned), on='time_label')
-                        .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'correct',
-                                  'update_type'])
-                        .reset_index(drop=True))
-        aligned_data['update_type'] = aligned_data['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
+        if np.size(self.units_subset):
+            aligned_data = (pd.merge(pd.DataFrame(units_aligned), pd.DataFrame(ts_aligned), on='time_label')
+                            .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'correct',
+                                      'update_type'])
+                            .reset_index(drop=True))
+            aligned_data['update_type'] = aligned_data['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
 
-        self.aligned_data = pd.merge(aligned_data, self.unit_selectivity, on='unit_id')
+            self.aligned_data = pd.merge(aligned_data, self.unit_selectivity, on='unit_id')
+        else:
+            self.aligned_data = pd.DataFrame()
 
     def _get_event_window(self, time_label):
         window_start, window_stop = self.window, self.window
