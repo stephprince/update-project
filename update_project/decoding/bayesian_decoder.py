@@ -31,7 +31,7 @@ class BayesianDecoder:
         self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
                                                                           correct=[0, 1]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
-        self.decoder_bin_size = params.get('decoder_bin_size', 0.2)  # time to use for decoder
+        self.decoder_bin_size = params.get('decoder_bin_size', 0.25)  # time to use for decoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
@@ -85,7 +85,7 @@ class BayesianDecoder:
                 self._load_data()  # load data structure if it exists and matches the params
             else:
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
-                self.run_decoding(overwrite=True)
+                self.run_decoding(overwrite=True, export_data=export_data)
 
         return self
 
