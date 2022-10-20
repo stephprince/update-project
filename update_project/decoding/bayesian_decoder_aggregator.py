@@ -44,9 +44,11 @@ class BayesianDecoderAggregator:
                                           num_units=len(sess_dict['decoder'].spikes),
                                           num_trials=len(sess_dict['decoder'].train_df),
                                           excluded_session=self._meets_exclusion_criteria(sess_dict['decoder']),)
-            metadata_keys = ['encoder_bin_num', 'decoder_bin_size', 'bins', 'virtual_track', 'model', 'results_io',
-                             'results_tags', 'convert_to_binary',]
+            metadata_keys = ['bins', 'virtual_track', 'model', 'results_io', 'results_tags', 'convert_to_binary',
+                             'encoder_bin_num', 'decoder_bin_size',]
             metadata_dict = {k: getattr(sess_dict['decoder'], k) for k in metadata_keys}
+            # metadata_dict['encoder_bin_num'] = sess_dict['decoder'].encoder_bin_num.item()
+            # metadata_dict['decoder_bin_size'] = sess_dict['decoder'].decoder_bin_size.item()
             sess_dict.update({**session_aggregate_dict, **metadata_dict})
 
         # get group dataframe
@@ -250,9 +252,12 @@ class BayesianDecoderAggregator:
             num_bins = dict()
             output_list = []
             for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                prob_map_bins = (bins[1:] + bins[:-1]) / 2
-                start_bin = np.searchsorted(prob_map_bins, bound_values[0])
-                stop_bin = np.searchsorted(prob_map_bins, bound_values[1])
+                start_bin, stop_bin = np.searchsorted(bins, bound_values)
+                if bins[0] == bound_values[0]:
+                    start_bin = start_bin - 1  # if the bin edge is the same as the bound edge, include that bin
+                elif bins[-1] == bound_values[-1]:
+                    stop_bin = stop_bin + 1
+                stop_bin = stop_bin - 1  # adjust by one since bins is bin_edges and applying to bin centers
 
                 threshold = 0.1  # total probability density to call a left/right choice
                 integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
@@ -366,36 +371,6 @@ class BayesianDecoderAggregator:
                          index=['corr', 'corr_coeff', 'corr_lags', 'corr_sliding',
                                 'corr_coeff_sliding', 'lags_sliding', 'times_sliding'])
 
-    def calc_movement_reaction_times(self, param_data, plot_groups):
-        group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
-        reaction_df = group_aligned_data.apply(lambda x: self.get_reaction_time(x['rotational_velocity'],
-                                                                                x['times']), axis=1)
-
-        cols = ['session_id', 'animal', 'region', 'trial_id', 'time_label', 'feature_name', 'bins', 'times',
-                'rotational_velocity']
-        reaction_df = pd.concat([group_aligned_data[cols], reaction_df], axis='columns')
-        # TODO - move reaction times to single unit analysis so not restricted by bins
-
-        return reaction_df
-
-    def get_reaction_time(self, velocity, times):
-        # get slope of velocity over time
-        veloc_diff = np.diff(velocity, prepend=velocity[0])
-
-        # only calc reaction times post-event for aligned times
-        reaction_time = np.max(times)  # default value is max time
-        if any(times > 0):
-            event_time = np.argwhere(times >= 0)[0][0]
-            post_event = veloc_diff[event_time:]
-
-            # calc reaction time
-            slope_sign = np.sign(post_event)
-            reaction_time_post = np.where(np.diff(slope_sign, prepend=slope_sign[0]))[0] # get elements immediately after sign switch
-            if np.size(reaction_time_post):  # if any slope changes, otherwise keep default
-                reaction_time = times[event_time:][reaction_time_post[0]]
-
-        return pd.Series([veloc_diff, reaction_time], index=['veloc_diff', 'reaction_time'])
-
     def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
@@ -460,9 +435,13 @@ class BayesianDecoderAggregator:
             if bins is not None:
                 areas = dict()
                 for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                    prob_map_bins = (bins[1:] + bins[:-1]) / 2
-                    areas[f'{bound_name}_start'] = np.searchsorted(prob_map_bins, bound_values[0])
-                    areas[f'{bound_name}_stop'] = np.searchsorted(prob_map_bins, bound_values[1])
+                    start_bin, stop_bin = np.searchsorted(bins, bound_values)
+                    if bins[0] == bound_values[0]:
+                        start_bin = start_bin - 1   # if the bin edge is the same as the bound edge, include that bin
+                    elif bins[-1] == bound_values[-1]:
+                        stop_bin = stop_bin + 1
+                    areas[f'{bound_name}_start'] = start_bin
+                    areas[f'{bound_name}_stop'] = stop_bin - 1
 
                 left_data = row[areas['left_start']:areas['left_stop'], :].copy()
                 right_data = row[areas['right_start']:areas['right_stop'], :].copy()
@@ -592,7 +571,7 @@ class BayesianDecoderAggregator:
                     window_stop = 0  # if choice made, don't grab data past bc could be end of trial
                 elif time_label == 'start_time':
                     window_start = 0
-                new_times = np.linspace(-window_start, window_stop, num=nbins)
+                new_times = np.linspace(-window_start, window_stop, num=nbins + 1)
 
                 mid_times = trials_to_agg[time_label]
                 turns = trials_to_agg['turn_type'][~mid_times.isna()].values
@@ -616,7 +595,8 @@ class BayesianDecoderAggregator:
                         for key, val in vars.items():
                             if decoder.dim_num == 1 and key == 'probability':
                                 interp_dict[name][key] = griddata_time_intervals(val, locs[key]['start'],
-                                                                                 locs[key]['stop'], nbins, mid_times)
+                                                                                 locs[key]['stop'], nbins, mid_times,
+                                                                                 time_bins=new_times)
                             elif decoder.dim_num == 2 and key == 'probability':
                                 interp_dict[name][key] = griddata_2d_time_intervals(val, decoder.bins,
                                                                                decoder.decoding_values.index.values,
@@ -655,7 +635,7 @@ class BayesianDecoderAggregator:
                                 window_stop=window_stop,
                                 window=window,
                                 nbins=nbins,
-                                times=new_times,)
+                                times=new_times,)  # times are the middle of the bin
                     data.update(stats={k: get_fig_stats(v, axis=1) for k, v in data.items()
                                        if k in ['feature', 'decoding', 'error']})
                 output.append(data)

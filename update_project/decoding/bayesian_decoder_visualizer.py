@@ -60,12 +60,11 @@ class BayesianDecoderVisualizer:
                     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
 
-                    # self.plot_movement_reaction_times(data, **kwargs)
-                    # self.plot_group_aligned_data(data, **kwargs)
+                    self.plot_group_aligned_data(data, **kwargs)
                     # self.plot_scatter_dists_around_update(data, **kwargs)
                     # self.plot_trial_by_trial_around_update(data, **kwargs)
-                    # self.plot_phase_modulation_around_update(data, **kwargs)
-                    # self.plot_theta_phase_histogram(data, **kwargs)
+                    self.plot_phase_modulation_around_update(data, **kwargs)
+                    self.plot_theta_phase_histogram(data, **kwargs)
 
             # plot region interactions
             for name, data in self.aggregator.group_aligned_df.groupby(self.params):
@@ -442,9 +441,10 @@ class BayesianDecoderVisualizer:
     def plot_group_aligned_data(self, param_data, title, plot_groups=None, tags=''):
         # load up data
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups)
-        reaction_data = self.aggregator.calc_movement_reaction_times(param_data, plot_groups)
+        # reaction_data = self.aggregator.calc_movement_reaction_times(param_data, plot_groups)
         aligned_data = self.aggregator.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         bounds = trial_data['bound_values'].unique()
+        spaces = getattr(param_data['virtual_track'].values[0], 'edge_spacing', [])
         prob_maps = aligned_data.groupby('time_label').apply(lambda x: np.nanmean(np.stack(x['probability']), axis=0))
         n_bins = np.shape(prob_maps.loc['start_time'])[0]
         prob_lims = np.linspace(aligned_data['feature'].apply(np.nanmin).min(),
@@ -461,20 +461,28 @@ class BayesianDecoderVisualizer:
             switch_mat = trial_mat.query('choice == "switch"').to_numpy()
             stay_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
             times = trial_mat.columns.to_numpy()
+            im_times = (times[0] - np.diff(times)[0] / 2, times[-1] + np.diff(times)[0] / 2)
 
             im_prob = axes[0][col].imshow(prob_maps.loc[name] * n_bins, cmap=self.colors['cmap'], aspect='auto',
                                           origin='lower', vmin=0.6, vmax=2.8,
-                                          extent=[times[0], times[-1], prob_lims[0], prob_lims[-1]])
+                                          extent=[im_times[0], im_times[-1], prob_lims[0], prob_lims[-1]])
             axes[0][col].invert_yaxis()
             for b in bounds:
                 axes[0][col].axhline(b[0], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
                 axes[0][col].axhline(b[1], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
+            for s in spaces:
+                xmin, xmax = 0, 1
+                if (times[0], times[-1]) == (0, time_lims[-1]):
+                    xmin, xmax = 0.5, 1
+                elif (times[0], times[-1]) == (time_lims[0], 0):
+                    xmin, xmax = 0, 0.5
+                axes[0][col].axhspan(*s, color='#DDDDDD', edgecolor=None, xmin=xmin, xmax=xmax)
 
             im_goal1 = axes[1][col].imshow(stay_mat, cmap=self.colors['stay_cmap'], aspect='auto', vmin=0, vmax=2.5,
-                                           origin='lower', extent=[times[0], times[-1], 0, np.shape(stay_mat)[0]])
+                                           origin='lower', extent=[im_times[0], im_times[-1], 0, np.shape(stay_mat)[0]])
             im_goal2 = axes[2][col].imshow(switch_mat, cmap=self.colors['switch_cmap'], aspect='auto',
                                            vmin=0, vmax=2.5, origin='lower',
-                                           extent=[times[0], times[-1], 0, np.shape(switch_mat)[0]], )
+                                           extent=[im_times[0], im_times[-1], 0, np.shape(switch_mat)[0]], )
 
             axes[3][col].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['switch'], label='switch')
             axes[3][col].fill_between(times, np.nanmean(switch_mat, axis=0) + sem(switch_mat),
@@ -510,13 +518,13 @@ class BayesianDecoderVisualizer:
             axes[4][col].set(ylabel='velocity', title=name, xlim=time_lims)
             axes[5][col].set(ylabel='decoding error', title=name, xlim=time_lims)
 
-        medians = reaction_data.groupby('time_label', sort=False)['reaction_time'].median()
+        # medians = reaction_data.groupby('time_label', sort=False)['reaction_time'].median()
         for r in range(nrows):
             axes[r][col].legend(fontsize='large')
             for c in range(ncols):
-                med = medians.get(axes[r][c].title.get_text(), np.nan)
+                # med = medians.get(axes[r][c].title.get_text(), np.nan)
                 axes[r][c].axvline(0, color='k', linestyle='dashed', alpha=0.5)
-                axes[r][c].axvline(med, color='purple', linestyle='dashed')
+                # axes[r][c].axvline(med, color='purple', linestyle='dashed')
 
         # save figure
         fig.suptitle(title)
@@ -624,87 +632,6 @@ class BayesianDecoderVisualizer:
             sfigs[-1][0].supxlabel(fig.axes[-1].get_xlabel())
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_by_trial',
                                      additional_tags=tags, tight_layout=False)
-
-    def plot_movement_reaction_times(self, param_data, title, plot_groups=None, tags=''):
-        reaction_data = self.aggregator.calc_movement_reaction_times(param_data, plot_groups)
-        if np.size(reaction_data):
-            reaction_data_by_time = reaction_data.explode(['times', 'rotational_velocity', 'veloc_diff'])
-            lims = dict()
-            for col in ['rotational_velocity', 'veloc_diff']:
-                mag = np.min(np.abs((reaction_data[col].apply(np.min).min(), reaction_data[col].apply(np.max).max())))
-                lims[col] = (-mag, mag)
-
-            ncols, nrows = (len(self.aggregator.align_times), 3)
-            fig = plt.figure(figsize=(20, 20))
-            sfigs = fig.subfigures(nrows, 1, height_ratios=[2, 1, 1])
-
-            # plot heatmaps of rotational velocity with derivative overlay
-            axes = sfigs[0].subplots(2, ncols+1, sharex='col', squeeze=False,
-                                     gridspec_kw={'width_ratios':[1, 1, 1, 1, 1, 0.1]})
-            for name, data in reaction_data.groupby(['time_label'], sort=False):
-                col = np.argwhere(reaction_data['time_label'].unique() == name)[0][0]
-                data.sort_values('reaction_time', inplace=True, ascending=False)
-
-                rot = np.stack(data['rotational_velocity'])
-                times = data['times'].to_numpy()[0]
-                im_rot = axes[0][col].imshow(rot, cmap=self.colors['div_cmap'], aspect='auto',
-                                             vmin=lims['rotational_velocity'][0]*0.5, vmax=lims['rotational_velocity'][-1]*0.5,
-                                             origin='lower', extent=[times[0], times[-1], 0, np.shape(rot)[0]], )
-                # axes[0][col].scatter(data['reaction_time'].to_numpy(),  np.array(range(np.shape(rot)[0])) + 0.5,
-                #                      facecolors='none', edgecolors='k', alpha=0.5, s=10)
-                axes[0][col].set(xlim=(times[0], times[-1]), ylim=(0, np.shape(rot)[0]), title=name)
-
-                rot_diff = np.stack(data['veloc_diff'])
-                im_diff = axes[1][col].imshow(rot_diff, cmap=self.colors['div_cmap'], aspect='auto',
-                                              vmin=lims['veloc_diff'][0]*0.5, vmax=lims['veloc_diff'][-1]*0.5,
-                                              origin='lower', extent=[times[0], times[-1], 0, np.shape(rot_diff)[0]], )
-                # axes[1][col].scatter(data['reaction_time'].to_numpy(), np.array(range(np.shape(rot_diff)[0])) + 0.5,
-                #                      facecolors='none', edgecolors='k', alpha=0.5, s=10)
-                axes[1][col].set(xlim=(times[0], times[-1]), ylim=(0, np.shape(rot_diff)[0]), title=name)
-
-                if col == 0:
-                    axes[0][col].set_ylabel('trials')
-                    axes[1][col].set_ylabel('trials')
-            plt.colorbar(im_rot, cax=axes[0][col + 1], label='rotational velocity')
-            plt.colorbar(im_diff, cax=axes[1][col + 1], label='veloc_diff')
-
-            (  # plot average rotational velocity over time
-                so.Plot(reaction_data_by_time, x='times', y='rotational_velocity')
-                    .facet(col='time_label')
-                    .add(so.Band(color='k'), so.Est(errorbar='se'))
-                    .add(so.Line(color='k', linewidth=2), so.Agg(), )
-                    .theme(rcparams)
-                    .layout(engine='constrained')
-                    .on(sfigs[1])
-                    .plot()
-            )
-
-            (  # plot distribution of movement
-                so.Plot(reaction_data, x='reaction_time')
-                    .facet(col='time_label')
-                    .add(so.Bars(color='k'), so.Hist(stat='proportion', binrange=(0, 2.5), binwidth=0.25))
-                    .limit(x=(reaction_data['times'].apply(min).min(), reaction_data['times'].apply(max).max()))
-                    .label(y='proportion')
-                    .theme(rcparams)
-                    .scale(color=self.colors['control'])
-                    .layout(engine='constrained')
-                    .on(sfigs[2])
-                    .plot()
-            )
-
-            medians = reaction_data.groupby('time_label', sort=False)['reaction_time'].median()
-            for ind, sf in enumerate(sfigs):
-                for a in sf.axes:
-                    med = medians.get(a.title.get_text(), np.nan)
-                    a.axvline(0, color='k', linestyle='dashed', alpha=0.5)
-                    a.axvline(med, color='purple', linestyle='dashed')
-                    if ind == len(sfigs) - 1:  # add median number to last plot only
-                        a.annotate(f'median: {med:.3f}', (0.65, 0.7), xycoords='axes fraction', xytext=(0.65, 0.7),
-                                   textcoords='axes fraction',)
-
-            # save figures
-            fig.suptitle(title)
-            self.results_io.save_fig(fig=fig, filename=f'reaction_times', additional_tags=tags)
 
     def plot_group_aligned_comparisons(self, param_data, plot_groups=None, tags=''):
         print('Plotting group aligned comparisons...')
