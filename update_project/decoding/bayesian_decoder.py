@@ -142,12 +142,19 @@ class BayesianDecoder:
 
         return pd.DataFrame.from_dict(data_dict)
 
-    def _get_time_intervals(self, trial_starts, trial_stops):
+    def _get_time_intervals(self, trial_starts, trial_stops, align_times=None):
         movement = self.velocity['combined'] > self.speed_threshold
+
+        if align_times is not None:
+            iterator = zip(trial_starts, trial_stops, align_times)
+        else:
+            align_times = trial_stops.copy(deep=True)
+            align_times[:] = np.nan
+            iterator = zip(trial_starts, trial_stops, align_times)  # nan values if none indicated
 
         new_starts = []
         new_stops = []
-        for start, stop in zip(trial_starts, trial_stops):
+        for start, stop, align in iterator:
             # pull out trial specific time periods
             start_ind = bisect(movement.index, start)
             stop_ind = bisect_left(movement.index, stop)
@@ -161,8 +168,21 @@ class BayesianDecoder:
 
             # append new start/stop times to data struct
             new_times = movements_df[movements_df['moving'] == True].index
-            new_starts.append(new_times.left.values)
-            new_stops.append(new_times.right.values)
+            if np.isnan(align):
+                new_left = new_times.left.values
+                new_right = new_times.right.values
+            else:
+                n_steps_back = np.floor((align - new_times.left.values) / self.decoder_bin_size)
+                n_steps_forward = np.floor((new_times.right.values - align) / self.decoder_bin_size)
+                new_left = align - (self.decoder_bin_size * n_steps_back)
+                new_right = align + (self.decoder_bin_size * n_steps_forward)
+                assert np.max((new_times.right.values - new_times.left.values) -
+                              (new_right - new_left)) < self.decoder_bin_size * 2, \
+                    'Durations differences after adjustment should be no more than 2x bin size (1 bin for forward and' \
+                    ' back'
+
+            new_starts.append(new_left)  # TODO - check this looks ok by looking at the decoding output
+            new_stops.append(new_right)
 
         times = nap.IntervalSet(start=np.hstack(new_starts), end=np.hstack(new_stops), time_units='s')
 
@@ -243,8 +263,8 @@ class BayesianDecoder:
 
         # get start/stop times of train and test trials
         self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
-        self.decoder_times = self._get_time_intervals(self.test_df['start_time'], self.test_df['stop_time'])
-        # TODO - make decoder bins aligned to update cue (windows around update?)
+        self.decoder_times = self._get_time_intervals(self.test_df['start_time'], self.test_df['stop_time'],
+                                                      align_times=self.test_df['t_update'])
 
         # select feature
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
@@ -260,7 +280,7 @@ class BayesianDecoder:
         if self.spikes:  # if there were units and spikes to use for encoding
             if self.dim_num == 1:
                 feat_input = self.features_train[self.feature_names[0]]
-                self.bins = np.linspace(np.min(feat_input), np.max(feat_input), self.encoder_bin_num + 1)
+                self.bins = np.linspace(*self.limits[self.feature_names[0]], self.encoder_bin_num + 1)
                 self.model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
                                           ep=self.encoder_times, minmax=self.limits[self.feature_names[0]])
             elif self.dim_num == 2:
