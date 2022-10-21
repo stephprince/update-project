@@ -6,8 +6,12 @@ import seaborn as sns
 def clean_plot(fig, axes):
     if hasattr(axes, 'flat'):
         ax_list = axes.flat
-    else:
+    elif hasattr(axes,'values'):
         ax_list = list(axes.values())
+    elif isinstance(axes,list):
+        ax_list = axes
+    else:
+        ax_list = [axes]
 
     for axi in ax_list:
         xlim = axi.get_xlim()
