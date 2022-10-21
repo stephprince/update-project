@@ -5,7 +5,7 @@ from track_linearization import make_track_graph, get_linearized_position
 
 class VirtualTrack:
     def __init__(self, coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries, home_boundaries,
-                 mappings=None, linearization=False, delay_locations=None):
+                 mappings=None, linearization=False, delay_locations=None, trial_types=None):
         self.coords = coords
         self.nodes = nodes
         self.edges = edges
@@ -16,6 +16,7 @@ class VirtualTrack:
         self.mappings = mappings
         self.linearization = linearization
         self.delay_locations = delay_locations
+        self.trial_types=trial_types
 
     def get_track_boundaries(self):
         xs, ys = zip(*self.coords)
@@ -76,9 +77,11 @@ class UpdateTrack(VirtualTrack):
                          delay2=(179,181), # later delay
                          delay3=(144,146), # middle delay
                          delay4=(119,121)) # earlier delay
+    trial_types = ['linear', 'ymaze_short', 'ymaze_long', 'delay1', 'delay2', 'delay3', 'delay4', 'stay_update',
+                   'switch_update']
 
     def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_start_locations=cue_start_locations,
                  cue_end_locations=cue_end_locations, choice_boundaries=choice_boundaries,
-                 home_boundaries=home_boundaries, mappings=mappings, linearization=False, delay_locations=delay_locations):
+                 home_boundaries=home_boundaries, mappings=mappings, linearization=False, delay_locations=delay_locations, trial_types=trial_types):
         super().__init__(coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries,
-                         home_boundaries, mappings, linearization, delay_locations)
+                         home_boundaries, mappings, linearization, delay_locations, trial_types)
