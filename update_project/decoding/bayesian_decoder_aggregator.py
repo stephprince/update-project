@@ -47,8 +47,9 @@ class BayesianDecoderAggregator:
             metadata_keys = ['bins', 'virtual_track', 'model', 'results_io', 'results_tags', 'convert_to_binary',
                              'encoder_bin_num', 'decoder_bin_size',]
             metadata_dict = {k: getattr(sess_dict['decoder'], k) for k in metadata_keys}
-            # metadata_dict['encoder_bin_num'] = sess_dict['decoder'].encoder_bin_num.item()
-            # metadata_dict['decoder_bin_size'] = sess_dict['decoder'].decoder_bin_size.item()
+            if hasattr(sess_dict['decoder'].encoder_bin_num, 'item'):
+                metadata_dict['encoder_bin_num'] = sess_dict['decoder'].encoder_bin_num.item()
+                metadata_dict['decoder_bin_size'] = sess_dict['decoder'].decoder_bin_size.item()
             sess_dict.update({**session_aggregate_dict, **metadata_dict})
 
         # get group dataframe
@@ -253,10 +254,8 @@ class BayesianDecoderAggregator:
             output_list = []
             for bound_name, bound_values in bounds.items():  # loop through left/right bounds
                 start_bin, stop_bin = np.searchsorted(bins, bound_values)
-                if bins[0] == bound_values[0]:
-                    start_bin = start_bin - 1  # if the bin edge is the same as the bound edge, include that bin
-                elif bins[-1] == bound_values[-1]:
-                    stop_bin = stop_bin + 1
+                if (bins[-1] == bound_values[-1]) or (bins[0] == bound_values[0]):
+                    stop_bin = stop_bin + 1  # adjust for cases on edge of bins lists
                 stop_bin = stop_bin - 1  # adjust by one since bins is bin_edges and applying to bin centers
 
                 threshold = 0.1  # total probability density to call a left/right choice
