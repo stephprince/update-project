@@ -27,18 +27,21 @@ class BehaviorVisualizer:
 
         # get session visualization info
         for sess_dict in self.data:
-            sess_dict.update(proportion_correct=sess_dict['behavior'].proportion_correct)
+            sess_dict.update(proportion_correct_by_update=sess_dict['behavior'].proportion_correct_by_update)
             sess_dict.update(proportion_correct_by_phase=sess_dict['behavior'].proportion_correct_by_phase)
+            sess_dict.update(proportion_correct_by_trial=sess_dict['behavior'].proportion_correct_by_trial)
             sess_dict.update(trajectories=sess_dict['behavior'].trajectories)
             sess_dict.update(aligned_data=sess_dict['behavior'].aligned_data)
 
         self.group_df = pd.DataFrame(data)
 
     def plot(self):
+        if self.results_type=='session':
+            self.plot_session_performance()
         self.plot_proportion_correct_by_phase()
         self.plot_trajectories()
         self.plot_aligned_data()
-        #self.plot_proportion_correct()
+        #self.plot_proportion_correct_by_update()
     def plot_proportion_correct_by_phase(self):
         temp_df = self.group_df[['animal', 'proportion_correct_by_phase']].explode('proportion_correct_by_phase').reset_index(drop=True)
         df_by_phase = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['proportion_correct_by_phase']))], axis=1)
@@ -81,10 +84,10 @@ class BehaviorVisualizer:
         fig.suptitle(f'Behavioral performance by phase - all animals')
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance by phase', results_type=self.results_type)
 
-    def plot_proportion_correct(self):
+    def plot_proportion_correct_by_update(self):
         # explode df so each prop correct value has one row (duplicates for each session/animal
-        temp_df = self.group_df[['animal', 'proportion_correct']].explode('proportion_correct').reset_index(drop=True)
-        df_by_update_type = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
+        temp_df = self.group_df[['animal', 'proportion_correct_by_update']].explode('proportion_correct_by_update').reset_index(drop=True)
+        df_by_update_type = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['proportion_correct_by_update']))], axis=1)
         df_by_bin = df_by_update_type.explode('prop_correct').reset_index(drop=True)
         df_by_bin = pd.DataFrame(df_by_bin.to_dict())  # fix bc data gets saved as object for some weird reason
 
@@ -214,3 +217,43 @@ class BehaviorVisualizer:
             # save figure
             fig.suptitle(f'Aligned data')
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', results_type=self.results_type)
+    def plot_session_performance(self):
+        temp_df=self.group_df['proportion_correct_by_trial'].values[0]
+
+        # do not know how to save without fig, axes
+        nrows = 1
+        ncols = 1
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(8, 8))
+
+        #plot proportion correct line
+        axes.plot(temp_df['prop_correct'])
+
+        # plot the switch and stay trials
+        switch_df = temp_df[temp_df['phase'] == 'switch_update']['prop_correct']
+        stay_df = temp_df[temp_df['phase'] == 'stay_update']['prop_correct']
+        axes.plot(switch_df,marker='*',linestyle='None', markersize='5', label='switch update', color=self.colors['switch'])
+        axes.plot(stay_df, marker='D', linestyle='None', markersize='3', label='stay update', color=self.colors['stay'])
+
+        #plot lines to distinguish trial types
+        trial_locations=dict()
+        for a in self.virtual_track.trial_types:
+            if (temp_df.phase.ne(a).idxmin())!=0:
+                trial_locations.update({a: temp_df.phase.ne(a).idxmin()})
+        for a in trial_locations.keys():
+            axes.axvline(x=trial_locations[a], alpha=0.3, color='k', label=a)
+
+        #add colors to graph to indicate trial type
+        min_delay=min(trial_locations['delay1'],trial_locations['delay2'],trial_locations['delay3'],trial_locations['delay4'])
+        min_update=min(trial_locations['switch_update'],trial_locations['stay_update'])
+
+        axes.axvspan(min_delay, min_update, facecolor='k', alpha=0.1)
+        axes.axvspan(min_update, len(temp_df['prop_correct']), facecolor='c', alpha=0.1)
+
+        # make visually appealing
+        axes.legend()
+        axes.set(xlabel='Number of Trials', ylabel='Proportion Correct')
+        axes.set(ylim=[0,1])
+        axes.axhline(y=0.5, alpha=0.1, linestyle='dashed', color='k')
+        axes.set_title(f'Session Performance - {session_db.get_session_id(name)}')
+
+        self.results_io.save_fig(fig=fig,axes=axes,filename=f'session_performance', results_type=self.results_type)
