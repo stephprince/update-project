@@ -20,7 +20,7 @@ class BehaviorAnalyzer:
         self.analog_vars = params.get('analog_vars', ['rotational_velocity', 'translational_velocity', 'licks'])
         self.maze_ids = params.get('maze_ids', [1, 2, 3, 4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
-        self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
+        self.trial_window = params.get('trial_window', 30)  # number of trials to use for rolling calculations
         self.align_window_start = params.get('align_window_start', -5.0)  # seconds to add before/after aligning window
         self.align_window_stop = params.get('align_window_stop', 5.0)  # seconds to add before/after aligning window
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',
@@ -32,15 +32,16 @@ class BehaviorAnalyzer:
 
         # setup I/O
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem)
-        self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories','proportion_correct_by_phase'],
+        self.data_files = dict(behavior_output=dict(vars=['proportion_correct_by_update', 'aligned_data', 'trajectories','proportion_correct_by_phase','proportion_correct_by_trial'],
                                                     format='pkl')) #TODO detect if all variables exist when loading
 
     def run_analysis(self, overwrite=False):
         print(f'Analyzing behavioral data for {self.results_io.session_id}...')
 
         if overwrite:
-            self._get_proportion_correct()
+            self._get_proportion_correct_by_trial()
             self._get_proportion_correct_by_phase()
+            self._get_proportion_correct_by_update()
             self._get_trajectories()
             self._align_data()
             self._export_data()  # save output data
@@ -100,8 +101,9 @@ class BehaviorAnalyzer:
 
     def _get_proportion_correct_by_trial(self):
         self.trials['prop_correct'] = self.trials['correct'].rolling(self.trial_window, min_periods=0).mean()
+        self.proportion_correct_by_trial = self.trials[['prop_correct','phase']].copy()
 
-    def _get_proportion_correct(self):
+    def _get_proportion_correct_by_update(self):
         proportion_correct = []
         groups = self.trials.groupby(['update_type'])
         for name, group_data in groups:
@@ -118,7 +120,7 @@ class BehaviorAnalyzer:
                                            type='binned',
                                            update_type=self.virtual_track.mappings['update_type'][str(name)]))
 
-        self.proportion_correct = proportion_correct
+        self.proportion_correct_by_update = proportion_correct
 
     def _get_proportion_correct_by_phase(self):
         proportion_correct_by_phase = []
