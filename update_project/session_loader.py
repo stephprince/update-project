@@ -5,14 +5,18 @@ from pathlib import Path
 
 class SessionLoader:
     def __init__(self, animals, base_path=None, csv_filename=None, dates_included=None, dates_excluded=None,
-                 behavior=None):
+                 behavior_only=False):
         self.base_path = base_path or Path('Y:/singer/NWBData/UpdateTask/')  # if no value given, use default path
         self.csv_filename = csv_filename or 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv'
+
+        self.behavior_only = behavior_only
+        if self.behavior_only:
+            behavior_spreadsheet_filename = 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv'
+            self.behavior_csv_filename = behavior_spreadsheet_filename
 
         self.animals = animals
         self.dates_included = dates_included
         self.dates_excluded = dates_excluded
-        self.behavior = behavior
 
     @staticmethod
     def get_animal_id(session_name):
@@ -31,20 +35,28 @@ class SessionLoader:
 
     def get_session_info(self):
         # import all session info
-        df_all = pd.read_csv(self.csv_filename, skiprows=[1],
+        df_ephys = pd.read_csv(self.csv_filename, skiprows=[1],
                              encoding='cp1252')  # skip the first row that's just the detailed header info
+
+        if self.behavior_only:
+            df_behavior = pd.read_csv(self.behavior_csv_filename)
+            df_behavior['Animal'] = df_behavior['Animal'].str.replace('[Ss]', '').astype(
+                int)  # convert animal ids into int
+            df_behavior['ID'] = 'S'  # add separate ID column with the S tag
+
+            dob_mapping = df_ephys.groupby(['Animal', 'DOB']).size().reset_index()
+            df_all = df_behavior.merge(dob_mapping[['Animal', 'DOB']], on='Animal', how='outer')
+        else:
+            df_all = df_ephys[df_ephys['Include'] == 1]  # only use included ephys sessions
 
         # if None values, deal with appropriately so it doesn't negatively affect the filtering
         dates_incl = self.dates_included or df_all['Date']  # if no value given, include all dates
         dates_excl = self.dates_excluded or [None]  # if no value given, exclude no dates
-        behavior = self.behavior or df_all['Behavior'].unique()  # if no value given, include all behavior types
 
         # filter session info depending on cases
-        session_info = df_all[(df_all['Include'] == 1) &  # DOES HAVE an include value in the column
-                              (df_all['Animal'].isin(self.animals)) &  # IS IN the animals list
+        session_info = df_all[(df_all['Animal'].isin(self.animals)) &  # IS IN the animals list
                               (df_all['Date'].isin(dates_incl)) &  # IS IN the included dates list
-                              ~(df_all['Date'].isin(dates_excl)) &  # NOT IN the excluded dates list
-                              (df_all['Behavior'].isin(behavior))  # IS IN the behavior type list
+                              ~(df_all['Date'].isin(dates_excl))  # NOT IN the excluded dates list
                               ]
 
         return session_info
