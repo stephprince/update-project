@@ -238,7 +238,17 @@ class BayesianDecoderAggregator:
         return mean_prob
 
     @staticmethod
-    def quantify_aligned_data(param_data, aligned_data, ret_df=False):
+    def get_bound_bins(bins, bound_values):
+        start_bin, stop_bin = np.searchsorted(bins, bound_values)
+        if bins[0] == bound_values[0]:
+            start_bin = start_bin - 1  # if the bin edge is the same as the bound edge, include that bin
+        if bins[-1] == bound_values[-1]:
+            stop_bin = stop_bin + 1
+        stop_bin = stop_bin - 1
+
+        return start_bin, stop_bin
+
+    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False):
         if np.size(aligned_data) and aligned_data is not None:
             # get bounds to use to quantify choices
             bins = param_data['bins'].values[0]
@@ -253,10 +263,7 @@ class BayesianDecoderAggregator:
             num_bins = dict()
             output_list = []
             for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                start_bin, stop_bin = np.searchsorted(bins, bound_values)
-                if (bins[-1] == bound_values[-1]) or (bins[0] == bound_values[0]):
-                    stop_bin = stop_bin + 1  # adjust for cases on edge of bins lists
-                stop_bin = stop_bin - 1  # adjust by one since bins is bin_edges and applying to bin centers
+                start_bin, stop_bin = self.get_bound_bins(bins, bound_values)
 
                 threshold = 0.1  # total probability density to call a left/right choice
                 integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :], axis=1)  # (trials, feature bins, window)
@@ -427,20 +434,15 @@ class BayesianDecoderAggregator:
 
         return exploded_df
 
-    @staticmethod
-    def _flip_y_position(data, bounds, bins=None):
+    def _flip_y_position(self, data, bounds, bins=None):
         flipped_data = []
         for ind, row in data.iteritems():
             if bins is not None:
                 areas = dict()
                 for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                    start_bin, stop_bin = np.searchsorted(bins, bound_values)
-                    if bins[0] == bound_values[0]:
-                        start_bin = start_bin - 1   # if the bin edge is the same as the bound edge, include that bin
-                    elif bins[-1] == bound_values[-1]:
-                        stop_bin = stop_bin + 1
+                    start_bin, stop_bin = self.get_bound_bins(bins, bound_values)
                     areas[f'{bound_name}_start'] = start_bin
-                    areas[f'{bound_name}_stop'] = stop_bin - 1
+                    areas[f'{bound_name}_stop'] = stop_bin
 
                 left_data = row[areas['left_start']:areas['left_stop'], :].copy()
                 right_data = row[areas['right_start']:areas['right_stop'], :].copy()
