@@ -8,6 +8,8 @@ import more_itertools as mit
 from bisect import bisect, bisect_left
 from pathlib import Path
 from pynwb import NWBFile
+from scipy.stats import sem, ranksums
+from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
 from update_project.results_io import ResultsIO
 from update_project.virtual_track import UpdateTrack
@@ -27,14 +29,13 @@ class SingleUnitAnalyzer:
         self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1], correct=[0, 1]))  # trials
-        self.encoder_bin_num = params.get('encoder_bin_num', 40)  # number of bins to build encoder
+        self.encoder_bin_num = params.get('encoder_bin_num', 50)  # number of bins to build encoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
-        self.limits = self.virtual_track.get_limits(feature)
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
         self.window = params.get('align_window', 2.5)  # number of bins to build encoder  # sec to look at aligned psth
         self.align_nbins = np.round((self.window * 2) / 25)  # hardcoded to match binsize of decoder too
-        self.downsample_factor = 10  # downsample signal from 2000Hz to 200Hz
+        self.downsample_factor = 20  # downsample signal from 2000Hz to 200Hz
 
         # setup decoding/encoding functions based on dimensions
         self.encoder = nap.compute_1d_tuning_curves
@@ -46,8 +47,9 @@ class SingleUnitAnalyzer:
                             f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
                                     tags=self.results_tags)
-        self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'unit_selectivity',
-                                                             'aligned_data', 'bins', 'trials', 'train_df'],
+        self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'goal_selectivity',
+                                                             'update_selectivity', 'aligned_data', 'bins',
+                                                             'trials', 'train_df'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'feature_name',
@@ -63,14 +65,16 @@ class SingleUnitAnalyzer:
         self.velocity = get_velocity(nwbfile)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
+        self.limits = self.virtual_track.get_limits(feature)
 
     def run(self, overwrite=False, export_data=True):
         print(f'Analyzing single unit data for session {self.results_io.session_id}...')
 
         if overwrite:
             self._preprocess()._encode()  # get tuning curves
-            self._get_unit_selectivity()  # get selectivity index
+            self._get_goal_selectivity()  # get selectivity index
             self._get_aligned_spikes()  # get spiking aligned to task events
+            self._get_update_selectivity()  # get units that respond
             if export_data:
                 self._export_data()  # save output data
         else:
@@ -226,7 +230,7 @@ class SingleUnitAnalyzer:
 
         return largest_field_ind
 
-    def _get_unit_selectivity(self):
+    def _get_goal_selectivity(self):
         if np.size(self.tuning_curves):
             # get goal selective cells (cells with a place field in at least one of the choice locations)
             place_field_thresholds = self.tuning_curves.apply(lambda x: x > (np.mean(x) + np.std(x)))
@@ -248,19 +252,21 @@ class SingleUnitAnalyzer:
             selectivity_index = goal_selective_cells.apply(lambda x: self._calc_selectivity_index(x, self.bounds))
             selectivity_index = selectivity_index.transpose()
 
-            self.unit_selectivity = pd.merge(self.units_subset[['region', 'cell_type']], selectivity_index,
+            self.goal_selectivity = pd.merge(self.units_subset[['region', 'cell_type']], selectivity_index,
                                              left_index=True, right_index=True, how='left')
-            self.unit_selectivity['unit_id'] = self.unit_selectivity.index
-            self.unit_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
-            self.unit_selectivity['place_field_peak_ind'] = place_fields.apply(lambda x: self._get_largest_field_loc(x),
+            self.goal_selectivity['unit_id'] = self.goal_selectivity.index
+            self.goal_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
+            self.goal_selectivity['place_field_peak_ind'] = place_fields.apply(lambda x: self._get_largest_field_loc(x),
                                                                                axis=0)
         else:
-            self.unit_selectivity = pd.DataFrame()
+            self.goal_selectivity = pd.DataFrame()
 
         return self
 
     @staticmethod
     def _calc_selectivity_index(x, bounds):
+        # based on Kay, Frank Neuron 2020 paper for goal-selective cells (but more stringent bc must have a place field
+        # only within the goal zone
         mean_fr = [np.nanmean(x.loc[b[0]:b[1]]) if np.size(x.loc[b[0]:b[1]]) else np.nan for b in bounds]
         max_fr = [np.nanmax(x.loc[b[0]:b[1]]) if np.size(x.loc[b[0]:b[1]]) else np.nan for b in bounds]
 
@@ -279,7 +285,7 @@ class SingleUnitAnalyzer:
             new_times = np.linspace(window_start, window_stop,
                                     int(np.round(self.theta['phase'].rate * (window_stop - window_start))))
 
-            for unit_index in range(len(self.nwb_units)):  # TODO - also filter nwb units with unit filtering
+            for unit_index in range(len(self.nwb_units)):
                 if self.nwb_units.id[unit_index] in self.units_subset.index.to_list():
                     units_aligned.append(dict(trial_ids=self.trials.index.to_numpy(),
                                               time_label=time_label,
@@ -309,7 +315,7 @@ class SingleUnitAnalyzer:
                             .reset_index(drop=True))
             aligned_data['update_type'] = aligned_data['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
 
-            self.aligned_data = pd.merge(aligned_data, self.unit_selectivity, on='unit_id')
+            self.aligned_data = pd.merge(aligned_data, self.goal_selectivity, on='unit_id')
         else:
             self.aligned_data = pd.DataFrame()
 
@@ -321,6 +327,74 @@ class SingleUnitAnalyzer:
             window_start = 0
 
         return -window_start, window_stop
+
+    def _get_update_selectivity(self):
+        # based on the Finkelstein, Svoboda, Nat Neurosci 2021 selectivity indices
+        # get trial averaged spike rates for update and non-update trials
+        update_aligned = (self.aligned_data
+                            .query('time_label == "t_update" & correct == 1.0')
+                            .groupby(['unit_id', 'update_type', 'region', 'cell_type'])
+                            .apply(lambda x: self._calc_trial_averaged_psth(x['spikes'], x['new_times']))
+                            .reset_index())
+        psth_data = pd.json_normalize(update_aligned[0])
+        update_aligned = pd.concat([update_aligned.drop(labels=[0, 'region', 'cell_type'], axis=1), psth_data], axis=1)
+
+        # subtract update - non-update trials at all timepoints
+        default_diff = np.empty(np.shape(update_aligned['psth_mean'].to_numpy()[0]))
+        default_diff[:] = np.nan
+        update_pivot = update_aligned.pivot(index=['unit_id'], columns=['update_type'], values=['psth_mean', 'psth_err'])
+        update_pivot['psth_diff_switch_non_update'] = [default_diff] * len(update_pivot.index)
+        update_pivot['psth_diff_switch_stay'] = [default_diff] * len(update_pivot.index)
+        trial_types = [c for c in update_pivot['psth_mean'].columns if c != 'switch' ]
+        for c in trial_types:
+            update_pivot[f'psth_diff_switch_{c}'] = (update_pivot[('psth_mean', 'switch')] -
+                                                     update_pivot[('psth_mean', c)])
+        update_pivot['psth_times'] = update_aligned.query('update_type == "non_update"')['psth_times'].to_numpy()
+        update_pivot.reset_index(inplace=True)
+
+        # average time after update and test if significant? confused how they did that
+        update_selective = update_pivot.apply(lambda x: self._get_update_selectivity_index(x['psth_mean'],
+                                                                                           x[('psth_times', '')]),
+                                              axis=1)
+        update_pivot.columns = ['_'.join(c) if c[1] != '' else c[0] for c in update_pivot.columns.to_flat_index()]
+        self.update_selectivity = pd.concat([update_pivot, pd.json_normalize(update_selective)], axis=1)
+
+    @staticmethod
+    def _get_update_selectivity_index(psth_mean, psth_times, window_size=2, pval_threshold=0.001):
+        window_start = np.where(psth_times > 0)[0][0]
+        window_end = np.where(psth_times > window_size)[0][0]
+
+        mean_non_update = np.nanmean(psth_mean['non_update'][window_start:window_end])
+        mean_switch = np.nanmean(psth_mean['switch'][window_start:window_end])
+        mean_stay = np.nanmean(psth_mean['stay'][window_start:window_end])
+
+        # _, switch_vs_non_update_p_value = ranksums(psth_switch, psth_non_update) from Finkelstien Svoboda 2021
+        # _, switch_vs_stay_p_value = ranksums(psth_switch, psth_stay)
+
+        switch_vs_non_update_mod = (mean_switch - mean_non_update) / (mean_switch + mean_non_update)
+        switch_vs_stay_mod = (mean_switch - mean_stay) / (mean_switch + mean_stay)
+
+        return dict(switch_vs_non_update_index=switch_vs_non_update_mod,
+                    switch_vs_stay_index=switch_vs_stay_mod)
+
+    @staticmethod
+    def _calc_trial_averaged_psth(data, times, ntt=None):
+        sigma_in_secs = 0.05  # 50 ms smoothing
+        ntt = ntt or 500  # default value
+        tt = np.linspace(times.values[0].min(), times.values[0].max(), ntt)
+
+        all_data = np.hstack(data)
+        if len(all_data):  # if any spikes
+            firing_rate = np.array([compute_smoothed_firing_rate(x, tt, sigma_in_secs) for x in data])
+        else:
+            firing_rate = np.empty((np.shape(data)[0], ntt))
+            firing_rate[:] = np.nan
+
+        # get average across trials
+        mean = np.nanmean(firing_rate, axis=0)
+        err = sem(firing_rate, axis=0)  # just filled with nan values
+
+        return dict(psth_mean=mean, psth_err=err, psth_times=tt)
 
     def _load_data(self):
         print(f'Loading existing data for session {self.results_io.session_id}...')

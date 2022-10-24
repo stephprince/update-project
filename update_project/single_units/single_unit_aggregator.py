@@ -16,7 +16,8 @@ class SingleUnitAggregator:
         # aggregate session data
         for sess_dict in data:
             sess_dict.update(dict(tuning_curves=sess_dict['analyzer'].tuning_curves,
-                                  unit_selectivity=sess_dict['analyzer'].unit_selectivity,
+                                  goal_selectivity=sess_dict['analyzer'].goal_selectivity,
+                                  update_selectivity=sess_dict['analyzer'].update_selectivity,
                                   aligned_data=sess_dict['analyzer'].aligned_data,
                                   tuning_bins=sess_dict['analyzer'].bins,
                                   trial_info=sess_dict['analyzer'].trials,
@@ -32,7 +33,7 @@ class SingleUnitAggregator:
         self.group_tuning_curves = self._get_group_tuning_curves()
 
         # save memory once information is extracted
-        self.group_df.drop(['tuning_curves', 'unit_selectivity', 'aligned_data'], axis=1, inplace=True)
+        self.group_df.drop(['tuning_curves', 'goal_selectivity', 'aligned_data'], axis=1, inplace=True)
 
     def _meets_exclusion_criteria(self, data):
         exclude_session = False  # default to include session
@@ -58,13 +59,17 @@ class SingleUnitAggregator:
     def _get_group_tuning_curves(self):
         tuning_curve_list = []
         for _, sess_data in self.group_df.iterrows():
-            tuning_curves = sess_data['tuning_curves'].transpose()
-            tuning_curves.columns = np.round((sess_data['tuning_bins'][1:] + sess_data['tuning_bins'][:-1]) / 2, 2)
-            tuning_curves.insert(loc=0, column='unit_id', value=tuning_curves.index)
+            tuning_curves = pd.DataFrame(data=sess_data['tuning_curves'].columns, columns=['unit_id'])
+            tuning_curves.insert(loc=1, column='tuning_bins',
+                                 value=[sess_data['tuning_curves'].index.to_numpy()] * len(tuning_curves.index))
+            tuning_curves.insert(loc=1, column='tuning_curves',
+                                 value=list(sess_data['tuning_curves'].transpose().to_numpy()))
             tuning_curves.insert(loc=0, column='feature_name', value=sess_data['feature_name'])
             tuning_curves.insert(loc=0, column='session_id', value=sess_data['session_id'])
             tuning_curves.insert(loc=0, column='animal', value=sess_data['animal'])
-            tuning_curves = tuning_curves.merge(sess_data['unit_selectivity'], how='left', on='unit_id')
+
+            tuning_curves = tuning_curves.merge(sess_data['goal_selectivity'], how='left', on='unit_id')
+            tuning_curves = tuning_curves.merge(sess_data['update_selectivity'], how='left', on='unit_id')
 
             tuning_curve_list.append(tuning_curves)
 
@@ -147,7 +152,7 @@ class SingleUnitAggregator:
 
     @staticmethod
     def _calc_firing_rate(data, start, stop, ret_timestamps=False, ntt=None):
-        sigma_in_secs = 0.01
+        sigma_in_secs = 0.05
         ntt = ntt or 100  # default value
         tt = np.linspace(start, stop, ntt)
 
@@ -252,6 +257,7 @@ class SingleUnitAggregator:
         data = data[data['theta_phase'].map(lambda x: len(x) > 0)]
 
         # break down so each row has a single theta phase/amplitude value
+        # TODO - fix this so that it combines unit data before exploding
         data['spike_counts'] = data.apply(lambda x: np.histogram(x['spikes'], range=(x['new_times'][0], x['new_times'][-1]),
                                                     bins=len(x['new_times']))[0], axis=1)
         data_to_explode = ['theta_phase', 'theta_amplitude', 'spike_counts', 'new_times', 'timestamps']
