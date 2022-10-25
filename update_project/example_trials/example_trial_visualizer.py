@@ -63,7 +63,7 @@ class ExampleTrialVisualizer:
                         prev_group = g_name[0]
 
                     fig = plt.figure(figsize=(15, 20), layout='constrained')
-                    sfigs = fig.subfigures(1, 2, width_ratios=[2, 2])
+                    sfigs = fig.subfigures(1, 2, width_ratios=[4, 1])
 
                     # plot all neural data/behavioral metrics over time
                     axes = sfigs[0].subplots(14, 1, sharex='col',
@@ -126,18 +126,15 @@ class ExampleTrialVisualizer:
             axes[3 + ax_adjust[s_name[0]]].set(ylabel='mean fr')
 
         # plot tuning curves for this session
-        cols_to_skip = ['session_id', 'animal', 'feature_name', 'unit_id', 'region', 'cell_type',
-                        'mean_selectivity_index', 'max_selectivity_index', 'place_field_threshold',
-                        'place_field_peak_ind']
         tuning_data = self.aggregator.single_unit_agg.group_tuning_curves.query(f'session_id == "{session_id}"')
         for r_name, r_data in tuning_data.groupby('region'):
             r_data.sort_values('place_field_peak_ind', na_position='first', inplace=True)
-            map_df = r_data[tuning_data.columns.difference(cols_to_skip)]
-            tuning_curve_scaled = np.stack(map_df.to_numpy()) / np.max(np.stack(map_df.to_numpy()), axis=1)[:, None]
+            curve = np.stack(r_data['tuning_curves'].to_numpy())
+            tuning_curve_scaled = curve / np.max(curve, axis=1)[:, None]
 
             y_limits = [0, np.shape(tuning_curve_scaled)[0]]
-            x_limits = [np.round(np.min(map_df.columns.to_numpy()), 2),
-                        np.round(np.max(map_df.columns.to_numpy()), 2)]
+            x_limits = [np.round(np.min(r_data['tuning_bins'].to_numpy()[0]), 2),
+                        np.round(np.max(r_data['tuning_bins'].to_numpy()[0]), 2)]
             im = axes[5 + ax_adjust[r_name]].imshow(tuning_curve_scaled, aspect='auto',
                                                     cmap=self.colors['cmap_r'], origin='lower', vmin=0.1,
                                                     vmax=0.9,

@@ -7,8 +7,8 @@ from update_project.example_trials.example_trial_visualizer import ExampleTrialV
 
 # setup sessions
 animals = [17, 20, 25, 28, 29, 33, 34]
-dates_included = [220623]
-dates_excluded = [211117]
+dates_included = []
+dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
