@@ -24,11 +24,11 @@ def run_bayesian_decoding():
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['y_position']  # idk if it's a lot of data or what but this takes awhile when give too many options
+    features = ['y_position']
     regions = [['CA1']]
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
-    testing_params = dict(encoder_bins=[40],
-                          decoder_bins=[0.25])
+    testing_params = dict(encoder_bin_num=[50],  # TODO - add catch for goal zone division with different bins
+                          decoder_bin_size=[0.2])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
