@@ -1005,7 +1005,7 @@ class BayesianDecoderVisualizer:
             for g_name, g_data in data_subset.groupby('update_type', sort=False):
                 # bin trials for percent correct calculations
                 col = np.argwhere(trial_data['update_type'].unique() == g_name)[0][0]
-                trial_block = 50
+                trial_block = 40
                 bins = np.hstack([g_data['index'].unique()[::trial_block], g_data['index'].unique()[-1]])
                 g_data['trials_binned'] = pd.cut(g_data['index'], bins=bins, include_lowest=True, labels=False, duplicates='drop')
 

@@ -27,7 +27,7 @@ class BayesianDecoder:
         self.decoder_test_size = params.get('decoder_test_size', 0.2)  # prop of trials for testing on train/test split
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],
                                                                           correct=[0, 1]))  # trial filters
-        self.encoder_bin_num = params.get('encoder_bin_num', 40)  # number of bins to build encoder
+        self.encoder_bin_num = params.get('encoder_bin_num', 50)  # number of bins to build encoder
         self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
                                                                           correct=[0, 1]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
@@ -181,7 +181,7 @@ class BayesianDecoder:
                     'Durations differences after adjustment should be no more than 2x bin size (1 bin for forward and' \
                     ' back'
 
-            new_starts.append(new_left)  # TODO - check this looks ok by looking at the decoding output
+            new_starts.append(new_left)
             new_stops.append(new_right)
 
         times = nap.IntervalSet(start=np.hstack(new_starts), end=np.hstack(new_stops), time_units='s')
