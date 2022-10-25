@@ -331,48 +331,52 @@ class SingleUnitAnalyzer:
     def _get_update_selectivity(self):
         # based on the Finkelstein, Svoboda, Nat Neurosci 2021 selectivity indices
         # get trial averaged spike rates for update and non-update trials
-        update_aligned = (self.aligned_data
-                            .query('time_label == "t_update" & correct == 1.0')
-                            .groupby(['unit_id', 'update_type', 'region', 'cell_type'])
-                            .apply(lambda x: self._calc_trial_averaged_psth(x['spikes'], x['new_times']))
-                            .reset_index())
-        psth_data = pd.json_normalize(update_aligned[0])
-        update_aligned = pd.concat([update_aligned.drop(labels=[0, 'region', 'cell_type'], axis=1), psth_data], axis=1)
+        if np.size(self.aligned_data):
+            update_aligned = (self.aligned_data
+                                .query('time_label == "t_update" & correct == 1.0')
+                                .groupby(['unit_id', 'update_type', 'region', 'cell_type'])
+                                .apply(lambda x: self._calc_trial_averaged_psth(x['spikes'], x['new_times']))
+                                .reset_index())
+            psth_data = pd.json_normalize(update_aligned[0])
+            update_aligned = pd.concat([update_aligned.drop(labels=[0, 'region', 'cell_type'], axis=1), psth_data], axis=1)
 
-        # subtract update - non-update trials at all timepoints
-        default_diff = np.empty(np.shape(update_aligned['psth_mean'].to_numpy()[0]))
-        default_diff[:] = np.nan
-        update_pivot = update_aligned.pivot(index=['unit_id'], columns=['update_type'], values=['psth_mean', 'psth_err'])
-        update_pivot['psth_diff_switch_non_update'] = [default_diff] * len(update_pivot.index)
-        update_pivot['psth_diff_switch_stay'] = [default_diff] * len(update_pivot.index)
-        trial_types = [c for c in update_pivot['psth_mean'].columns if c != 'switch' ]
-        for c in trial_types:
-            update_pivot[f'psth_diff_switch_{c}'] = (update_pivot[('psth_mean', 'switch')] -
-                                                     update_pivot[('psth_mean', c)])
-        update_pivot['psth_times'] = update_aligned.query('update_type == "non_update"')['psth_times'].to_numpy()
-        update_pivot.reset_index(inplace=True)
+            # subtract update - non-update trials at all timepoints
+            default_diff = np.empty(np.shape(update_aligned['psth_mean'].to_numpy()[0]))
+            default_diff[:] = np.nan
+            update_pivot = update_aligned.pivot(index=['unit_id'], columns=['update_type'], values=['psth_mean', 'psth_err'])
+            update_pivot['psth_diff_switch_non_update'] = [default_diff] * len(update_pivot.index)
+            update_pivot['psth_diff_switch_stay'] = [default_diff] * len(update_pivot.index)
+            trial_types = [c for c in update_pivot['psth_mean'].columns if c != 'switch' ]
+            for c in trial_types:
+                update_pivot[f'psth_diff_switch_{c}'] = (update_pivot[('psth_mean', 'switch')] -
+                                                         update_pivot[('psth_mean', c)])
+            update_pivot['psth_times'] = update_aligned.query('update_type == "non_update"')['psth_times'].to_numpy()
+            update_pivot.reset_index(inplace=True)
 
-        # average time after update and test if significant? confused how they did that
-        update_selective = update_pivot.apply(lambda x: self._get_update_selectivity_index(x['psth_mean'],
-                                                                                           x[('psth_times', '')]),
-                                              axis=1)
-        update_pivot.columns = ['_'.join(c) if c[1] != '' else c[0] for c in update_pivot.columns.to_flat_index()]
-        self.update_selectivity = pd.concat([update_pivot, pd.json_normalize(update_selective)], axis=1)
+            # average time after update and test if significant? confused how they did that
+            update_selective = update_pivot.apply(lambda x: self._get_update_selectivity_index(x['psth_mean'],
+                                                                                               x[('psth_times', '')],),
+                                                  axis=1)
+            update_pivot.columns = ['_'.join(c) if c[1] != '' else c[0] for c in update_pivot.columns.to_flat_index()]
+            self.update_selectivity = pd.concat([update_pivot, pd.json_normalize(update_selective)], axis=1)
+        else:
+            self.update_selectivity = pd.DataFrame()
 
     @staticmethod
-    def _get_update_selectivity_index(psth_mean, psth_times, window_size=2, pval_threshold=0.001):
+    def _get_update_selectivity_index(psth_mean, psth_times, window_size=2):
         window_start = np.where(psth_times > 0)[0][0]
         window_end = np.where(psth_times > window_size)[0][0]
 
-        mean_non_update = np.nanmean(psth_mean['non_update'][window_start:window_end])
-        mean_switch = np.nanmean(psth_mean['switch'][window_start:window_end])
-        mean_stay = np.nanmean(psth_mean['stay'][window_start:window_end])
+        means = dict(switch=np.nan, non_update=np.nan, stay=np.nan)
+        for t in ['switch', 'non_update', 'stay']:
+            if t in psth_mean.index:
+                means[t] = np.nanmean(psth_mean[t][window_start:window_end])
 
         # _, switch_vs_non_update_p_value = ranksums(psth_switch, psth_non_update) from Finkelstien Svoboda 2021
         # _, switch_vs_stay_p_value = ranksums(psth_switch, psth_stay)
 
-        switch_vs_non_update_mod = (mean_switch - mean_non_update) / (mean_switch + mean_non_update)
-        switch_vs_stay_mod = (mean_switch - mean_stay) / (mean_switch + mean_stay)
+        switch_vs_non_update_mod = (means['switch'] - means['non_update']) / (means['switch'] + means['non_update'])
+        switch_vs_stay_mod = (means['switch'] - means['stay']) / (means['switch'] + means['stay'])
 
         return dict(switch_vs_non_update_index=switch_vs_non_update_mod,
                     switch_vs_stay_index=switch_vs_stay_mod)
@@ -380,7 +384,7 @@ class SingleUnitAnalyzer:
     @staticmethod
     def _calc_trial_averaged_psth(data, times, ntt=None):
         sigma_in_secs = 0.05  # 50 ms smoothing
-        ntt = ntt or 500  # default value
+        ntt = ntt or 250  # default value
         tt = np.linspace(times.values[0].min(), times.values[0].max(), ntt)
 
         all_data = np.hstack(data)
