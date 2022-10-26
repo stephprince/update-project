@@ -20,6 +20,7 @@ class BehaviorVisualizer:
 
         if session_id:
             self.results_type = 'session'
+            self.session_id = session_id
             self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem, session_id=session_id)
         else:
             self.results_type = 'group'
@@ -234,26 +235,34 @@ class BehaviorVisualizer:
         axes.plot(switch_df,marker='*',linestyle='None', markersize='5', label='switch update', color=self.colors['switch'])
         axes.plot(stay_df, marker='D', linestyle='None', markersize='3', label='stay update', color=self.colors['stay'])
 
-        #plot lines to distinguish trial types
-        trial_locations=dict()
-        for a in self.virtual_track.trial_types:
-            if (temp_df.phase.ne(a).idxmin())!=0:
-                trial_locations.update({a: temp_df.phase.ne(a).idxmin()})
-        for a in trial_locations.keys():
-            axes.axvline(x=trial_locations[a], alpha=0.3, color='k', label=a)
-
-        #add colors to graph to indicate trial type
-        min_delay=min(trial_locations['delay1'],trial_locations['delay2'],trial_locations['delay3'],trial_locations['delay4'])
-        min_update=min(trial_locations['switch_update'],trial_locations['stay_update'])
-
-        axes.axvspan(min_delay, min_update, facecolor='k', alpha=0.1)
-        axes.axvspan(min_update, len(temp_df['prop_correct']), facecolor='c', alpha=0.1)
+        # add shading to indicate trial type
+        current_phase=temp_df['phase'][0]
+        ind=0
+        update=False
+        for trial in range(len(temp_df)-1):
+            if temp_df['phase'][trial+1] != current_phase:
+                previous_phase=current_phase
+                current_phase=temp_df['phase'][trial+1]
+                if update and current_phase not in ['stay_update','switch_update','delay4']:
+                    update=False
+                    axes.axvspan(ind, trial+1,facecolor='c', alpha=0.1, label='update')
+                    ind = trial + 1
+                elif not update and current_phase in ['stay_update', 'switch_update']:
+                    update = True
+                    axes.axvspan(ind, trial + 1, color=self.colors[previous_phase], label=previous_phase)
+                    ind = trial + 1
+                if not update:
+                    update=False
+                    axes.axvspan(ind, trial+1, color=self.colors[previous_phase], label=previous_phase)
+                    ind=trial+1
+                if trial==len(temp_df)-2 and previous_phase in ['stay_update','switch_update','delay4']:
+                    axes.axvspan(ind, len(temp_df), facecolor='c', alpha=0.1, label='update')
 
         # make visually appealing
         axes.legend()
         axes.set(xlabel='Number of Trials', ylabel='Proportion Correct')
-        axes.set(ylim=[0,1])
+        axes.set(ylim=[0,1], xlim=[0,len(temp_df)])
         axes.axhline(y=0.5, alpha=0.1, linestyle='dashed', color='k')
-        axes.set_title(f'Session Performance - {session_db.get_session_id(name)}')
+        axes.set_title(f'Session Performance - %s' %self.session_id)
 
         self.results_io.save_fig(fig=fig,axes=axes,filename=f'session_performance', results_type=self.results_type)
