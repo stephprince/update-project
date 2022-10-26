@@ -62,6 +62,15 @@ def get_color_theme():
     color_theme_dict['non_update'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
 
+    color_theme_dict['delay1'] = '#e6e6e6'
+    color_theme_dict['delay2'] = '#dadada'
+    color_theme_dict['delay3'] = '#cdcdcd'
+    color_theme_dict['delay4'] = '#c0c0c0'
+
+    color_theme_dict['ymaze_long'] = '#ffffff'
+    color_theme_dict['ymaze_short'] = '#ffffff'
+    color_theme_dict['linear'] = '#ffffff'
+
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
     color_theme_dict['home_cmap'] = sns.color_palette("Greys", as_cmap=True)
