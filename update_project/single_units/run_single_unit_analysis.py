@@ -1,3 +1,5 @@
+import numpy as np
+
 from pynwb import NWBHDF5IO
 
 from update_project.session_loader import SessionLoader

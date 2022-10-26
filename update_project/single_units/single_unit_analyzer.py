@@ -36,6 +36,8 @@ class SingleUnitAnalyzer:
         self.window = params.get('align_window', 2.5)  # number of bins to build encoder  # sec to look at aligned psth
         self.align_nbins = np.round((self.window * 2) / 25)  # hardcoded to match binsize of decoder too
         self.downsample_factor = 20  # downsample signal from 2000Hz to 200Hz
+        self.goal_selectivity_strictness = 'goal_field'  # options are 'only_goal_field' (no fields in rest of track)
+                                                         # or 'goal_field' (can have other fields in rest of track)
 
         # setup decoding/encoding functions based on dimensions
         self.encoder = nap.compute_1d_tuning_curves
@@ -240,12 +242,20 @@ class SingleUnitAnalyzer:
             place_fields = np.logical_or(place_fields_2_bins, bins_shifted).astype(bool)
 
             # get cells with place fields in goal arms but no fields in other parts of the track
-            all_bounds = np.hstack([place_fields.loc[self.bounds[0][0]:self.bounds[0][1]].index,
-                                    place_fields.loc[self.bounds[1][0]:self.bounds[1][1]].index])
-            out_of_bounds_bool = place_fields.apply(lambda x: x[~x.index.isin(all_bounds)].any())
-            bounds_bool_1 = place_fields.apply(lambda x: x.loc[self.bounds[0][0]:self.bounds[0][1]].any())  # get all goal
-            bounds_bool_2 = place_fields.apply(lambda x: x.loc[self.bounds[1][0]:self.bounds[1][1]].any())  # get all goal
-            goal_selective_bool = np.logical_and(np.logical_or(bounds_bool_1, bounds_bool_2), ~out_of_bounds_bool).astype(bool)
+            bounds_bool_1 = place_fields.apply(
+                lambda x: x.loc[self.bounds[0][0]:self.bounds[0][1]].any())  # get all goal
+            bounds_bool_2 = place_fields.apply(
+                lambda x: x.loc[self.bounds[1][0]:self.bounds[1][1]].any())  # get all goal
+
+            if self.goal_selectivity_strictness == 'only_goal_field':
+                all_bounds = np.hstack([place_fields.loc[self.bounds[0][0]:self.bounds[0][1]].index,
+                                        place_fields.loc[self.bounds[1][0]:self.bounds[1][1]].index])
+                out_of_bounds_bool = place_fields.apply(lambda x: x[~x.index.isin(all_bounds)].any())
+                goal_selective_bool = np.logical_and(np.logical_or(bounds_bool_1, bounds_bool_2),
+                                                     ~out_of_bounds_bool).astype(bool)
+            else:
+                goal_selective_bool = np.logical_or(bounds_bool_1, bounds_bool_2).astype(bool)
+
             goal_selective_cells = self.tuning_curves.loc[:, goal_selective_bool]
 
             # get left/right selective (goal selective + how much prefer one goal location to the other)
@@ -341,7 +351,7 @@ class SingleUnitAnalyzer:
             update_aligned = pd.concat([update_aligned.drop(labels=[0, 'region', 'cell_type'], axis=1), psth_data], axis=1)
 
             # subtract update - non-update trials at all timepoints
-            default_diff = np.empty(np.shape(update_aligned['psth_mean'].to_numpy()[0]))
+            default_diff = np.empty(np.shape(update_aligned['psth_times'].to_numpy()[0]))
             default_diff[:] = np.nan
             update_pivot = update_aligned.pivot(index=['unit_id'], columns=['update_type'], values=['psth_mean', 'psth_err'])
             update_pivot['psth_diff_switch_non_update'] = [default_diff] * len(update_pivot.index)
@@ -369,7 +379,7 @@ class SingleUnitAnalyzer:
 
         means = dict(switch=np.nan, non_update=np.nan, stay=np.nan)
         for t in ['switch', 'non_update', 'stay']:
-            if t in psth_mean.index:
+            if t in psth_mean.index and ~np.isnan(psth_mean[t]).all():
                 means[t] = np.nanmean(psth_mean[t][window_start:window_end])
 
         # _, switch_vs_non_update_p_value = ranksums(psth_switch, psth_non_update) from Finkelstien Svoboda 2021
@@ -391,8 +401,9 @@ class SingleUnitAnalyzer:
         if len(all_data):  # if any spikes
             firing_rate = np.array([compute_smoothed_firing_rate(x, tt, sigma_in_secs) for x in data])
         else:
-            firing_rate = np.empty((np.shape(data)[0], ntt))
-            firing_rate[:] = np.nan
+            # firing_rate = np.empty((np.shape(data)[0], ntt))
+            # firing_rate[:] = np.nan
+            firing_rate = np.nan  # TODO - test how these nans propogate to include cells or not
 
         # get average across trials
         mean = np.nanmean(firing_rate, axis=0)
@@ -434,4 +445,4 @@ class SingleUnitAnalyzer:
                 with open(fname, 'wb') as f:
                     [pickle.dump(getattr(self, v), f) for v in file_info['vars']]
             else:
-                raise RuntimeError(f'{file_info["format"]} format is not currently supported for exporting data')
+                raise RuntimeError(f'{file_info["format"]} format is not currently supported')
