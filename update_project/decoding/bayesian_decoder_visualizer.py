@@ -47,24 +47,20 @@ class BayesianDecoderVisualizer:
             # make plots for different parameters, groups, features
             groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
             for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
-                # plot comparisons between plot groups (e.g. correct/incorrect, left/right, update/non-update)
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-                self.plot_performance_comparisons(data, tags=tags)
-                # self.plot_group_aligned_comparisons(data, **kwargs)
-                # self.plot_theta_phase_comparisons(data, **kwargs)
+                self.plot_group_aligned_comparisons(data, **kwargs)
+                # self.plot_performance_comparisons(data, tags=tags)
+                self.plot_theta_data(data, kwargs)
 
                 # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
                 for plot_types in list(itertools.product(*self.plot_groups.values())):
                     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-
                     self.plot_group_aligned_data(data, **kwargs)
                     # self.plot_scatter_dists_around_update(data, **kwargs)
                     # self.plot_trial_by_trial_around_update(data, **kwargs)
-                    self.plot_phase_modulation_around_update(data, **kwargs)
-                    self.plot_theta_phase_histogram(data, **kwargs)
 
             # plot region interactions
             for name, data in self.aggregator.group_aligned_df.groupby(self.params):
@@ -89,6 +85,21 @@ class BayesianDecoderVisualizer:
                 self.plot_parameter_comparison(data, name, thresh_params=True)
         else:
             print(f'No data found to plot')
+
+    def plot_theta_data(self, data, kwargs):
+        unique_bins = data['decoder_bin_size'].unique()
+        any_small_bins = np.size([b for b in unique_bins if b < 0.05])
+
+        if any_small_bins:
+            self.plot_theta_phase_comparisons(data, **kwargs)
+
+            for plot_types in list(itertools.product(*self.plot_groups.values())):
+                plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
+                title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+                kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{kwargs["tags"]}_{title}')
+
+                self.plot_phase_modulation_around_update(data, **kwargs)
+                self.plot_theta_phase_histogram(data, **kwargs)
 
     def _sort_group_confusion_matrices(self, data):
         param_group_data_sorted = []
@@ -635,103 +646,126 @@ class BayesianDecoderVisualizer:
 
     def plot_group_aligned_comparisons(self, param_data, plot_groups=None, tags=''):
         print('Plotting group aligned comparisons...')
-
         feat = param_data['feature_name'].values[0]
         compiled_data = []
         for plot_types in list(itertools.product(*plot_groups.values())):
             plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
-            for ind, time_label in enumerate(self.aggregator.align_times):
-                filter_dict = dict(time_label=[time_label], **plot_group_dict)
-                group_aligned_data = self.aggregator.select_group_aligned_data(param_data, filter_dict)
-                if np.size(group_aligned_data) and group_aligned_data is not None:
-                    quant_aligned_data = self.aggregator.quantify_aligned_data(param_data, group_aligned_data)
-                    compiled_data.append(dict(data=group_aligned_data, quant=quant_aligned_data,
-                                              **{k: v[0] for k, v in
-                                                 filter_dict.items()}))  # TODO - separate out the compilation
+            filter_dict = dict(time_label=['t_update'], **plot_group_dict)
+            trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, filter_dict)
+            aligned_data = self.aggregator.select_group_aligned_data(param_data, filter_dict, ret_df=True)
+            compiled_data.append(dict(aligned_data=aligned_data, trial_data=trial_data,
+                                      **{k: v[0] for k, v in
+                                         filter_dict.items()}))  # TODO - separate out the compilation
 
         # compile data for comparisons
+        comparisons = dict(update_type=dict(update_type=['switch', 'stay', 'non_update'],
+                                            correct=[1]),
+                           correct=dict(update_type=['switch'], correct=[0, 1]))
         compiled_data_df = pd.DataFrame(compiled_data)
-        filter_dict = dict(time_label='t_update', correct=1)
-        update_mask = pd.concat([compiled_data_df[k] == v for k, v in filter_dict.items()], axis=1).all(axis=1)
-        filter_dict = dict(time_label='t_update', update_type='switch')
-        correct_mask = pd.concat([compiled_data_df[k] == v for k, v in filter_dict.items()], axis=1).all(axis=1)
-        compare_df = dict(update_type=dict(data=compiled_data_df[update_mask],
-                                           comparison=['switch', 'stay']),
-                          correct=dict(data=compiled_data_df[correct_mask],
-                                       comparison=[1, 0]))
 
         # plot the data and accompanying stats
-        for comp, data_dict in compare_df.items():
-            stats_data, stats_plot_data = self.aggregator.get_aligned_stats(comp, data_dict, quant_aligned_data, tags)
-            self.plot_aligned_comparison(comp, data_dict, stats_plot_data, feat, filter_dict, tags)
-            self.plot_group_aligned_stats(stats_data, tags=tags)
+        for comp, filters in comparisons.items():
+            mask = pd.concat([compiled_data_df[k].isin(v) for k, v in filters.items()], axis=1).all(axis=1)
+            self.plot_aligned_comparison(comp, compiled_data_df[mask], feat, filters, tags)
+            # stats_data, stats_plot_data = self.aggregator.get_aligned_stats(comp, data_dict, quant_aligned_data, tags)
+            # self.plot_group_aligned_stats(stats_data, tags=tags)
 
-    def plot_aligned_comparison(self, comp, data_dict, stats_data, feat, filter_dict, tags):
-        ncols, nrows = (2, 6)  # one col for each comparison, 1 col for difference between two
-        fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
-        comparison_data = []
-        for ind, v in enumerate(data_dict['comparison']):
-            # plot comparison data
-            title = f'{v}_{"".join([f"{k}{v}" for k, v in filter_dict.items()])}'
-            data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
-            quant = data_dict['data'][data_dict['data'][comp] == v]['quant'].values[0]
-            bounds = [v['bound_values'] for v in quant.values()]
-            self.plot_1d_around_update(data, quant, title, feat, axes, row_id=np.arange(nrows), col_id=[ind] * nrows,
-                                       feature_name=feat, prob_map_axis=0, bounds=bounds)
+    def plot_aligned_comparison(self, comp, data, feat, filters, tags):
+        ncols, nrows = (np.shape(data)[0], 6)  # one col for each comparison, 1 col for difference between two
+        fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row',
+                                 constrained_layout=True)
+        data.reset_index(drop=True, inplace=True)  # reset index so iteration through rows for each column
+        for ind, v in data.iterrows():
+            # load up data
+            title = f'{"".join([f"{k}{f}" for k, f in filters.items()])}'
+            bounds = v['trial_data']['bound_values'].unique()
+            spaces = getattr(self.aggregator.group_df['virtual_track'].values[0], 'edge_spacing', [])
+            prob_maps = v['aligned_data'].groupby('time_label').apply(
+                lambda x: np.nanmean(np.stack(x['probability']), axis=0))
+            n_bins = np.shape(prob_maps.loc['t_update'])[0]
+            prob_lims = np.linspace(v['aligned_data']['feature'].apply(np.nanmin).min(),
+                                    v['aligned_data']['feature'].apply(np.nanmax).max(), n_bins)
+            time_lims = (v['aligned_data']['times'].apply(np.nanmin).min(),
+                         v['aligned_data']['times'].apply(np.nanmax).max())
 
-            # compile comparison data for differential
-            all_data = dict(data['stats']['probability'], bound='all', comparison=comp, group=v)
-            initial_data = dict(**quant['left']['stats']['prob_sum'], bound='initial', comparison=comp, group=v)
-            new_data = dict(**quant['right']['stats']['prob_sum'], bound='new', comparison=comp, group=v)
-            comparison_data.extend([all_data, initial_data, new_data])
-        data_df = pd.DataFrame(comparison_data)
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data', additional_tags=tags)
+            trial_mat = v['trial_data'].pivot(index=['choice', 'trial_index'], columns='times', values='prob_over_chance')
+            switch_mat = trial_mat.query('choice == "switch"').to_numpy()
+            stay_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+            times = trial_mat.columns.to_numpy()
+            im_times = (times[0] - np.diff(times)[0] / 2, times[-1] + np.diff(times)[0] / 2)
 
-        # calculate difference
-        ncols, nrows = (1, 2)  # one col for each comparison, 1 col for difference between two
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
-        groups = data_df.groupby('group')
-        g_names = data_dict['comparison']
-        diff_mean = groups.get_group(g_names[0])['mean'].to_numpy() - groups.get_group(g_names[1])['mean'].to_numpy()
-        diff_labels = groups.get_group(g_names[0]).bound.values
-        diff_data = {k: v for k, v in zip(diff_labels, diff_mean)}
-        times = data['times']
-        n_position_bins = np.shape(diff_data['all'])[0]
-        feat_bins = np.linspace(np.nanmin(data['decoding']), np.nanmax(data['decoding']), n_position_bins)
+            im_prob = axes[0][ind].imshow(prob_maps.loc['t_update'] * n_bins, cmap=self.colors['cmap'], aspect='auto',
+                                          origin='lower', vmin=0.6, vmax=2.8,
+                                          extent=[im_times[0], im_times[-1], prob_lims[0], prob_lims[-1]])
+            axes[0][ind].invert_yaxis()
+            for b in bounds:
+                axes[0][ind].axhline(b[0], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
+                axes[0][ind].axhline(b[1], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
+            for s in spaces:
+                xmin, xmax = 0, 1
+                if (times[0], times[-1]) == (0, time_lims[-1]):
+                    xmin, xmax = 0.5, 1
+                elif (times[0], times[-1]) == (time_lims[0], 0):
+                    xmin, xmax = 0, 0.5
+                axes[0][ind].axhspan(*s, color='#DDDDDD', edgecolor=None, xmin=xmin, xmax=xmax)
 
-        im = axes[0][0].imshow(diff_data['all'], cmap='Greys', origin='lower', aspect='auto',
-                               vmin=0.25 * np.nanmin(diff_data['all']), vmax=0.75 * np.nanmax(diff_data['all']),
-                               extent=[times[0], times[-1], feat_bins[0], feat_bins[-1]])
-        axes[0][0].axvline(0, linestyle='dashed', color='k', zorder=0)
-        axes[0][0].invert_yaxis()
-        axes[0][0].set(xlabel='Time around update (s)', ylabel=f'diff in probability', xlim=[times[0], times[-1]],
-                       ylim=[feat_bins[0], feat_bins[-1]])
-        axes[0][0].set_title(f'{title} trials - probability density - {g_names[0]} - {g_names[1]}', fontsize=14)
-        plt.colorbar(im, ax=axes[0][0], label='probability density', pad=0.01, location='right', fraction=0.046)
-        for b in bounds:
-            axes[0][0].axhline(b[0], linestyle='dashed', linewidth=0.5, zorder=0)
-            axes[0][0].axhline(b[1], linestyle='dashed', linewidth=0.5, zorder=0)
+            im_goal1 = axes[1][ind].imshow(stay_mat, cmap=self.colors['stay_cmap'], aspect='auto', vmin=0,
+                                           vmax=2.5,
+                                           origin='lower',
+                                           extent=[im_times[0], im_times[-1], 0, np.shape(stay_mat)[0]])
+            im_goal2 = axes[2][ind].imshow(switch_mat, cmap=self.colors['switch_cmap'], aspect='auto',
+                                           vmin=0, vmax=2.5, origin='lower',
+                                           extent=[im_times[0], im_times[-1], 0, np.shape(switch_mat)[0]], )
 
-        # add labels for bound_values, threshold
-        axes[1][0].plot(times, diff_data['initial'], color=self.colors['stay'], label='initial_stay')
-        axes[1][0].plot(times, diff_data['new'], color=self.colors['switch'], label='switch')
-        axes[1][0].axvline(0, linestyle='dashed', color='k', zorder=0)
-        axes[1][0].set(xlabel='Time around update (s)', ylabel=f'diff in probability', xlim=[times[0], times[-1]])
-        axes[1][0].set_title(f'{title} trials - probability density - {g_names[0]} - {g_names[1]}', fontsize=14)
-        axes[1][0].legend(loc='upper left')
+            axes[3][ind].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['switch'],
+                              label='switch')
+            axes[3][ind].fill_between(times, np.nanmean(switch_mat, axis=0) + sem(switch_mat),
+                                      np.nanmean(switch_mat, axis=0) - sem(switch_mat),
+                                      color=self.colors['switch'],
+                                      alpha=0.2)
+            axes[3][ind].plot(times, np.nanmean(stay_mat, axis=0), color=self.colors['initial_stay'],
+                              label='initial')
+            axes[3][ind].fill_between(times, np.nanmean(stay_mat, axis=0) + sem(stay_mat),
+                                      np.nanmean(stay_mat, axis=0) - sem(stay_mat),
+                                      color=self.colors['initial_stay'],
+                                      alpha=0.2)
+            axes[3][ind].axhline(1, linestyle='dashed', color='k', alpha=0.5)
+            axes[0][ind].set(ylim=(prob_lims[0], prob_lims[-1]), ylabel=self.aggregator.group_df['feature'].values[0],
+                             title=v[comp], xlim=time_lims)
+            axes[1][ind].set(ylim=(0, np.shape(stay_mat)[0]), ylabel='trials', title=v[comp], xlim=time_lims)
+            axes[2][ind].set(ylim=(0, np.shape(switch_mat)[0]), ylabel='trials', title=v[comp], xlim=time_lims)
+            axes[3][ind].set(ylabel='prob / chance', title=v[comp], xlim=time_lims)
 
-        # add significance stars
-        bound_plot_info = dict(initial=dict(height=10, color=self.colors['stay']),
-                               new=dict(height=5, color=self.colors['switch']))
-        for key, val in bound_plot_info.items():
-            stars_height = [axes[1][0].get_ylim()[1] / (val['height'])] * len(stats_data['sig'][key])
-            blanks_height = [axes[1][0].get_ylim()[1] / (val['height'])] * len(stats_data['ns'][key])
-            axes[1][0].plot(stats_data['ns'][key], blanks_height, marker="o", linestyle='', markerfacecolor='k',
-                            markersize=5, label='n.s.')
-            axes[1][0].plot(stats_data['sig'][key], stars_height, marker="*", linestyle='',
-                            markerfacecolor=val['color'],
-                            markersize=10, label=f'{key} sig.')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data_diff', additional_tags=tags)
+            veloc = np.stack(v['aligned_data']['rotational_velocity'])
+            error = np.stack(v['aligned_data']['error'])
+            axes[4][ind].plot(v['aligned_data']['times'].values[0], np.nanmean(veloc, axis=0), color=self.colors['control'],
+                              label='rotational velocity')
+            axes[4][ind].fill_between(v['aligned_data']['times'].values[0], np.nanmean(veloc, axis=0) + sem(veloc),
+                                      np.nanmean(veloc, axis=0) - sem(veloc), color=self.colors['control'],
+                                      alpha=0.2)
+            axes[5][ind].plot(v['aligned_data']['times'].values[0], np.nanmean(error, axis=0), color=self.colors['error'],
+                              label='decoding error')
+            axes[5][ind].fill_between(v['aligned_data']['times'].values[0], np.nanmean(error, axis=0) + sem(error),
+                                      np.nanmean(error, axis=0) - sem(error), color=self.colors['error'],
+                                      alpha=0.2)
+            axes[4][ind].set(ylabel='velocity', title=v[comp], xlim=time_lims)
+            axes[5][ind].set(ylabel='decoding error', title=v[comp], xlim=time_lims)
+
+        plt.colorbar(im_prob, ax=axes[0][ind], label='prob / chance', pad=0.01, fraction=0.046,
+                     location='right')
+        plt.colorbar(im_goal1, ax=axes[1][ind], label='prob / chance', pad=0.01, fraction=0.046,
+                     location='right')
+        plt.colorbar(im_goal2, ax=axes[2][ind], label='prob / chance', pad=0.01, fraction=0.046,
+                     location='right')
+
+        for r in range(nrows):
+            axes[r][ind].legend(fontsize='large')
+            for c in range(ncols):
+                axes[r][c].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+
+        fig.suptitle(title)
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data', additional_tags=tags,
+                                 tight_layout=False)
 
     def plot_group_aligned_stats(self, data_for_stats, tags=''):
         # grab data from the first second after the update occurs
@@ -925,64 +959,40 @@ class BayesianDecoderVisualizer:
             compiled_data.append(dict(data=theta_phase_data, **{k: v[0] for k, v in filter_dict.items()}))
 
         # compile data for comparisons
+        comparisons = dict(update_type=dict(update_type=['switch', 'stay', 'non_update'],
+                                            correct=[1]),
+                           correct=dict(update_type=['switch'], correct=[0, 1]))
         compiled_data_df = pd.DataFrame(compiled_data)
-        update_mask = pd.concat([compiled_data_df[k] == v for k, v in dict(correct=1).items()], axis=1).all(axis=1)
-        correct_mask = pd.concat([compiled_data_df[k] == v for k, v in dict(update_type='switch').items()], axis=1).all(
-            axis=1)
-        compare_df = dict(update_type=dict(data=compiled_data_df[update_mask], comparison=['switch', 'stay']),
-                          correct=dict(data=compiled_data_df[correct_mask], comparison=[1, 0]))
 
         # plot the data and accompanying stats
-        for comp, data_dict in compare_df.items():
-            # get difference between groups
-            comparison_data = []
-            for ind, v in enumerate(data_dict['comparison']):
-                d = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
-                d = d[d['bin_name'] == 'full']
-                d['comparison'] = comp
-                d['group'] = v
-                comparison_data.append(d)
-            comparison_df = pd.concat(comparison_data, axis=0)
+        for comp, filters in comparisons.items():
+            mask = pd.concat([compiled_data_df[k].isin(v) for k, v in filters.items()], axis=1).all(axis=1)
+            data = compiled_data_df[mask].reset_index(drop=True)  # reset index so iteration through rows for each column
 
             # calculate difference
-            ncols, nrows = (6, 2)  # cols for pre/post, g12 g_diff, row for each value
+            ncols, nrows = (np.shape(data)[0]*2, 3)  # cols for pre/post, g12 g_diff, row for each value
             fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
+            for col_add, v in data.iterrows():
+                r_data = v['data'].query('bin_name == "full"')
+                for time, d_time in r_data.groupby('times'):
+                    t_ind = np.argwhere(r_data['times'].unique() == time)[0][0]
+                    for loc in ['initial_stay', 'switch', 'home', 'theta_amplitude']:
+                        lstyle = ['dashed' if time == 'pre' else 'solid'][0]
+                        color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
+                        row_ind = [0 if loc == 'theta_amplitude' else 1 if loc in ['initial_stay', 'switch'] else 2][0]
+                        axes[row_ind][t_ind + 2*col_add].plot(d_time['phase_mid'].to_numpy() / np.pi,
+                                                      d_time[loc].to_numpy(), color=color,
+                                                      linestyle=lstyle,
+                                                      label=f'{loc}')
+                        axes[row_ind][t_ind + 2*col_add].set(title=f'{v[comp]} - {time}', ylabel='mean probability')
 
-            for t_ind, time in enumerate(['pre', 'post']):
-                groups = comparison_df[comparison_df['times'] == time].groupby('group')
-                g_names = data_dict['comparison']
-                for loc in ['initial_stay', 'switch', 'home']:
-                    diff_mean = np.vstack(groups.get_group(g_names[0])[loc].to_numpy()) - \
-                                np.vstack(groups.get_group(g_names[1])[loc].to_numpy())
-                    diff_labels = groups.get_group(g_names[0])['times'].values
-                    diff_data = {k: v for k, v in zip(diff_labels, diff_mean)}
-
-                    lstyle = ['dashed' if time == 'pre' else 'solid'][0]
-                    color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
-                    row_ind = [0 if loc in ['initial_stay', 'switch'] else 1][0]
-                    axes[row_ind][0 + t_ind].plot(np.array(comparison_df['phase_mid'][0]) / np.pi,
-                                                  groups.get_group(g_names[0])[loc].to_numpy()[0], color=color,
-                                                  linestyle=lstyle,
-                                                  label=f'{loc}')
-                    axes[row_ind][2 + t_ind].plot(np.array(comparison_df['phase_mid'][0]) / np.pi,
-                                                  groups.get_group(g_names[1])[loc].to_numpy()[0], color=color,
-                                                  linestyle=lstyle,
-                                                  label=f'{loc} {g_names[1]}')
-                    axes[row_ind][4 + t_ind].plot(np.array(comparison_df['phase_mid'][0]) / np.pi, diff_data[time],
-                                                  color=color,
-                                                  linestyle=lstyle, label=f'{loc}')
-                    axes[row_ind][0 + t_ind].set(title=f'{g_names[0]} - {time}', ylabel='mean probability')
-                    axes[row_ind][2 + t_ind].set(title=f'{g_names[1]} - {time}')
-                    axes[row_ind][4 + t_ind].set(title=f'{g_names[0]} - {g_names[1]} - {time}')
-                    axes[row_ind][4 + t_ind].set(ylabel='diff probability')
-
-            ax_list = axes.flat
-            for ax in ax_list:
-                ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%g $\pi$'))
-                ax.xaxis.set_major_locator(ticker.MultipleLocator(base=1.0))
-                ax.set(xlabel='theta phase')
-                ax.legend()
-            fig.suptitle(f'Theta phase histogram comparison - {g_names[0]} - {g_names[1]}')
+                ax_list = axes.flat
+                for ax in ax_list:
+                    ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%g $\pi$'))
+                    ax.xaxis.set_major_locator(ticker.MultipleLocator(base=1.0))
+                    ax.set(xlabel='theta phase')
+                    ax.legend()
+                fig.suptitle(f'Theta phase histogram comparison')
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_phase_hist',
                                      additional_tags=tags)
 
@@ -994,18 +1004,18 @@ class BayesianDecoderVisualizer:
                            time_label=['t_update'])  # use as default if no value given
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups=plot_groups, n_time_bins=6)
         trial_data.dropna(subset='times_binned', inplace=True)
+        trial_block = 40
 
         # make figure
         time_bins = trial_data['times_binned'].unique()
         for t_ind, t in enumerate(time_bins):
-            time_included = list(time_bins[:(t_ind + 1)])  # get all data up to this point in time
+            time_included = list(time_bins[(t_ind - 1):(t_ind + 1)])  # get all data up to this point in time
             data_subset = trial_data.query(f'times_binned.isin({time_included})')
             fig = plt.figure(figsize=(8.5, 11), constrained_layout=True)
             sfigs = fig.subfigures(3, 3, hspace=0.1, wspace=0.1)
             for g_name, g_data in data_subset.groupby('update_type', sort=False):
                 # bin trials for percent correct calculations
                 col = np.argwhere(trial_data['update_type'].unique() == g_name)[0][0]
-                trial_block = 40
                 bins = np.hstack([g_data['index'].unique()[::trial_block], g_data['index'].unique()[-1]])
                 g_data['trials_binned'] = pd.cut(g_data['index'], bins=bins, include_lowest=True, labels=False, duplicates='drop')
 
@@ -1014,7 +1024,7 @@ class BayesianDecoderVisualizer:
 
                     (  # plot scatters with estimates
                         so.Plot(plot_data, x='correct', color='choice')
-                            .pair(y=['diff_baseline', 'prob_over_chance'])
+                            .pair(y=['diff_baseline', ])  # 'prob_over_chance' remove for now
                             .add(so.Dot(alpha=0.3))
                             .add(so.Line(), so.PolyFit(order=1),)
                             .share(y='row')
@@ -1034,7 +1044,7 @@ class BayesianDecoderVisualizer:
                     sfigs[row][1].suptitle(f'Performance by {level}')
 
             # save figure
-            times = f'up_to_{np.max(time_included)}s'
+            times = f'up_to_{time_included}s_{trial_block}trials'
             self.results_io.save_fig(fig=fig, filename=f'performance_comparisons', additional_tags=f'{tags}_{times}',
                                      tight_layout=False)
 

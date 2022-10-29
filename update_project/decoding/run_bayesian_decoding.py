@@ -18,7 +18,7 @@ def run_bayesian_decoding():
 
     # setup sessions
     animals = [17, 20, 25, 28, 29, 33, 34]
-    dates_included = []
+    dates_included = [210913]
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
@@ -28,7 +28,7 @@ def run_bayesian_decoding():
     regions = [['CA1']]
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bin_num=[50],  # TODO - add catch for goal zone division with different bins
-                          decoder_bin_size=[0.2])
+                          decoder_bin_size=[0.02])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop

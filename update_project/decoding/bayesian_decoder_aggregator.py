@@ -241,7 +241,7 @@ class BayesianDecoderAggregator:
     def get_bound_bins(bins, bound_values):
         start_bin, stop_bin = np.searchsorted(bins, bound_values)
         if bins[0] == bound_values[0]:
-            start_bin = start_bin - 1  # if the bin edge is the same as the bound edge, include that bin
+            stop_bin = stop_bin + 1
         if bins[-1] == bound_values[-1]:
             stop_bin = stop_bin + 1
         stop_bin = stop_bin - 1
@@ -381,7 +381,7 @@ class BayesianDecoderAggregator:
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
 
-        if np.size(quant_df):
+        if np.size(quant_df) and quant_df is not None:
             # get diff from baseline
             prob_sum_mat = np.vstack(quant_df[prob_value])
             align_time = np.argwhere(quant_df['times'].values[0] >= 0)[0][0]
