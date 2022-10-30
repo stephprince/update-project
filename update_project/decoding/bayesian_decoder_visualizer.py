@@ -50,7 +50,7 @@ class BayesianDecoderVisualizer:
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
                 self.plot_group_aligned_comparisons(data, **kwargs)
-                # self.plot_performance_comparisons(data, tags=tags)
+                self.plot_performance_comparisons(data, tags=tags)
                 self.plot_theta_data(data, kwargs)
 
                 # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
@@ -62,16 +62,8 @@ class BayesianDecoderVisualizer:
                     # self.plot_scatter_dists_around_update(data, **kwargs)
                     # self.plot_trial_by_trial_around_update(data, **kwargs)
 
-            # plot region interactions
-            for name, data in self.aggregator.group_aligned_df.groupby(self.params):
-                for plot_types in list(itertools.product(*self.plot_groups.values())):
-                    plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
-                    tags = "_".join([str(n) for n in name])
-                    title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-                    kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                    self.plot_region_interaction_data(data, **kwargs)
-
-            # plots decoding errors across all groups
+            #  make plots with both brain regions
+            self.plot_multiregional_data()
             self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
             self.plot_all_groups_error(main_group=group_names, sub_group='animal')
             self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
@@ -85,6 +77,16 @@ class BayesianDecoderVisualizer:
                 self.plot_parameter_comparison(data, name, thresh_params=True)
         else:
             print(f'No data found to plot')
+
+    def plot_multiregional_data(self):
+        if len(self.aggregator.group_aligned_df['region'].unique()) > 1:
+            for name, data in self.aggregator.group_aligned_df.groupby(self.params):
+                for plot_types in list(itertools.product(*self.plot_groups.values())):
+                    plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
+                    tags = "_".join([str(n) for n in name])
+                    title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+                    kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
+                    self.plot_region_interaction_data(data, **kwargs)
 
     def plot_theta_data(self, data, kwargs):
         unique_bins = data['decoder_bin_size'].unique()
@@ -320,6 +322,7 @@ class BayesianDecoderVisualizer:
             title_thresh = ''.join([f'{p}: {n} {new_line}' for p, n in zip(self.threshold_params.keys(),
                                                                            sorted_data['thresh_values'])])
             title = f'{title_params}{title_thresh}'
+            param_tags = '_'.join([f'{p}_{n}' for p, n in zip(self.params, sorted_data['param_values'])])
 
             # plot the data
             if (counter % (ncols * nrows) == 0) and (counter != 0):
@@ -373,7 +376,8 @@ class BayesianDecoderVisualizer:
         # wrap up last plot after loop finished
         fig.suptitle(f'Confusion matrices - all parameters - {name}')
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices', additional_tags=tags)
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices_{param_tags}',
+                                 additional_tags=tags)
 
     def plot_region_interaction_data(self, param_data, title, plot_groups=None, tags=''):
         interaction_data = self.aggregator.calc_region_interactions(param_data, plot_groups)
@@ -457,6 +461,7 @@ class BayesianDecoderVisualizer:
         bounds = trial_data['bound_values'].unique()
         spaces = getattr(param_data['virtual_track'].values[0], 'edge_spacing', [])
         prob_maps = aligned_data.groupby('time_label').apply(lambda x: np.nanmean(np.stack(x['probability']), axis=0))
+        true_feat = aligned_data.groupby('time_label').apply(lambda x: np.nanmean(np.stack(x['feature']), axis=0))
         n_bins = np.shape(prob_maps.loc['start_time'])[0]
         prob_lims = np.linspace(aligned_data['feature'].apply(np.nanmin).min(),
                                 aligned_data['feature'].apply(np.nanmax).max(), n_bins)
@@ -478,6 +483,7 @@ class BayesianDecoderVisualizer:
                                           origin='lower', vmin=0.6, vmax=2.8,
                                           extent=[im_times[0], im_times[-1], prob_lims[0], prob_lims[-1]])
             axes[0][col].invert_yaxis()
+            axes[0][col].plot(times, true_feat.loc[name], color='w', linestyle='dashed')
             for b in bounds:
                 axes[0][col].axhline(b[0], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
                 axes[0][col].axhline(b[1], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
@@ -799,7 +805,7 @@ class BayesianDecoderVisualizer:
         feat = data['feature'].values[0]
         locations = data.virtual_track.values[0].cue_end_locations.get(feat, dict())
         tuning_curve_params = [p for p in self.params if p not in ['decoder_bins']]
-        data_const_decoding = data[data['decoder_bins'] == data['decoder_bins'].values[0]]
+        data_const_decoding = data[data['decoder_bin_size'] == data['decoder_bin_size'].values[0]]
         param_group_data = data_const_decoding.groupby(tuning_curve_params)
         plot_num, counter = (0, 0)
         nrows, ncols = (1, 3)
