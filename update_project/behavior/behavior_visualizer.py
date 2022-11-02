@@ -239,24 +239,30 @@ class BehaviorVisualizer:
         current_phase=temp_df['phase'][0]
         ind=0
         update=False
+        all_phases=[]
         for trial in range(len(temp_df)-1):
             if temp_df['phase'][trial+1] != current_phase:
                 previous_phase=current_phase
                 current_phase=temp_df['phase'][trial+1]
+                if current_phase in all_phases:
+                    label='_'
+                else:
+                    label=''
+                    all_phases.append(current_phase)
                 if update and current_phase not in ['stay_update','switch_update','delay4']:
                     update=False
-                    axes.axvspan(ind, trial+1,facecolor='c', alpha=0.1, label='update')
+                    axes.axvspan(ind, trial+1,facecolor='c', alpha=0.1, label=f'{label}update')
                     ind = trial + 1
                 elif not update and current_phase in ['stay_update', 'switch_update']:
                     update = True
-                    axes.axvspan(ind, trial + 1, color=self.colors[previous_phase], label=previous_phase)
+                    axes.axvspan(ind, trial + 1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
                     ind = trial + 1
-                if not update:
+                elif not update:
                     update=False
-                    axes.axvspan(ind, trial+1, color=self.colors[previous_phase], label=previous_phase)
+                    axes.axvspan(ind, trial+1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
                     ind=trial+1
-                if trial==len(temp_df)-2 and previous_phase in ['stay_update','switch_update','delay4']:
-                    axes.axvspan(ind, len(temp_df), facecolor='c', alpha=0.1, label='update')
+                elif trial==len(temp_df)-2 and previous_phase in ['stay_update','switch_update','delay4']:
+                    axes.axvspan(ind, len(temp_df), facecolor='c', alpha=0.1, label=f'{label}update')
 
         # make visually appealing
         axes.legend()
