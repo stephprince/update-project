@@ -49,9 +49,9 @@ class BayesianDecoderVisualizer:
             for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
+                self.plot_theta_data(data, kwargs)
                 self.plot_group_aligned_comparisons(data, **kwargs)
                 self.plot_performance_comparisons(data, tags=tags)
-                self.plot_theta_data(data, kwargs)
 
                 # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
                 for plot_types in list(itertools.product(*self.plot_groups.values())):
@@ -71,8 +71,8 @@ class BayesianDecoderVisualizer:
 
             # plot model metrics (comparing parameters across brain regions and features)
             for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
-                self.plot_tuning_curves(data, name,)
-                self.plot_group_confusion_matrices(data, name,)
+                self.plot_group_confusion_matrices(data, name, )
+                self.plot_tuning_curves(data, name, )
                 self.plot_all_confusion_matrices(data, name)
                 self.plot_parameter_comparison(data, name, thresh_params=True)
         else:
@@ -98,10 +98,10 @@ class BayesianDecoderVisualizer:
             for plot_types in list(itertools.product(*self.plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                 title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-                kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{kwargs["tags"]}_{title}')
+                new_kwargs = dict(title=title, plot_groups=plot_group_dict, tags=kwargs["tags"])
 
-                self.plot_phase_modulation_around_update(data, **kwargs)
-                self.plot_theta_phase_histogram(data, **kwargs)
+                self.plot_phase_modulation_around_update(data, **new_kwargs)
+                self.plot_theta_phase_histogram(data, **new_kwargs)
 
     def _sort_group_confusion_matrices(self, data):
         param_group_data_sorted = []
@@ -688,6 +688,8 @@ class BayesianDecoderVisualizer:
             spaces = getattr(self.aggregator.group_df['virtual_track'].values[0], 'edge_spacing', [])
             prob_maps = v['aligned_data'].groupby('time_label').apply(
                 lambda x: np.nanmean(np.stack(x['probability']), axis=0))
+            true_feat = v['aligned_data'].groupby('time_label').apply(
+                lambda x: np.nanmean(np.stack(x['feature']), axis=0))
             n_bins = np.shape(prob_maps.loc['t_update'])[0]
             prob_lims = np.linspace(v['aligned_data']['feature'].apply(np.nanmin).min(),
                                     v['aligned_data']['feature'].apply(np.nanmax).max(), n_bins)
@@ -704,6 +706,7 @@ class BayesianDecoderVisualizer:
                                           origin='lower', vmin=0.6, vmax=2.8,
                                           extent=[im_times[0], im_times[-1], prob_lims[0], prob_lims[-1]])
             axes[0][ind].invert_yaxis()
+            axes[0][ind].plot(times, true_feat.loc['t_update'], color='w', linestyle='dashed')
             for b in bounds:
                 axes[0][ind].axhline(b[0], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
                 axes[0][ind].axhline(b[1], linestyle='dashed', color='k', alpha=0.5, linewidth=0.5)
@@ -840,7 +843,7 @@ class BayesianDecoderVisualizer:
                 # plot heatmaps
                 y_limits = [0, np.shape(tuning_curve_scaled)[0]]
                 x_limits = [np.round(np.min(tuning_curve_bins), 2), np.round(np.max(tuning_curve_bins), 2)]
-                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['cmap'],
+                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['cmap_r'],
                                                  origin='lower',
                                                  vmin=0.1,
                                                  aspect='auto',
@@ -907,7 +910,7 @@ class BayesianDecoderVisualizer:
 
         # save figure
         fig.suptitle(f'{feat}_{title}')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_mod_around_update',
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_mod_around_update_{title}',
                                  additional_tags=tags)
 
     def plot_theta_phase_histogram(self, param_data, title, plot_groups=None, tags=''):
@@ -952,7 +955,7 @@ class BayesianDecoderVisualizer:
 
         # save figure
         fig.suptitle(f'{feat}_{title}')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_phase_hist', additional_tags=tags)
+        self.results_io.save_fig(fig=fig, axes=axes, filename=f'theta_phase_hist_{title}', additional_tags=tags)
 
     def plot_theta_phase_comparisons(self, param_data, plot_groups=None, tags=''):
         print('Plotting theta phase comparisons...')

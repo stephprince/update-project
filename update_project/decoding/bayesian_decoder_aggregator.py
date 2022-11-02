@@ -13,7 +13,7 @@ from scipy import signal
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.results_io import ResultsIO
-from update_project.statistics import get_fig_stats, get_comparative_stats
+from update_project.statistics.statistics import get_fig_stats, get_comparative_stats
 
 
 class BayesianDecoderAggregator:
