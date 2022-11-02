@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import more_itertools as mit
 
 from scipy.stats import sem, zscore
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
@@ -240,7 +241,18 @@ class SingleUnitAggregator:
 
                 # calc reaction time
                 slope_sign = np.sign(post_event)
-                reaction_time_post = np.where(np.diff(slope_sign, prepend=slope_sign[0]))[0]  # get elements immediately after sign switch
+                slope_change = np.diff(post_event, prepend=post_event[0])
+                increasing_neg_slope = np.logical_and(slope_sign < 0, slope_change < 0)
+                runs = list(mit.run_length.encode(increasing_neg_slope))
+                ind_count = 0
+                reaction_time_post = []
+                for val, count in runs:
+                    if val and count > 1:  # if True and at least 2 in a row
+                        reaction_time_post.append(ind_count)
+                    else:
+                        ind_count = ind_count + count
+
+                # reaction_time_post = np.where(np.diff(slope_sign, prepend=slope_sign[0]))[0]  # get elements immediately after sign switch
                 if np.size(reaction_time_post):  # if any slope changes, otherwise keep default
                     reaction_time = times[event_time:][reaction_time_post[0]]
 

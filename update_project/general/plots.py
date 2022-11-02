@@ -60,6 +60,10 @@ def get_color_theme():
     color_theme_dict['CA1'] = '#4897D8'
     color_theme_dict['PFC'] = '#F77669'
 
+    color_theme_dict['Narrow Interneuron'] = '#2594f6'
+    color_theme_dict['Pyramidal Cell'] = '#da3b46'
+    color_theme_dict['Wide Interneuron'] = '#20a0a8'
+
     color_theme_dict['control'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['nan'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['home'] = '#474747'  # 12 in degrees, 0 saturation, 30 light

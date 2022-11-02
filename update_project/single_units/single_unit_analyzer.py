@@ -35,7 +35,7 @@ class SingleUnitAnalyzer:
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
         self.window = params.get('align_window', 2.5)  # number of bins to build encoder  # sec to look at aligned psth
         self.align_nbins = np.round((self.window * 2) / 25)  # hardcoded to match binsize of decoder too
-        self.downsample_factor = 20  # downsample signal from 2000Hz to 200Hz
+        self.downsample_factor = 40  # downsample signal from 2000Hz to 50Hz
         self.goal_selectivity_strictness = 'goal_field'  # options are 'only_goal_field' (no fields in rest of track)
                                                          # or 'goal_field' (can have other fields in rest of track)
 
