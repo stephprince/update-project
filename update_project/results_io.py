@@ -1,12 +1,11 @@
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pickle
 
 from git import Repo
 from pathlib import Path
 
 from update_project.general.plots import clean_plot
-from update_project.statistics import get_stats_summary
+from update_project.statistics.statistics import get_stats_summary
 
 
 class ResultsIO:

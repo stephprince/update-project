@@ -53,6 +53,7 @@ def get_descriptive_stats(data, name=None, axis=0):
 
     return stats_dict
 
+
 def get_comparative_stats(x, y):
     rs_test_statistic, rs_p_value = ranksums(x, y)
     ks_test_statistic, ks_p_value = kstest(x, y)
@@ -64,6 +65,7 @@ def get_comparative_stats(x, y):
                       )
 
     return stats_dict
+
 
 def get_stats_summary(data_dict, axis=0):
     plus_minus = '\u00B1'
