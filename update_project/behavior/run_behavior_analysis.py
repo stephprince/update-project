@@ -7,15 +7,15 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 def run_behavior_analysis():
     # setup flags
-    overwrite = False  # when False, this will only load data if the parameters match
+    overwrite = True  # when False, this will only load data if the parameters match
     plot = True  # this only plots on a session by session basis
-    group = False  # this compiles the data for group plotting
+    group = True  # this compiles the data for group plotting
 
     # setup sessions
-    animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29
-    dates_included = []  # 210913
+    animals = [20]  # 17, 20, 25, 28, 29, 33, 34
+    dates_included = [210511]  # 210913 210511
     dates_excluded = []
-    session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
+    session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded, behavior_only=True)
     session_names = session_db.load_session_names()
 
     # loop through individual sessions
