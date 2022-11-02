@@ -15,6 +15,7 @@ class VirtualTrack:
         self.home_boundaries = home_boundaries
         self.mappings = mappings
         self.linearization = linearization
+        self.edge_spacing = []
 
         # update cue end locations if linearized
         # if linearization:
