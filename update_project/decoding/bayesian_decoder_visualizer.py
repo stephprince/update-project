@@ -53,8 +53,8 @@ class BayesianDecoderVisualizer:
             for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-                # self.plot_theta_data(data, kwargs)
-                self.plot_group_aligned_stats(data, **kwargs)
+                self.plot_theta_data(data, kwargs)
+                # self.plot_group_aligned_stats(data, **kwargs)
                 # self.plot_group_aligned_comparisons(data, **kwargs)
                 # self.plot_performance_comparisons(data, tags=tags)
 
@@ -823,7 +823,7 @@ class BayesianDecoderVisualizer:
                          .annotate())
 
                         axes[1][col] = sns.boxplot(data=data_for_stats[mask], x=comp, y=var, hue=group, ax=axes[1][col],
-                                                   width=0.5)
+                                                   width=0.5, showfliers=False)
                         annot.new_plot(axes[1][col], pairs=pairs, data=data_for_stats[mask], x=comp, y=var, hue=group)
                         (annot
                          .configure(test=None, test_short_name=test, text_format='simple')
@@ -1054,11 +1054,13 @@ class BayesianDecoderVisualizer:
                           .add_prefix('decoding_')
                           .reset_index())
         data_for_stats['location'] = data_for_stats['location'].map({'initial_stay': 'initial', 'switch': 'new','home': 'home'})
+        stats_tests = [('bootstrap', 'direct_prob'), ('traditional', 'mann-whitney')]
 
         # loop through each comparison to get stats output
         stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io)
         group = ['location', 'phase_mid']
         dependent_vars = ['decoding_max', 'decoding_mean']
+
         for comp, filters in self.data_comparisons.items():
             # define group variables, pairs to compare, and levels of hierarchical data
             mask = pd.concat([data_for_stats[k].isin(v) for k, v in filters.items()], axis=1).all(axis=1)
@@ -1067,37 +1069,87 @@ class BayesianDecoderVisualizer:
             combos = list(itertools.combinations(filters[comp], r=2))
             pairs = [((c[0], *g), (c[1], *g)) for c in combos for g in group_list]
 
-            # filter data based on comparison
+            # run comparisons between trial types
             stats.run(data_to_plot, dependent_vars=dependent_vars, group_vars=[comp, *group], pairs=pairs,
                       filename='aligned_decoding')
-
             for var in dependent_vars:
-                fig, axes = plt.subplots(2, 2)
-                for col, (approach, test) in enumerate([('bootstrap', 'direct_prob'), ('traditional', 'mann-whitney')]):
-                    stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
-                                                      f'& variable == "{var}"')
-                    pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+                for g_name, g_data in data_to_plot.groupby(group[0]):
+                    pairs_subset = [p for p in pairs if p[0][1] == g_name]
+                    fig, axes = plt.subplots(2, 2)
+                    for col, (approach, test) in enumerate(stats_tests):
+                        stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
+                                                          f'& variable == "{var}"')
+                        stats_data = stats_data[stats_data['pair'].isin(pairs_subset)]
+                        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs_subset]
 
-                    data_to_plot['hue'] = data_to_plot[group].apply(tuple, axis=1)
-                    axes[0][col] = sns.violinplot(data=data_to_plot, x=comp, y=var, hue='hue',
-                                                  ax=axes[0][col])
-                    annot = Annotator(axes[0][col], pairs=pairs, data=data_to_plot, x=comp, y=var, hue='hue')
-                    (annot
-                     .configure(test=None, test_short_name=test, text_format='simple')
-                     .set_pvalues(pvalues=pvalues)
-                     .annotate())
+                        if len(pairs_subset[0][0]) > 2:
+                            g_data['hue'] = g_data[group].apply(lambda x: str(tuple(x)), axis=1)
+                            annot_pairs = [((c[0], str(g)), (c[1], str(g))) for c in combos for g in group_list
+                                           if g[0] == g_name]
+                        else:
+                            g_data['hue'] = g_data[group]
+                            annot_pairs = pairs_subset
 
-                    axes[1][col] = sns.boxplot(data=data_to_plot, x=comp, y=var, hue='hue', ax=axes[1][col],
-                                               width=0.5)
-                    annot.new_plot(axes[1][col], pairs=pairs, data=data_to_plot, x=comp, y=var, hue='hue')
-                    (annot
-                     .configure(test=None, test_short_name=test, text_format='simple')
-                     .set_pvalues(pvalues=pvalues)
-                     .annotate())
+                        axes[0][col] = sns.violinplot(data=g_data, x=comp, y=var, hue='hue',
+                                                      ax=axes[0][col])
+                        annot = Annotator(axes[0][col], pairs=annot_pairs, data=g_data, x=comp, y=var, hue='hue')
+                        (annot
+                         .configure(test=None, test_short_name=test, text_format='simple')
+                         .set_pvalues(pvalues=pvalues)
+                         .annotate())
 
-                fig.suptitle(f'{comp}')
-                self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_modulation_{var}',
-                                         additional_tags=tags, tight_layout=False)
+                        axes[1][col] = sns.boxplot(data=g_data, x=comp, y=var, hue='hue', ax=axes[1][col],
+                                                   width=0.5, showfliers=False)
+                        annot.new_plot(axes[1][col], pairs=annot_pairs, data=g_data, x=comp, y=var, hue='hue')
+                        (annot
+                         .configure(test=None, test_short_name=test, text_format='simple')
+                         .set_pvalues(pvalues=pvalues)
+                         .annotate())
+
+                    fig.suptitle(f'{comp}')
+                    self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_modulation_{var}_{g_name}',
+                                             additional_tags=tags, tight_layout=False)
+
+            # run comparisons between theta phase
+            for f in filters[comp]:
+                data_to_comp = data_to_plot.query(f'{comp} == "{f}"')
+                group_list = list(data_to_plot.groupby('phase_mid').groups.keys())
+                combos = list(itertools.combinations(data_to_plot['location'].unique(), r=2))
+                pairs = [((c[0], g), (c[1], g)) for c in combos for g in group_list]
+                stats.run(data_to_comp, dependent_vars=dependent_vars, group_vars=['location', 'phase_mid'],
+                          pairs=pairs, filename='aligned_decoding')
+
+                for var in dependent_vars:
+                    fig, axes = plt.subplots(2, 2, figsize=(15, 15))
+
+                    for col, (approach, test) in enumerate(stats_tests):
+                        stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
+                                                          f'& variable == "{var}"')
+                        stats_data = stats_data[stats_data['pair'].isin(pairs)]
+                        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+
+                        axes[0][col] = sns.violinplot(data=data_to_comp, x='location', y=var, hue='phase_mid',
+                                                      ax=axes[0][col])
+                        annot = Annotator(axes[0][col], pairs=pairs, data=data_to_comp, x='location', y=var,
+                                          hue='phase_mid')
+                        (annot
+                         .configure(test=None, test_short_name=test, text_format='simple')
+                         .set_pvalues(pvalues=pvalues)
+                         .annotate())
+
+                        axes[1][col] = sns.boxplot(data=data_to_comp, x='location', y=var, hue='phase_mid',
+                                                   ax=axes[1][col], width=0.5, showfliers=False)
+                        annot.new_plot(axes[1][col], pairs=pairs, data=data_to_comp, x='location', y=var,
+                                       hue='phase_mid')
+                        (annot
+                         .configure(test=None, test_short_name=test, text_format='simple')
+                         .set_pvalues(pvalues=pvalues)
+                         .annotate())
+
+                    fig.suptitle(f'{f}')
+                    self.results_io.save_fig(fig=fig, axes=axes,
+                                             filename=f'compare_phase_{f}_theta_modulation_{var}_{g_name}',
+                                             additional_tags=tags, tight_layout=False)
 
     def plot_performance_comparisons(self, param_data, plot_groups=None, tags=''):
         # load up data
