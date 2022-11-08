@@ -1,6 +1,189 @@
+import itertools
 import numpy as np
+import pandas as pd
+import pingouin as pg
+import warnings
 
+from pathlib import Path
 from scipy.stats import sem, ranksums, kstest
+from tqdm import tqdm
+
+from update_project.results_io import ResultsIO
+
+rng = np.random.default_rng(12345)
+
+
+class Stats:
+    def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None):
+        # setup defaults unless given otherwise
+        self.levels = levels or ['animal', 'session_id']  # append levels needed (e.g., trials, units)
+        self.approaches = approaches or ['bootstrap', 'traditional']  # 'summary' as other option
+        self.tests = tests or ['direct_prob', 'mann-whitney']  # 'wilcoxon' as other option
+        self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
+        self.nboot = 1000  # number of iterations to perform for bootstrapping
+        self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
+
+    def run(self, df, dependent_vars=None, group_vars='group', pairs=None, filename=''):
+        # function requires data to be a dataframe in the following format
+        # levels, dependent variable column, group variable column for group comparison
+        self.dependent_vars = dependent_vars
+        self.group_vars = group_vars
+        self.pairs = pairs
+
+        stats_output = []
+        for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):
+            self._setup_data(approach=a, data=df)
+            out = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
+            stats_output.append(out)
+        self.stats_df = pd.concat(stats_output, axis=0)
+
+        self._get_descriptive_stats()
+        self._export_stats(filename)
+
+    def _setup_data(self, approach, data):
+        if approach == 'bootstrap':
+            self.df_processed = (data
+                                 .groupby(self.group_vars)
+                                 .apply(lambda grp: self._get_bootstrapped_data(grp))
+                                 .reset_index())
+        elif approach == 'summarized':
+            self.df_processed = data.groupby(
+                [*self.group_vars, self.levels[0]]).mean().reset_index()  # calc means for level 1
+        elif approach == 'traditional':
+            self.df_processed = data.copy(deep=True)
+        else:
+            warnings.warn(f'Statistical approach {approach} is not supported')
+            self.df_processed = []
+
+        return self
+
+    def _perform_test(self, approach, test, alternative, pairs=None):
+        pair_outputs = []
+        for p in pairs:
+            query = [' & '.join([f'{g_item} == "{p_item}"' if isinstance(p_item, str)
+                                 else f'{g_item} == {p_item}' for p_item, g_item in zip(p_var, self.group_vars)])
+                     for p_var in p]
+            samples = [self.df_processed.query(q) for q in query]
+
+            for var in self.dependent_vars:
+                if test == 'direct_prob':
+                    comparisons = {0: f'{p[1]} >= {p[0]}', 1: f'{p[0]} >= {p[1]}'}
+                    prob_vals = (self.get_direct_prob(samples[0][var].to_numpy(), samples[1][var].to_numpy()),
+                                 self.get_direct_prob(samples[1][var].to_numpy(), samples[0][var].to_numpy()))
+                    test_output = dict(pair=p, variable=var, test=test, approach=approach, prob_test_vals=[prob_vals],
+                                       p_val=np.min(prob_vals) * 2, alternative=comparisons[np.argmin(prob_vals)])
+                elif test == 'mann-whitney':
+                    output = pg.mwu(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
+                    test_output = dict(pair=p, variable=var, test=test, approach=approach,
+                                       prob_test_vals=output['U-val'].to_numpy()[0],
+                                       p_val=output["p-val"].to_numpy()[0],
+                                       alternative=output['alternative'].to_numpy()[0])
+                elif test == 'wilcoxon':
+                    output = pg.wilcoxon(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
+                    test_output = dict(pair=p, variable=var, test=test, approach=approach,
+                                       prob_test_vals=output['W-val'].to_numpy()[0],
+                                       p_val=output["p-val"].to_numpy()[0],
+                                       alternative=output['alternative'].to_numpy()[0])
+
+                pair_outputs.append(test_output)
+
+        return pd.DataFrame(pair_outputs)
+
+    def _get_descriptive_stats(self):
+        self.descriptive_stats = (self.df_processed
+                                  .groupby(self.group_vars)[self.dependent_vars]
+                                  .describe()
+                                  .reset_index()
+                                  .melt(id_vars=[(g, '') for g in self.group_vars], value_name='metric',
+                                        var_name=['variable_0', 'variable_1'])
+                                  .pipe(lambda x: x.set_axis(x.columns.map(''.join), axis=1))
+                                  .pivot(columns='variable_1', index=[*self.group_vars, 'variable_0'],
+                                         values='metric')
+                                  .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
+                                  .reset_index())
+
+    def _export_stats(self, filename):
+        self.results_io.export_statistics(self.descriptive_stats, f'{filename}_descriptive', format='csv')
+        self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', format='csv')
+
+    def _bootstrap_recursive(self, data, current_level=0, output_data=None):
+        unique_samples = np.unique(data[self.levels[current_level]])
+        random_samples = rng.choice(unique_samples, len(unique_samples))
+
+        if current_level == 0:
+            output_data = []
+
+        for samp in random_samples:
+            samp = f'"{samp}"' if isinstance(samp, str) else samp
+            subset = data.query(f'{self.levels[current_level]} == {samp}')
+
+            if current_level == len(self.levels) - 1:  # if it's the last level, add data
+                output_data.append(subset[self.dependent_vars])
+            else:  # if it's not the last level, keep going down hierarchy and resampling
+                output_data = self._bootstrap_recursive(subset, current_level=current_level + 1,
+                                                        output_data=output_data)
+
+        return output_data
+
+    def _get_bootstrapped_data(self, data, fxn=None):
+        '''
+        This function performs a hierarchical bootstrap
+        This function assumes that the data is a dataframe where levels indicates column containing
+        data from highest hierarchical level to lowest. Data is assumed to already be separated by group
+        so only one group is input to the function at a time and the first level is resampled with replacement
+        '''
+
+        bootstats = []
+        for i in tqdm(range(self.nboot), desc='bootstrap'):
+            bootstrapped_data = pd.concat(self._bootstrap_recursive(data), axis=0)
+            if fxn:
+                calculation_output = fxn(bootstrapped_data)  # default to calculate mean but can apply any function
+            else:
+                calculation_output = bootstrapped_data.mean()
+
+            bootstats.append(calculation_output)
+
+        return pd.concat(bootstats, axis=1).transpose()
+
+    @staticmethod
+    def get_direct_prob(sample1, sample2):
+        '''
+        get_direct_prob Returns the direct probability of items from sample2 being
+        greater than or equal to those from sample1.
+           Sample1 and Sample2 are two bootstrapped samples and this function
+           directly computes the probability of items from sample 2 being greater
+           than those from sample1. Since the bootstrapped samples are
+           themselves posterior distributions, this is a way of computing a
+           Bayesian probability. The joint matrix can also be returned to compute
+           directly upon.
+        '''
+        joint_low_val = min([min(sample1), min(sample2)])
+        joint_high_val = max([max(sample1), max(sample2)])
+
+        p_joint_matrix = np.zeros((100, 100))
+        p_axis = np.linspace(joint_low_val, joint_high_val, num=100)
+        edge_shift = (p_axis[2] - p_axis[1]) / 2
+        p_axis_edges = p_axis - edge_shift
+        p_axis_edges = np.append(p_axis_edges, (joint_high_val + edge_shift))
+
+        # Calculate probabilities using histcounts for edges.
+
+        p_sample1 = np.histogram(sample1, bins=p_axis_edges)[0] / np.size(sample1)
+        p_sample2 = np.histogram(sample2, bins=p_axis_edges)[0] / np.size(sample2)
+
+        # Now, calculate the joint probability matrix:
+
+        for i in np.arange(np.shape(p_joint_matrix)[0]):
+            for j in np.arange(np.shape(p_joint_matrix)[1]):
+                p_joint_matrix[i, j] = p_sample1[i] * p_sample2[j]
+
+        # Normalize the joint probability matrix:
+        p_joint_matrix = p_joint_matrix / np.sum(p_joint_matrix)
+
+        # Get the volume of the joint probability matrix in the upper triangle:
+        p_test = np.sum(np.triu(p_joint_matrix, k=1))  # k=1 calculate greater than instead of greater than or equal to
+
+        return p_test
 
 
 def get_fig_stats(data, axis=0):
@@ -59,9 +242,9 @@ def get_comparative_stats(x, y):
     ks_test_statistic, ks_p_value = kstest(x, y)
 
     stats_dict = dict(ranksum=dict(test_statistic=rs_test_statistic,
-                                   p_value=rs_p_value,),
+                                   p_value=rs_p_value, ),
                       kstest=dict(test_statistic=ks_test_statistic,
-                                  p_value=ks_p_value,),
+                                  p_value=ks_p_value, ),
                       )
 
     return stats_dict

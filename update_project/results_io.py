@@ -5,7 +5,6 @@ from git import Repo
 from pathlib import Path
 
 from update_project.general.plots import clean_plot
-from update_project.statistics.statistics import get_stats_summary
 
 
 class ResultsIO:
@@ -105,11 +104,12 @@ class ResultsIO:
         with open(fname, 'wb') as f:
             pickle.dump(data, f)
 
-    def export_statistics(self, data_dict, filename, axis=0, results_type='group', format='txt'):
+    def export_statistics(self, stats_data, filename, results_type='group', format='txt'):
         fname = self.get_stats_filename(filename, results_type=results_type, format=format)
-        summary = get_stats_summary(data_dict, axis)
-        with open(fname, 'w') as f:
-            f.write(summary)
+        if format == 'csv':
+            stats_data.to_csv(fname, index=False)
+        elif format == 'txt':
+            stats_data.to_csv(fname, header=None, index=False, sep=' ', mode='a')
 
     def data_exists(self, data_files):
         files_exist = []
