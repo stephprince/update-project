@@ -143,7 +143,7 @@ class BayesianDecoderAggregator:
         else:
             return group_data
 
-    def calc_theta_phase_data(self, param_data, filter_dict, time_bins=3):
+    def calc_theta_phase_data(self, param_data, filter_dict, time_bins=3, ret_by_trial=False):
         # get aligned df and apply filters
         mask = pd.concat([param_data[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
         data_subset = param_data[mask].rename_axis('trial').reset_index()
@@ -166,10 +166,11 @@ class BayesianDecoderAggregator:
                 lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
 
         # get histogram, ratio, and mean probability values for different theta phases
-        theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), half=np.linspace(-np.pi, np.pi, 3))
+        theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), quarter=np.linspace(-np.pi, np.pi, 5))
         time_bins = np.linspace(-self.window, self.window, time_bins)
         data_to_average = [*list(bound_mapping.values()), 'theta_amplitude']
         theta_phase_list = []
+        theta_phase_by_trial_list = []
         for t_name, t_bins in theta_bins.items():
             theta_df_bins = pd.cut(theta_phase_df['theta_phase'], t_bins)
             time_df_bins = pd.cut(theta_phase_df['times'], time_bins, right=False)
@@ -194,12 +195,40 @@ class BayesianDecoderAggregator:
                     g_value['time_bins'] = [time_bins] * len(g_value)
                     theta_phase_list.append(g_value)
 
+                theta_phase_df['time_bins'] = time_df_bins
+                theta_phase_df['phase_bins'] = theta_df_bins
+                groupby_cols = ['animal', 'session_id', 'region', 'feature_name', 'trial_id', 'update_type', 'correct',
+                                'time_bins', 'phase_bins']
+                t_by_trial_df = (theta_phase_df
+                                 .groupby(groupby_cols)[data_to_average]
+                                 .agg(np.nanmean)
+                                 .dropna()
+                                 .reset_index())
+                t_by_trial_df['theta_amplitude'] = (theta_phase_df
+                                                    .groupby(groupby_cols)['theta_amplitude']
+                                                    .apply(np.nanmean).dropna().reset_index())['theta_amplitude']
+                t_by_trial_df['phase_mid'] = t_by_trial_df['phase_bins'].astype('interval').apply(lambda x: x.mid)
+                t_by_trial_df['time_mid'] = t_by_trial_df['time_bins'].astype('interval').apply(lambda x: x.mid)
+
+                for g_name, g_value in t_by_trial_df.groupby('time_mid'):
+                    if g_value['time_mid'].values[0] < 0:
+                        times_label = 'pre'
+                    elif g_value['time_mid'].values[0] > 0:
+                        times_label = 'post'
+                    g_value['bin_name'] = t_name
+                    g_value['times'] = times_label
+                    g_value['time_bins'] = [time_bins] * len(g_value)
+                    theta_phase_by_trial_list.append(g_value)
+
         if len(theta_phase_list):
             theta_phase_output = pd.concat(theta_phase_list, axis=0, ignore_index=True)
         else:
             theta_phase_output = None
 
-        return theta_phase_output
+        if ret_by_trial:
+            return pd.concat(theta_phase_by_trial_list, axis=0, ignore_index=True)
+        else:
+            return theta_phase_output
 
     def _get_example_period(self, window=500):
         time_window = self.data.decoder_bin_size * window
@@ -229,13 +258,13 @@ class BayesianDecoderAggregator:
 
         return np.squeeze(grid_prob)
 
-    @staticmethod
-    def _integrate_prob_density(prob_density, prob_density_bins, bounds, axis=0):
-        prob_map_bins = (prob_density_bins[1:] + prob_density_bins[:-1]) / 2
-        start_bin = np.searchsorted(prob_map_bins, bounds[0])
-        stop_bin = np.searchsorted(prob_map_bins, bounds[1])
-        mean_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
-        return mean_prob
+    def _integrate_prob_density(self, prob_density, prob_density_bins, bounds, axis=0):
+        start_bin, stop_bin = self.get_bound_bins(prob_density_bins, bounds)
+        integrated_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
+        num_bins = len(prob_density[start_bin:stop_bin])
+        prob_over_chance = integrated_prob * len(prob_density_bins) / num_bins
+
+        return prob_over_chance
 
     @staticmethod
     def get_bound_bins(bins, bound_values):
@@ -673,7 +702,7 @@ class BayesianDecoderAggregator:
 
         return session_error
 
-    def get_aligned_stats(self, comp, data_dict, quant, tags):
+    def get_aligned_stats(self, comp, data, tags):
         data_for_stats = []
         for ind, v in enumerate(data_dict['comparison']):
             data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
@@ -684,7 +713,7 @@ class BayesianDecoderAggregator:
         # add significance stars to sections of plot
         prob_sum_df = pd.DataFrame(data_for_stats)
         prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
-        bins_to_grab = [0, len(data['times'])]
+        bins_to_grab = [0, len(dagroupby_colsta['times'])]
         times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
         stars_to_plot = dict(initial=[], new=[])
         blanks_to_plot = dict(initial=[], new=[])
