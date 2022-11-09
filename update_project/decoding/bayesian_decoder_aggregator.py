@@ -177,9 +177,9 @@ class BayesianDecoderAggregator:
             if not theta_phase_df.empty:
                 mean = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(lambda x: np.mean(x))
                 err_upper = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
-                    lambda x: np.mean(x) + sem(x.astype(float)))
+                    lambda x: np.mean(x) + np.std(x.astype(float)))
                 err_lower = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
-                    lambda x: np.mean(x) - sem(x.astype(float)))
+                    lambda x: np.mean(x) - np.std(x.astype(float)))
                 t_df = err_lower.join(err_upper, lsuffix='_err_lower', rsuffix='_err_upper')
                 t_df = mean.join(t_df).reset_index()
                 t_df['phase_mid'] = t_df['theta_phase'].astype('interval').apply(lambda x: x.mid)
@@ -340,7 +340,7 @@ class BayesianDecoderAggregator:
                                                     ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
 
             # pivot data to compare between regions
-            index_cols = ['session_id', 'animal', 'trial_id', 'time_label', 'choice', 'times']
+            index_cols = ['session_id', 'animal', 'update_type', 'trial_id', 'correct', 'time_label', 'choice', 'times']
             region_df = quant_df.pivot(index=index_cols,
                                        columns=['region', 'feature_name'],
                                        values=['prob_sum']).reset_index()
@@ -406,7 +406,8 @@ class BayesianDecoderAggregator:
                          index=['corr', 'corr_coeff', 'corr_lags', 'corr_sliding',
                                 'corr_coeff_sliding', 'lags_sliding', 'times_sliding'])
 
-    def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3):
+    def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3,
+                                       time_window=(0, 2.5)):
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
 
@@ -414,13 +415,15 @@ class BayesianDecoderAggregator:
             # get diff from baseline
             prob_sum_mat = np.vstack(quant_df[prob_value])
             align_time = np.argwhere(quant_df['times'].values[0] >= 0)[0][0]
+            if align_time != 0:
+                align_time = align_time - 1  # get index immediately preceding 0 if not the first one
             prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
 
             # get diff from left vs. right bounds
             quant_df['trial_index'] = quant_df.index
             quant_df = quant_df.explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline']).reset_index()
-            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(0, 2.5, n_time_bins)).apply(lambda x: x.mid)
+            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(*time_window, n_time_bins)).apply(lambda x: x.mid)
             quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
             choice_df = quant_df.pivot(index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],

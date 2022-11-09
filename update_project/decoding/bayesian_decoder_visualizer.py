@@ -53,7 +53,7 @@ class BayesianDecoderVisualizer:
             for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-                self.plot_theta_data(data, kwargs)
+                # self.plot_theta_data(data, kwargs)
                 # self.plot_group_aligned_stats(data, **kwargs)
                 # self.plot_group_aligned_comparisons(data, **kwargs)
                 # self.plot_performance_comparisons(data, tags=tags)
@@ -63,7 +63,7 @@ class BayesianDecoderVisualizer:
                     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                    self.plot_group_aligned_data(data, **kwargs)
+                    # self.plot_group_aligned_data(data, **kwargs)
                     # self.plot_scatter_dists_around_update(data, **kwargs)
                     # self.plot_trial_by_trial_around_update(data, **kwargs)
 
@@ -86,6 +86,10 @@ class BayesianDecoderVisualizer:
     def plot_multiregional_data(self):
         if len(self.aggregator.group_aligned_df['region'].unique()) > 1:
             for name, data in self.aggregator.group_aligned_df.groupby(self.params):
+                tags = "_".join([str(n) for n in name])
+                kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
+                self.plot_region_interaction_stats(data, **kwargs)
+
                 for plot_types in list(itertools.product(*self.plot_groups.values())):
                     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                     tags = "_".join([str(n) for n in name])
@@ -384,6 +388,66 @@ class BayesianDecoderVisualizer:
         tags = f'{"_".join(["".join(n) for n in name])}_plot{plot_num}'
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_confusion_matrices_{param_tags}',
                                  additional_tags=tags)
+
+    def plot_region_interaction_stats(self, param_data, plot_groups=None, tags=''):
+        plot_group_dict = {k: [i[0] for i in v] for k, v in plot_groups.items()}
+        plot_group_dict.update(time_label=['t_update'])
+        interaction_data = self.aggregator.calc_region_interactions(param_data, plot_group_dict)
+        interaction_data = interaction_data.query('a_vs_b == "CA1_pos_PFC_choice" & time_label == "t_update"')
+        groupby_cols = ['session_id', 'animal', 'trial_id', 'update_type', 'choice', 'correct']
+        data_for_stats = (interaction_data
+                          .drop(['corr_coeff_sliding', 'corr_coeff', 'corr', 'corr_lags', 'times'], axis=1)
+                          .explode(['corr_sliding', 'times_sliding'])
+                          .query('times_sliding > 0')
+                          .explode(['corr_sliding', 'lags_sliding'])
+                          .groupby(groupby_cols)['corr_sliding']
+                          .agg(['mean', 'max'])
+                          .add_prefix('corr_sliding_')
+                          .reset_index())
+        data_for_stats['choice'] = data_for_stats['choice'].map({'initial_stay': 'initial', 'switch': 'new'})
+        dependent_vars = ['corr_sliding_mean', 'corr_sliding_max']
+
+        # loop through each comparison to get stats output
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io)
+        stats_tests = [('bootstrap', 'direct_prob'), ('traditional', 'mann-whitney')]
+        group = 'choice'
+        for comp, filters in self.data_comparisons.items():
+            # define group variables, pairs to compare, and levels of hierarchical data
+            mask = pd.concat([data_for_stats[k].isin(v) for k, v in filters.items()], axis=1).all(axis=1)
+            comp_data = data_for_stats[mask]
+            combos = list(itertools.combinations(filters[comp], r=2))
+            pairs = [((c[0], g), (c[1], g)) for c in combos for g in comp_data[group].unique()]
+
+            # filter data based on comparison
+            stats.run(comp_data, dependent_vars=dependent_vars, group_vars=[comp, group], pairs=pairs,
+                      filename=f'interactions_{comp}_{tags}')
+
+            for var in dependent_vars:
+                fig, axes = plt.subplots(2, 2)
+                for col, (approach, test) in enumerate(stats_tests):
+                    stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
+                                                      f'& variable == "{var}"')
+                    pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+                    axes[0][col] = sns.violinplot(data=comp_data, x=comp, y=var, hue=group, ax=axes[0][col])
+                    annot = Annotator(axes[0][col], pairs=pairs, data=comp_data, x=comp, y=var, hue=group)
+                    (annot
+                     .configure(test=None, test_short_name=test, text_format='simple')
+                     .set_pvalues(pvalues=pvalues)
+                     .annotate())
+
+                    axes[1][col] = sns.boxplot(data=comp_data, x=comp, y=var, hue=group, ax=axes[1][col],
+                                               width=0.5, showfliers=False)
+                    annot.new_plot(axes[1][col], pairs=pairs, data=comp_data, x=comp, y=var, hue=group)
+                    (annot
+                     .configure(test=None, test_short_name=test, text_format='simple')
+                     .set_pvalues(pvalues=pvalues)
+                     .annotate())
+
+                fig.suptitle(f'{comp} - {var}')
+                self.results_io.save_fig(fig=fig, axes=axes,
+                                         filename=f'compare_{comp}_interactions_{var}',
+                                         additional_tags=tags, tight_layout=False)
+
 
     def plot_region_interaction_data(self, param_data, title, plot_groups=None, tags=''):
         interaction_data = self.aggregator.calc_region_interactions(param_data, plot_groups)
@@ -778,17 +842,17 @@ class BayesianDecoderVisualizer:
     def plot_group_aligned_stats(self, param_data, plot_groups, tags=''):
         plot_group_dict = {k: [i[0] for i in v] for k, v in plot_groups.items()}
         plot_group_dict.update(time_label=['t_update'])
-        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_group_dict, n_time_bins=6)
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_group_dict, n_time_bins=11,
+                                                                       time_window=(-2.5, 2.5))
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
 
-        windows = [1, 1.5, 2]
+        windows = [(-1, 0), (0, 1), (0, 2)]
         for win in windows:
             data_for_stats = (trial_data
-                              .dropna(subset='times_binned')    # get rid of any times before the update occurred
-                              .query(f'times_binned < {win}')        # only look at first two seconds, could do 1.75 too
+                              .query(f'times_binned > {win[0]} & times_binned < {win[1]}')        # only look at first two seconds, could do 1.75 too
                               .groupby(groupby_cols)[['prob_over_chance', 'diff_baseline']]  # group by trial/trial type
-                              .agg(['mean', 'max', np.argmax])  # get mean, peak, or peak latency for each trial
+                              .agg(['mean', 'max'])  # get mean, peak, or peak latency for each trial (np.argmax)
                               .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
             dependent_vars = data_for_stats.columns.to_list()
             data_for_stats.reset_index(inplace=True)
@@ -1025,6 +1089,10 @@ class BayesianDecoderVisualizer:
                                                       d_time[loc].to_numpy(), color=color,
                                                       linestyle=lstyle,
                                                       label=f'{loc}')
+                        axes[row_ind][t_ind + 2*col_add].fill_between(d_time['phase_mid'] / np.pi,
+                                                                    d_time[f'{loc}_err_lower'],
+                                                                    d_time[f'{loc}_err_upper'], alpha=0.2, color=color)
+                        # NOTE err_lower/upper is STD for visualization purposes
                         axes[row_ind][t_ind + 2*col_add].set(title=f'{v[comp]} - {time}', ylabel='mean probability')
 
                 ax_list = axes.flat

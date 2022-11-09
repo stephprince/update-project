@@ -20,7 +20,7 @@ class Stats:
         self.approaches = approaches or ['bootstrap', 'traditional']  # 'summary' as other option
         self.tests = tests or ['direct_prob', 'mann-whitney']  # 'wilcoxon' as other option
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
-        self.nboot = 1000  # number of iterations to perform for bootstrapping
+        self.nboot = 100  # number of iterations to perform for bootstrapping default should be 1000
         self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def run(self, df, dependent_vars=None, group_vars='group', pairs=None, filename=''):
@@ -37,7 +37,8 @@ class Stats:
             stats_output.append(out)
         self.stats_df = pd.concat(stats_output, axis=0)
 
-        self._get_descriptive_stats()
+        self.descriptive_stats_processed = self._get_descriptive_stats(self.df_processed)
+        self.descriptive_stats_raw = self._get_descriptive_stats(df)
         self._export_stats(filename)
 
     def _setup_data(self, approach, data):
@@ -89,21 +90,24 @@ class Stats:
 
         return pd.DataFrame(pair_outputs)
 
-    def _get_descriptive_stats(self):
-        self.descriptive_stats = (self.df_processed
-                                  .groupby(self.group_vars)[self.dependent_vars]
-                                  .describe()
-                                  .reset_index()
-                                  .melt(id_vars=[(g, '') for g in self.group_vars], value_name='metric',
-                                        var_name=['variable_0', 'variable_1'])
-                                  .pipe(lambda x: x.set_axis(x.columns.map(''.join), axis=1))
-                                  .pivot(columns='variable_1', index=[*self.group_vars, 'variable_0'],
-                                         values='metric')
-                                  .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
-                                  .reset_index())
+    def _get_descriptive_stats(self, data):
+        descriptive_stats = (data
+                              .groupby(self.group_vars)[self.dependent_vars]
+                              .describe()
+                              .reset_index()
+                              .melt(id_vars=[(g, '') for g in self.group_vars], value_name='metric',
+                                    var_name=['variable_0', 'variable_1'])
+                              .pipe(lambda x: x.set_axis(x.columns.map(''.join), axis=1))
+                              .pivot(columns='variable_1', index=[*self.group_vars, 'variable_0'],
+                                     values='metric')
+                              .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
+                              .reset_index())
+
+        return descriptive_stats
 
     def _export_stats(self, filename):
-        self.results_io.export_statistics(self.descriptive_stats, f'{filename}_descriptive', format='csv')
+        self.results_io.export_statistics(self.descriptive_stats_processed, f'{filename}_descriptive_processed', format='csv')
+        self.results_io.export_statistics(self.descriptive_stats_raw, f'{filename}_descriptive_raw', format='csv')
         self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', format='csv')
 
     def _bootstrap_recursive(self, data, current_level=0, output_data=None):
