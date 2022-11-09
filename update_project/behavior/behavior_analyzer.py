@@ -22,8 +22,8 @@ class BehaviorAnalyzer:
         self.maze_ids = params.get('maze_ids', [4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
         self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
-        self.align_window_start = params.get('align_window_start', -3)  # seconds to add before/after aligning window
-        self.align_window_stop = params.get('align_window_stop', 3)  # seconds to add before/after aligning window
+        self.align_window_start = params.get('align_window_start', -5)  # seconds to add before/after aligning window
+        self.align_window_stop = params.get('align_window_stop', 5)  # seconds to add before/after aligning window
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',
                                                       'stop_time'])
 
@@ -33,7 +33,8 @@ class BehaviorAnalyzer:
 
         # setup I/O
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem)
-        self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories'],
+        self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories',
+                                                          'event_durations'],
                                                     format='pkl'))
 
     def run_analysis(self, overwrite=False):
