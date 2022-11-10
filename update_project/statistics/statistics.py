@@ -31,14 +31,19 @@ class Stats:
         self.pairs = pairs
 
         stats_output = []
+        descript_output = []
         for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):
             self._setup_data(approach=a, data=df)
-            out = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
-            stats_output.append(out)
-        self.stats_df = pd.concat(stats_output, axis=0)
 
-        self.descriptive_stats_processed = self._get_descriptive_stats(self.df_processed)
-        self.descriptive_stats_raw = self._get_descriptive_stats(df)
+            descript = self._get_descriptive_stats(approach=a, test=t, alternative=alt)
+            descript_output.append(descript)
+
+            stats = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
+            stats_output.append(stats)
+
+        self.stats_df = pd.concat(stats_output, axis=0)
+        self.descript_df = pd.concat(descript_output, axis=0)
+
         self._export_stats(filename)
 
     def _setup_data(self, approach, data):
@@ -90,8 +95,8 @@ class Stats:
 
         return pd.DataFrame(pair_outputs)
 
-    def _get_descriptive_stats(self, data):
-        descriptive_stats = (data
+    def _get_descriptive_stats(self, approach, test, alternative):
+        descriptive_stats = (self.df_processed
                               .groupby(self.group_vars)[self.dependent_vars]
                               .describe()
                               .reset_index()
@@ -102,12 +107,14 @@ class Stats:
                                      values='metric')
                               .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
                               .reset_index())
+        descriptive_stats.insert(0, 'approach', approach)
+        descriptive_stats.insert(1, 'test', test)
+        descriptive_stats.insert(2, 'alternative', alternative)
 
         return descriptive_stats
 
     def _export_stats(self, filename):
-        self.results_io.export_statistics(self.descriptive_stats_processed, f'{filename}_descriptive_processed', format='csv')
-        self.results_io.export_statistics(self.descriptive_stats_raw, f'{filename}_descriptive_raw', format='csv')
+        self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', format='csv')
         self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', format='csv')
 
     def _bootstrap_recursive(self, data, current_level=0, output_data=None):

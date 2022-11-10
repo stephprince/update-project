@@ -54,7 +54,7 @@ class BayesianDecoderVisualizer:
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
                 # self.plot_theta_data(data, kwargs)
-                # self.plot_group_aligned_stats(data, **kwargs)
+                self.plot_group_aligned_stats(data, **kwargs)
                 # self.plot_group_aligned_comparisons(data, **kwargs)
                 # self.plot_performance_comparisons(data, tags=tags)
 
@@ -390,7 +390,7 @@ class BayesianDecoderVisualizer:
                                  additional_tags=tags)
 
     def plot_region_interaction_stats(self, param_data, plot_groups=None, tags=''):
-        plot_group_dict = {k: [i[0] for i in v] for k, v in plot_groups.items()}
+        plot_group_dict = {k: [i[0] for i in v] if k != 'turn_type' else v[0] for k, v in plot_groups.items()}
         plot_group_dict.update(time_label=['t_update'])
         interaction_data = self.aggregator.calc_region_interactions(param_data, plot_group_dict)
         interaction_data = interaction_data.query('a_vs_b == "CA1_pos_PFC_choice" & time_label == "t_update"')
@@ -840,7 +840,7 @@ class BayesianDecoderVisualizer:
                                  tight_layout=False)
 
     def plot_group_aligned_stats(self, param_data, plot_groups, tags=''):
-        plot_group_dict = {k: [i[0] for i in v] for k, v in plot_groups.items()}
+        plot_group_dict = {k: [i[0] for i in v] if k != 'turn_type' else v[0] for k, v in plot_groups.items()}
         plot_group_dict.update(time_label=['t_update'])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_group_dict, n_time_bins=11,
                                                                        time_window=(-2.5, 2.5))
@@ -870,7 +870,7 @@ class BayesianDecoderVisualizer:
 
                 # filter data based on comparison
                 stats.run(data_for_stats[mask], dependent_vars=dependent_vars, group_vars=[comp, group], pairs=pairs,
-                          filename='aligned_decoding')
+                          filename=f'aligned_decoding_{comp}_{tags}')
 
                 for var in dependent_vars:
                     fig, axes = plt.subplots(2, 2)
@@ -1106,7 +1106,7 @@ class BayesianDecoderVisualizer:
                                      additional_tags=tags)
 
     def plot_theta_phase_stats(self, param_data, plot_groups=None, tags=''):
-        plot_group_dict = {k: [i[0] for i in v] for k, v in plot_groups.items()}
+        plot_group_dict = {k: [i[0] for i in v] if k != 'turn_type' else v[0] for k, v in plot_groups.items()}
         plot_group_dict.update(time_label=['t_update'])
         theta_data = self.aggregator.calc_theta_phase_data(param_data, plot_group_dict, ret_by_trial=True)
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name', 'times',
@@ -1139,7 +1139,7 @@ class BayesianDecoderVisualizer:
 
             # run comparisons between trial types
             stats.run(data_to_plot, dependent_vars=dependent_vars, group_vars=[comp, *group], pairs=pairs,
-                      filename='aligned_decoding')
+                      filename=f'theta_modulation_{comp}_{tags}')
             for var in dependent_vars:
                 for g_name, g_data in data_to_plot.groupby(group[0]):
                     pairs_subset = [p for p in pairs if p[0][1] == g_name]
@@ -1185,7 +1185,7 @@ class BayesianDecoderVisualizer:
                 combos = list(itertools.combinations(data_to_plot['location'].unique(), r=2))
                 pairs = [((c[0], g), (c[1], g)) for c in combos for g in group_list]
                 stats.run(data_to_comp, dependent_vars=dependent_vars, group_vars=['location', 'phase_mid'],
-                          pairs=pairs, filename='aligned_decoding')
+                          pairs=pairs, filename=f'theta_quadrant_{comp}_{tags}')
 
                 for var in dependent_vars:
                     fig, axes = plt.subplots(2, 2, figsize=(15, 15))
