@@ -7,13 +7,13 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 def run_behavior_analysis():
     # setup flags
-    overwrite = True  # when False, this will only load data if the parameters match
-    plot = True  # this only plots on a session by session basis
+    overwrite = False  # when False, this will only load data if the parameters match
+    plot = False  # this only plots on a session by session basis
     group = True  # this compiles the data for group plotting
 
     # setup sessions
-    animals = [20]  # 17, 20, 25, 28, 29, 33, 34
-    dates_included = [210511]  # 210913 210511
+    animals = [17, 20, 25, 28, 29, 33, 34]  # 17, 20, 25, 28, 29, 33, 34
+    dates_included = []  # 210913 210511
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded, behavior_only=True)
     session_names = session_db.load_session_names()
@@ -33,7 +33,8 @@ def run_behavior_analysis():
         # save to group output
         session_data = dict(session_id=session_id,
                             animal=session_db.get_animal_id(name),
-                            behavior=behavior)
+                            behavior=behavior,
+                            is_ephys_session=session_db.get_session_ephys_flag(name))
         group_data.append(session_data)
 
         # plot data
