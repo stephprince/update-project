@@ -32,13 +32,14 @@ class BehaviorAnalyzer:
 
         # setup I/O
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem)
-        self.data_files = dict(behavior_output=dict(vars=['proportion_correct_by_update', 'aligned_data', 'trajectories','proportion_correct_by_phase','proportion_correct_by_trial'],
+        self.data_files = dict(behavior_output=dict(vars=['proportion_correct_by_update', 'aligned_data', 'trajectories','proportion_correct_by_phase','proportion_correct_by_trial', 'session_type'],
                                                     format='pkl')) #TODO detect if all variables exist when loading
 
     def run_analysis(self, overwrite=False):
         print(f'Analyzing behavioral data for {self.results_io.session_id}...')
 
         if overwrite:
+            self._get_session_type()
             self._get_proportion_correct_by_trial()
             self._get_proportion_correct_by_phase()
             self._get_proportion_correct_by_update()
@@ -89,7 +90,9 @@ class BehaviorAnalyzer:
     def _setup_data(self, nwbfile):
         data = dict()
         for an in self.analog_vars:
-            data[an] = nwbfile.acquisition[an]
+            aq_data = nwbfile.acquisition.get(an, [])
+            if np.size(aq_data):
+                data[an] = aq_data
 
         for vr in self.virmen_vars:
             if nwbfile.processing['behavior'][vr].neurodata_type in ['BehavioralEvents']:
@@ -101,7 +104,7 @@ class BehaviorAnalyzer:
 
     def _get_proportion_correct_by_trial(self):
         self.trials['prop_correct'] = self.trials['correct'].rolling(self.trial_window, min_periods=0).mean()
-        self.proportion_correct_by_trial = self.trials[['prop_correct','phase']].copy()
+        self.proportion_correct_by_trial = self.trials[['prop_correct','phase','turn_type', 'correct']].copy()
 
     def _get_proportion_correct_by_update(self):
         proportion_correct = []
@@ -115,10 +118,10 @@ class BehaviorAnalyzer:
 
             proportion_correct.append(dict(prop_correct=rolling.values,
                                            type='rolling',
-                                           update_type=self.virtual_track.mappings['update_type'][str(name)]))
+                                           update_type=self.virtual_track.mappings['update_type'][str(int(name))]))
             proportion_correct.append(dict(prop_correct=binned.values,
                                            type='binned',
-                                           update_type=self.virtual_track.mappings['update_type'][str(name)]))
+                                           update_type=self.virtual_track.mappings['update_type'][str(int(name))]))
 
         self.proportion_correct_by_update = proportion_correct
 
@@ -141,6 +144,30 @@ class BehaviorAnalyzer:
                                            phase=name))
 
         self.proportion_correct_by_phase = proportion_correct_by_phase
+
+    def _get_session_type(self):
+        # get total count and phase count
+        session_phases=self.trials['phase']
+        total_trials = session_phases.count()
+        phase_count=session_phases.value_counts(sort=False)
+
+        # set percentage of session needed parameter
+        session_percent=0.25
+        trials_needed=session_percent*total_trials
+
+        #find session type
+        trial_types=self.virtual_track.trial_types[0:7]
+        trial_types.reverse()
+        if phase_count['switch_update']!=0 or phase_count['stay_update']!=0:
+            session_type='update'
+        else:
+            for a in trial_types:
+                if phase_count[a]>=trials_needed:
+                    session_type=a
+                    break
+
+        self.session_type=session_type
+
     def _get_trajectories(self):
         trajectory_df = pd.DataFrame(index=self.data['position'].timestamps, data=self.data['position'].data[:, 1],
                                      columns=['y_position'])
@@ -149,19 +176,19 @@ class BehaviorAnalyzer:
 
         # get dataframe of data
         for key, value in self.data.items():
-            # get only times during trials
-            series_list = get_series_from_timeseries(value)
-            for s in series_list:
-                if value.timestamps:  # if the data is from virmen with timestamps/uneven sampling
-                    trajectory_df[s.name] = s
-                elif value.rate:  # if the data is from analog
-                    # match nearest analog sample to virmen sample
-                    trajectory_df = pd.merge_asof(trajectory_df, s, left_index=True, right_index=True)
+            if np.size(value):
+                # get only times during trials
+                series_list = get_series_from_timeseries(value)
+                for s in series_list:
+                    if value.timestamps:  # if the data is from virmen with timestamps/uneven sampling
+                        trajectory_df[s.name] = s
+                    elif value.rate:  # if the data is from analog
+                        # match nearest analog sample to virmen sample
+                        trajectory_df = pd.merge_asof(trajectory_df, s, left_index=True, right_index=True)
 
         # get average for each position bin for each trial
         trajectories = []
-        groups = self.trials.groupby(['update_type', 'turn_type'])
-        for name, group_data in groups:
+        for name, group_data in self.trials.groupby(['update_type', 'turn_type']):
             for ind, trial in group_data.iterrows():
                 start_loc = trajectory_df.index.searchsorted(trial['start_time'])
                 stop_loc = trajectory_df.index.searchsorted(trial['stop_time'])
@@ -171,8 +198,8 @@ class BehaviorAnalyzer:
                 agg_data = trial_df.groupby(bins).agg([lambda x: np.nanmean(x)])
                 agg_data.columns = trial_df.columns.values
                 trajectories.append(dict(**dict(trial_id=ind,
-                                                update_type=self.virtual_track.mappings['update_type'][str(name[0])],
-                                                turn_type=self.virtual_track.mappings['turn_type'][str(name[1])]),
+                                                update_type=self.virtual_track.mappings['update_type'][str(int(name[0]))],
+                                                turn_type=self.virtual_track.mappings['turn_type'][str(int(name[1]))]),
                                          **agg_data.to_dict()))
 
         self.trajectories = trajectories
@@ -198,8 +225,8 @@ class BehaviorAnalyzer:
                                                  stop_label=start_label,
                                                  aligned_data=data,
                                                  aligned_times=times,
-                                                 update_type=self.virtual_track.mappings['update_type'][str(name[0])],
-                                                 turn_type=self.virtual_track.mappings['turn_type'][str(name[1])]))
+                                                 update_type=self.virtual_track.mappings['update_type'][str(int(name[0]))],
+                                                 turn_type=self.virtual_track.mappings['turn_type'][str(int(name[1]))]))
 
         self.aligned_data = aligned_data
 
