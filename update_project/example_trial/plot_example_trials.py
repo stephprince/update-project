@@ -16,7 +16,7 @@ from update_project.virtual_track import UpdateTrack
 def plot_example_trials_ephys():
     # setup sessions
     animals = [17, 20, 25, 28, 29, 33, 34]  # 17, 20, 25, 28, 29, 33, 34
-    dates_included = [210520]  # 210913 is good
+    dates_included = []  # 210913 is good
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
@@ -254,7 +254,6 @@ def plot_example_trials_behavior():
             trial_type_inds = np.array(trial_inds_df.index[trial_inds_df['variable'] == trial_type_name])
             mosaic = """
             A
-            A
             B
             C
             D
@@ -267,28 +266,27 @@ def plot_example_trials_behavior():
 
                 # plot analog and digital channels
                 times = lfp_times[ind]-lfp_times[ind][0]
-                axes['A'].plot(times, lick_data[ind] / np.max(lick_data[ind]) + 4.5,
+                axes['A'].plot(times, lick_data[ind] / np.max(lick_data[ind]),
                                color=colors['general'][0], label='licks')
-                axes['A'].plot(times, dig_data[ind]['cue'] + 3, color=colors['general'][1], label='cue')
-                axes['A'].plot(times, dig_data[ind]['delay'] + 1.5, color=colors['general'][2], label='delay')
-                axes['A'].plot(times, dig_data[ind]['update'], color=colors['general'][3], label='update')
-                axes['A'].legend(loc='upper left',ncol=4)
-                axes['A'].set(ylim=[0, 6.7])
+                # axes['A'].plot(times, dig_data[ind]['cue'] + 3, color=colors['general'][1], label='cue')
+                # axes['A'].plot(times, dig_data[ind]['delay'] + 1.5, color=colors['general'][2], label='delay')
+                # axes['A'].plot(times, dig_data[ind]['update'], color=colors['general'][3], label='update')
+                axes['A'].set(ylim=[0, 1.8])
 
                 # plot x position / lateral position
-                axes['B'].plot(vr_times[ind]-vr_times[ind][0], position_data[ind][:, 0], color=colors['general'][4], label='lateral position')
+                axes['B'].plot(vr_times[ind]-vr_times[ind][0], position_data[ind][:, 0], color=colors['general'][1], label='lateral position')
                 axes['B'].legend()
                 axes['B'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
                 axes['B'].set(ylim=[virtual_track.choice_boundaries['x_position']['left'][0]-3, virtual_track.choice_boundaries['x_position']['right'][1]+3])
 
                 # plot y position / forward position
-                axes['C'].plot(vr_times[ind] - vr_times[ind][0], position_data[ind][:, 1]/max(position_data[ind][:, 1]), color=colors['general'][5], label='foreward position')
+                axes['C'].plot(vr_times[ind] - vr_times[ind][0], position_data[ind][:, 1]/max(position_data[ind][:, 1]), color=colors['general'][2], label='foreward position')
                 axes['C'].legend()
                 axes['C'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
                 axes['C'].set(ylabel='Fraction of track')
 
                 #plot view angle
-                axes['D'].plot(view_angle_times[ind] - view_angle_times[ind][0], np.degrees(view_angle_data[ind]), color=colors['general'][6],
+                axes['D'].plot(view_angle_times[ind] - view_angle_times[ind][0], np.degrees(view_angle_data[ind]), color=colors['general'][3],
                                label='view angle')
                 axes['D'].legend()
                 axes['D'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
@@ -296,14 +294,14 @@ def plot_example_trials_behavior():
                 axes['D'].axhline(linestyle='dashed', alpha=0.3)
 
                 #plot rotational velocity
-                axes['E'].plot(rvelocity_times[ind] - rvelocity_times[ind][0], rvelocity_data[ind], color=colors['general'][7],label='rotational velocity')
+                axes['E'].plot(rvelocity_times[ind] - rvelocity_times[ind][0], rvelocity_data[ind], color=colors['general'][4],label='rotational velocity')
                 axes['E'].legend()
                 axes['E'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
                 axes['E'].set(ylabel='Roll (a.u.)')
                 axes['E'].axhline(linestyle='dashed',alpha=0.3)
 
                 #plot translational velocity
-                axes['F'].plot(tvelocity_times[ind] - tvelocity_times[ind][0], tvelocity_data[ind], color=colors['general'][8], label='translational velocity')
+                axes['F'].plot(tvelocity_times[ind] - tvelocity_times[ind][0], tvelocity_data[ind], color=colors['general'][5], label='translational velocity')
                 axes['F'].legend()
                 axes['F'].set(xlabel='Time from trial start (s)', xlim=[0, np.max(times)])
                 axes['F'].set(ylabel='Pitch (a.u.)')
@@ -313,17 +311,22 @@ def plot_example_trials_behavior():
                            dig_data[ind]['cue'].size * times[-1]
                 delaylimits = np.where(np.diff(dig_data[ind]['delay'], prepend=dig_data[ind]['delay'][0]==-1))
                 for a in ['A','B','C','D','E','F']:
+                    if a!='A':
+                        label = '_'
+                    else:
+                        label = ''
                     delaylimit1=delaylimits[0][1]/dig_data[ind]['delay'].size * times[-1]
-                    axes[a].axvspan(cuelimit, delaylimit1, facecolor='k', alpha=0.1)
+                    axes[a].axvspan(cuelimit, delaylimit1, facecolor='k', alpha=0.1,  label=f'{label}delay1')
                     if len(delaylimits[0])==2:
-                        axes[a].axvspan(delaylimit1, times[-1], facecolor='y', alpha=0.1)
+                        axes[a].axvspan(delaylimit1, times[-1], facecolor='y', alpha=0.1, label=f'{label}choice made')
                     else:
                         delaylimit2=delaylimits[0][2]/dig_data[ind]['delay'].size * times[-1]
                         delaylimit3=delaylimits[0][3]/dig_data[ind]['delay'].size * times[-1]
-                        axes[a].axvspan(delaylimit1, delaylimit2, facecolor='c', alpha=0.1)
-                        axes[a].axvspan(delaylimit2, delaylimit3, facecolor='k', alpha=0.1)
-                        axes[a].axvspan(delaylimit3, times[-1], facecolor='y', alpha=0.1)
+                        axes[a].axvspan(delaylimit1, delaylimit2, facecolor='c', alpha=0.1, label=f'{label}update')
+                        axes[a].axvspan(delaylimit2, delaylimit3, facecolor='k', alpha=0.1, label=f'{label}delay2')
+                        axes[a].axvspan(delaylimit3, times[-1], facecolor='y', alpha=0.1, label=f'{label}choice made')
 
+                axes['A'].legend(loc='upper left', ncol=5, framealpha=1)
                 axes['A'].set_title(f'Example trial behavior only - {trial_type_name} - {session_db.get_session_id(name)}')
                 tags = f'{trial_type_name}_plot{plot_id}'
                 fig = axes['A'].get_figure()
