@@ -14,7 +14,6 @@ from update_project.virtual_track import UpdateTrack
 
 class BehaviorVisualizer:
     def __init__(self, data, session_id=None):
-        self.data = data
         self.virtual_track = UpdateTrack()
         self.colors = get_color_theme()
 
@@ -27,42 +26,52 @@ class BehaviorVisualizer:
             self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
         # get session visualization info
-        for sess_dict in self.data:
+        for sess_dict in data:
             sess_dict.update(proportion_correct_by_update=sess_dict['behavior'].proportion_correct_by_update)
             sess_dict.update(proportion_correct_by_phase=sess_dict['behavior'].proportion_correct_by_phase)
             sess_dict.update(proportion_correct_by_trial=sess_dict['behavior'].proportion_correct_by_trial)
+            sess_dict.update(session_type=sess_dict['behavior'].session_type)
             sess_dict.update(trajectories=sess_dict['behavior'].trajectories)
             sess_dict.update(aligned_data=sess_dict['behavior'].aligned_data)
 
         self.group_df = pd.DataFrame(data)
+        self.data = data
 
     def plot(self):
         if self.results_type=='session':
             self.plot_session_performance()
+        else:
+            self.plot_total_phase_count()
         self.plot_proportion_correct_by_phase()
-        self.plot_trajectories()
+        # self.plot_trajectories()
         self.plot_aligned_data()
-        #self.plot_proportion_correct_by_update()
+        self.plot_proportion_correct_by_update()
     def plot_proportion_correct_by_phase(self):
         temp_df = self.group_df[['animal', 'proportion_correct_by_phase']].explode('proportion_correct_by_phase').reset_index(drop=True)
         df_by_phase = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['proportion_correct_by_phase']))], axis=1)
         df_by_bin = df_by_phase.explode('prop_correct').reset_index(drop=True)
         df_by_bin = pd.DataFrame(df_by_bin.to_dict())
 
-        nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
-        ncols = 2  # 1 column for binned, 1 for rolling
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 15))
+        nrows = 1  # 1 row for each plot type (cum fract, hist, violin)
+        ncols = 1  # 1 column for binned, 1 for rolling
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10,8))
 
         # rolling proportion correct
         title = 'Performance - rolling'
         xlabel = 'proportion correct by phase'
         rolling_df = df_by_bin[df_by_bin["type"] == 'rolling']
         if np.size(rolling_df['prop_correct'].dropna()):
-            plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='phase',
-                               row_ids=[0, 1, 2],
-                               col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title)
-            plot_distributions(rolling_df, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
-                               col_ids=[1, 1, 1, 1], xlabel=xlabel, title=title)
+            data_to_plot = rolling_df.query('phase != "linear"')
+            # plot_distributions(data_to_plot, axes=axes, column_name='prop_correct', group='phase',
+            #                    row_ids=[0, 1, 2],
+            #                    col_ids=[0, 0, 0, 0], xlabel=xlabel, title=title, stripplot=False)
+            # plot_distributions(data_to_plot, axes=axes, column_name='prop_correct', group='animal', row_ids=[0, 1, 2],
+            #                    col_ids=[1, 1, 1, 1], xlabel=xlabel, title=title, stripplot=False)
+            sns.boxplot(data=data_to_plot, x='phase', y='prop_correct', showfliers=False)
+            plt.axhline(y=0.5, alpha=0.3, linestyle='dashed', color='k')
+            fig.suptitle('Rolling Behavioral Performance by Phase for All Animals')
+            self.results_io.save_fig(fig=fig, axes=axes, filename='performance_by_phase_boxplot',
+                                     results_type=self.results_type)
 
         # # binned proportion correct
         # title = 'Performance - binned'
@@ -75,15 +84,15 @@ class BehaviorVisualizer:
         #                        col_ids=[3, 3, 3, 3], xlabel=xlabel, title=title)
 
         # wrap up and save plot
-        for col in range(ncols):
-            axes[1][col].set_xlim((0, 1))
-            axes[2][col].set_ylim((0, 1))
-            axes[1][col].plot([0.5, 0.5], axes[1][col].get_ylim(), linestyle='dashed', color=[0, 0, 0, 0.5])
-            axes[2][col].plot(axes[2][col].get_xlim(), [0.5, 0.5], linestyle='dashed', color=[0, 0, 0, 0.5])
-
-        # save figure
-        fig.suptitle(f'Behavioral performance by phase - all animals')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance by phase', results_type=self.results_type)
+        # for col in range(ncols):
+        #     axes[1][col].set_xlim((0, 1))
+        #     axes[2][col].set_ylim((0, 1))
+        #     axes[1][col].plot([0.5, 0.5], axes[1][col].get_ylim(), linestyle='dashed', color=[0, 0, 0, 0.5])
+        #     axes[2][col].plot(axes[2][col].get_xlim(), [0.5, 0.5], linestyle='dashed', color=[0, 0, 0, 0.5])
+        #
+        # # save figure
+        # fig.suptitle(f'Behavioral performance by phase - all animals')
+        # self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance by phase', results_type=self.results_type)
 
     def plot_proportion_correct_by_update(self):
         # explode df so each prop correct value has one row (duplicates for each session/animal
@@ -127,6 +136,41 @@ class BehaviorVisualizer:
         fig.suptitle(f'Behavioral performance - all animals')
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'performance', results_type=self.results_type)
 
+    def plot_total_phase_count(self):
+        # sort, group, and clean up data
+        temp_df = self.group_df[['animal','session_id','session_type', 'is_ephys_session']]
+        temp_df = temp_df[temp_df.is_ephys_session != 1]
+        temp_df=temp_df.drop(columns=['is_ephys_session'])
+        grouped_df = temp_df.groupby(['session_type', 'animal']).describe().reset_index()
+        plot_data = pd.DataFrame(data={'animal': grouped_df['animal'], 'session_type': grouped_df['session_type'], 'count': grouped_df['session_id']['count']})
+        plot_data=pd.DataFrame(plot_data.to_dict())
+        plot_data['session_type'] = pd.Categorical(plot_data['session_type'],
+                                                   categories=['linear', 'ymaze_short', 'ymaze_long', 'delay1',
+                                                               'delay2',
+                                                               'delay3', 'delay4', 'update'], ordered=True)
+        nrows = 1
+        ncols = 1
+
+        # bar graph
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 8))
+        sns.barplot(x=plot_data['session_type'], y=plot_data['count'], alpha=0.5)
+        sns.swarmplot(x=plot_data['session_type'], y=plot_data['count'])
+        fig.suptitle('Average Time Spent on Each Trial Type')
+        self.results_io.save_fig(fig=fig, axes=axes, filename='total_phase_count_barplot', results_type=self.results_type)
+
+        # violin plot
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 8))
+        sns.violinplot(data=plot_data, x='session_type', y='count')
+        fig.suptitle('Average Time Spent on Each Trial Type')
+        self.results_io.save_fig(fig=fig, axes=axes, filename='total_phase_count_violinplot',
+                                 results_type=self.results_type)
+
+        # box plot
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 8))
+        sns.boxplot(data=plot_data, x='session_type', y='count', showfliers=False)
+        fig.suptitle('Average Time Spent on Each Trial Type')
+        self.results_io.save_fig(fig=fig, axes=axes, filename='total_phase_count_boxplot',
+                                 results_type=self.results_type)
     def plot_trajectories(self):
         temp_df = self.group_df[['animal', 'trajectories']].explode('trajectories').reset_index(drop=True)
         trajectory_df = pd.concat([temp_df['animal'], pd.DataFrame(list(temp_df['trajectories']))], axis=1)
@@ -220,22 +264,27 @@ class BehaviorVisualizer:
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', results_type=self.results_type)
     def plot_session_performance(self):
         temp_df=self.group_df['proportion_correct_by_trial'].values[0]
-
-        # do not know how to save without fig, axes
-        nrows = 1
+        nrows = 2
         ncols = 1
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(8, 8))
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(8, 8), sharex=True)
 
         #plot proportion correct line
-        axes.plot(temp_df['prop_correct'])
+        axes[0].plot(temp_df['prop_correct'])
 
         # plot the switch and stay trials
         switch_df = temp_df[temp_df['phase'] == 'switch_update']['prop_correct']
         stay_df = temp_df[temp_df['phase'] == 'stay_update']['prop_correct']
-        axes.plot(switch_df,marker='*',linestyle='None', markersize='5', label='switch update', color=self.colors['switch'])
-        axes.plot(stay_df, marker='D', linestyle='None', markersize='3', label='stay update', color=self.colors['stay'])
+        axes[0].plot(switch_df,marker='*',linestyle='None', markersize='5', label='switch update', color=self.colors['switch'])
+        axes[0].plot(stay_df, marker='D', linestyle='None', markersize='3', label='stay update', color=self.colors['stay'])
 
-        # add shading to indicate trial type
+        #plot the left and right proportion correct lines
+        #TODO move this to analyzer somehow and remove hardcoded trial window
+        left_df = (temp_df[temp_df['turn_type'] == 2]['correct']).rolling(30, min_periods=0).mean()
+        right_df = (temp_df[temp_df['turn_type'] == 1]['correct']).rolling(30, min_periods=0).mean()
+        axes[1].plot(left_df, label='left trials', marker='*', linestyle='None', markersize='5', color=self.colors['left'])
+        axes[1].plot(right_df, label='right trials', marker='*', linestyle='None', markersize='5', color=self.colors['right'])
+
+        # add shading to indicate trial type to both
         current_phase=temp_df['phase'][0]
         ind=0
         update=False
@@ -251,24 +300,35 @@ class BehaviorVisualizer:
                     all_phases.append(current_phase)
                 if update and current_phase not in ['stay_update','switch_update','delay4']:
                     update=False
-                    axes.axvspan(ind, trial+1,facecolor='c', alpha=0.1, label=f'{label}update')
+                    axes[0].axvspan(ind, trial+1,facecolor='c', alpha=0.1, label=f'{label}update')
+                    axes[1].axvspan(ind, trial + 1, facecolor='c', alpha=0.1, label=f'{label}update')
                     ind = trial + 1
                 elif not update and current_phase in ['stay_update', 'switch_update']:
                     update = True
-                    axes.axvspan(ind, trial + 1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
+                    axes[0].axvspan(ind, trial + 1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
+                    axes[1].axvspan(ind, trial + 1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
                     ind = trial + 1
                 elif not update:
                     update=False
-                    axes.axvspan(ind, trial+1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
+                    axes[0].axvspan(ind, trial+1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
+                    axes[1].axvspan(ind, trial + 1, color=self.colors[previous_phase], label=f'{label}{previous_phase}')
                     ind=trial+1
                 elif trial==len(temp_df)-2 and previous_phase in ['stay_update','switch_update','delay4']:
-                    axes.axvspan(ind, len(temp_df), facecolor='c', alpha=0.1, label=f'{label}update')
+                    axes[0].axvspan(ind, len(temp_df), facecolor='c', alpha=0.1, label=f'{label}update')
+                    axes[1].axvspan(ind, len(temp_df), facecolor='c', alpha=0.1, label=f'{label}update')
 
-        # make visually appealing
-        axes.legend()
-        axes.set(xlabel='Number of Trials', ylabel='Proportion Correct')
-        axes.set(ylim=[0,1], xlim=[0,len(temp_df)])
-        axes.axhline(y=0.5, alpha=0.1, linestyle='dashed', color='k')
-        axes.set_title(f'Session Performance - %s' %self.session_id)
+        # make switch/stay visually appealing
+        axes[0].legend()
+        axes[0].set(ylabel='Proportion Correct')
+        axes[0].set(ylim=[0,1], xlim=[0,len(temp_df)])
+        axes[0].axhline(y=0.5, alpha=0.1, linestyle='dashed', color='k')
 
+        # make left/right visually appealing
+        axes[1].legend()
+        axes[1].set(xlabel='Number of Trials', ylabel='Proportion Correct')
+        axes[1].set(ylim=[0, 1], xlim=[0, len(temp_df)])
+        axes[1].axhline(y=0.5, alpha=0.1, linestyle='dashed', color='k')
+
+        # add overall title and save
+        axes[0].set_title(f'Session Performance - %s' % self.session_id)
         self.results_io.save_fig(fig=fig,axes=axes,filename=f'session_performance', results_type=self.results_type)
