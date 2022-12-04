@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from pathlib import Path
@@ -32,7 +33,11 @@ class SessionLoader:
         session_path = f'{self.base_path / self.get_session_id(session_name)}.nwb'
 
         return session_path
+    def get_session_ephys_flag(self, session_name):
+        all_session_info = self.get_session_info()
+        is_ephys_session = all_session_info.query(f'Animal == {session_name[1]} & Date == {session_name[2]}')['Ephys?'].values[0]
 
+        return is_ephys_session
     def get_session_info(self):
         # import all session info
         df_ephys = pd.read_csv(self.csv_filename, skiprows=[1],
@@ -43,6 +48,10 @@ class SessionLoader:
             df_behavior['Animal'] = df_behavior['Animal'].str.replace('[Ss]', '').astype(
                 int)  # convert animal ids into int
             df_behavior['ID'] = 'S'  # add separate ID column with the S tag
+            # sessions_with_ephys = list(df_ephys[['Animal', 'Date']].apply(tuple, axis=1).unique())
+            # all_sessions = list(df_behavior[['Animal', 'Date']].apply(tuple, axis=1))
+            # df_behavior['Ephys?'] = [1 if sess in sessions_with_ephys else 0 for sess in all_sessions]
+            # df_behavior.to_csv("C://Users//tyassine3//Desktop//behaviorephystesting.csv")
 
             dob_mapping = df_ephys.groupby(['Animal', 'DOB']).size().reset_index()
             df_all = df_behavior.merge(dob_mapping[['Animal', 'DOB']], on='Animal', how='outer')
