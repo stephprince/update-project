@@ -24,7 +24,7 @@ def interp_timeseries(timeseries, trials, start_label, stop_label, start_window=
         time_aligned = np.array(timestamps[idx_start:idx_stop]) - offset
 
         # interpolate data interval to make even sampling rate
-        fxn = interp1d(time_aligned, data_aligned, kind='linear')
+        fxn = interp1d(time_aligned, data_aligned, kind='linear', bounds_error=False)
         new_times = np.arange(start + start_window - offset, stop + stop_window - offset, step)  # resample to constant sampling rate
         interpolated_data.append(fxn(new_times))
 
