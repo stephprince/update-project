@@ -66,7 +66,7 @@ class UpdateTrack(VirtualTrack):
                              turn_type={'left': (-2, 0), 'right': (0, 2)},
                              dynamic_choice={'left': (-1, -0.4), 'right': (0.4, 1)})
     mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},
-                    turn_type={'1': 'left', '2': 'right'})
+                    turn_type={'1': 'left', '2': 'right', '3': 'linear'})
     home_boundaries = dict(x_position=(-1, 1),
                            y_position=(5, 255),
                            view_angle=(2 * np.pi / 9, -2 * np.pi/9),
