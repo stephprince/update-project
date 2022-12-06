@@ -4,14 +4,26 @@ import pandas as pd
 import pingouin as pg
 import warnings
 
+from statsmodels.regression.mixed_linear_model import MixedLM
 from pathlib import Path
 from scipy.stats import sem, ranksums, kstest
 from tqdm import tqdm
 
-from update_project.results_io import ResultsIO
+# import rpy2.robjects as ro
+# from rpy2.robjects.packages import importr
+# from rpy2.robjects import pandas2ri
+
+from update_project.general.results_io import ResultsIO
+#
+# utils = importr('utils')
+# utils.chooseCRANmirror(ind=1)
+# utils.install_packages(ro.StrVector(['lme4', 'lmerTest', 'emmeans', 'report']))
+# lme4 = importr('lme4')
+# lme4= importr('lmerTest')  # TODO - determine if I need this or not
+# emmeans = importr('emmeans')
+# report = importr('report')
 
 rng = np.random.default_rng(12345)
-
 
 class Stats:
     def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None):
@@ -20,7 +32,7 @@ class Stats:
         self.approaches = approaches or ['bootstrap', 'traditional']  # 'summary' as other option
         self.tests = tests or ['direct_prob', 'mann-whitney']  # 'wilcoxon' as other option
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
-        self.nboot = 100  # number of iterations to perform for bootstrapping default should be 1000
+        self.nboot = 1000  # number of iterations to perform for bootstrapping default should be 1000
         self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def run(self, df, dependent_vars=None, group_vars='group', pairs=None, filename=''):
@@ -33,13 +45,16 @@ class Stats:
         stats_output = []
         descript_output = []
         for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):
-            self._setup_data(approach=a, data=df)
+            if a == 'bootstrap' and t != 'direct_prob':  # only run bootstrapping for direct prob test
+                continue
+            else:
+                self._setup_data(approach=a, data=df)
 
-            descript = self._get_descriptive_stats(approach=a, test=t, alternative=alt)
-            descript_output.append(descript)
+                descript = self._get_descriptive_stats(approach=a, test=t, alternative=alt)
+                descript_output.append(descript)
 
-            stats = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
-            stats_output.append(stats)
+                stats = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
+                stats_output.append(stats)
 
         self.stats_df = pd.concat(stats_output, axis=0)
         self.descript_df = pd.concat(descript_output, axis=0)
@@ -57,6 +72,8 @@ class Stats:
                 [*self.group_vars, self.levels[0]]).mean().reset_index()  # calc means for level 1
         elif approach == 'traditional':
             self.df_processed = data.copy(deep=True)
+        elif approach == 'mixed_effects':
+            self.df_processed = self._get_mixed_effects_model(data)
         else:
             warnings.warn(f'Statistical approach {approach} is not supported')
             self.df_processed = []
@@ -90,6 +107,8 @@ class Stats:
                                        prob_test_vals=output['W-val'].to_numpy()[0],
                                        p_val=output["p-val"].to_numpy()[0],
                                        alternative=output['alternative'].to_numpy()[0])
+                elif test == 'anova':
+                    output = pg.mixed_anova()  # TODO - determine if I need mixed or not
 
                 pair_outputs.append(test_output)
 
@@ -116,6 +135,41 @@ class Stats:
     def _export_stats(self, filename):
         self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', format='csv')
         self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', format='csv')
+
+    def _get_mixed_effects_model(self, data):
+        data['predictor'] = data[self.group_vars].apply(tuple, axis=1)
+        for var in self.dependent_vars:
+
+            formula = f'{var} ~ predictor + (1|animal) + (1|animal:session_id)'  # equivalent to var ~ predictor + 1|animal/session_id
+            model = lme4.lmer(formula, data=self.pandas_to_r_df(data), REML=False)
+            print(ro.r['summary'](model))
+            print(ro.r['anova'](model))
+            print(emmeans.emmeans(model, 'predictor', contr='pairwise', adjust='tukey'))
+            # model2 = ro.r['lm'](f'{var} ~ predictor', data=self.pandas_to_r_df(data))
+            # print(ro.r['anova'](model, model2))  # just for curiosity to compare with/without random effects
+            #print(report.report(model))
+
+            # TODO - add checks for assumptions of mixed effects models
+            # TODO - add plots for visualization of data
+            # TODO - add stats output in dataframe format
+            # not super clear but I'm pretty sure it's the same formula as 'var ~ predictor + (1|animal/session_id)' like above
+            model3 = (MixedLM
+                      .from_formula(f'{var} ~ C(predictor)', vc_formula={'session_id': '0+C(session_id)'}, re_formula='1',
+                                    groups='animal', data=data)
+                      .fit(method=['lbfgs'], reml=False))
+            print(model3.summary())
+            re_df = pd.DataFrame.from_dict(model3.random_effects, orient='index')
+            re_df['intercept'] = re_df['animal'] + model3.fe_params.loc['Intercept']
+            re_df['slopes'] = re_df.iloc[:, 1:] + model3.fe_params.loc['Intercept']
+
+        return output_data
+
+    @staticmethod
+    def pandas_to_r_df(data):
+        with ro.conversion.localconverter(ro.default_converter + pandas2ri.converter):
+            r_df = ro.conversion.py2rpy(data)
+
+        return r_df
 
     def _bootstrap_recursive(self, data, current_level=0, output_data=None):
         unique_samples = np.unique(data[self.levels[current_level]])
