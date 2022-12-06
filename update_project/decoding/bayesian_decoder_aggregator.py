@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 from scipy.stats import sem, pearsonr
 from scipy import signal
 
-from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
+from update_project.general.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.general.results_io import ResultsIO
 from update_project.statistics.statistics import get_fig_stats, get_comparative_stats

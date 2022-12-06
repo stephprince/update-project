@@ -1,7 +1,7 @@
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.behavior.behavior_analysis_interface import BehaviorAnalysisInterface
+from update_project.behavior.behavior_analyzer import BehaviorAnalyzer
 from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 
@@ -27,7 +27,7 @@ def run_behavior_analysis():
         nwbfile = io.read()
 
         # run analysis
-        behavior = BehaviorAnalysisInterface(nwbfile=nwbfile, session_id=session_id)
+        behavior = BehaviorAnalyzer(nwbfile=nwbfile, session_id=session_id)
         behavior.run_analysis(overwrite=overwrite)  # build decoding model
 
         # save to group output

@@ -9,7 +9,7 @@ session_db = SessionLoader(animals=animals, dates_included=dates_included)
 # initialize general analysis class and run for each of the specificed steps
 analyzer = UpdateTaskAnalyzer(analysis=dict(Behavior=dict(),
                                             ChoiceEstimate=dict(target_var='choice'),
-                                            Decoder=dict(features=['y_position', 'x_position', 'dynamic_choice'], ),
+                                            Decoder=dict(features=['y_position', 'x_position', 'choice'], ),
                                             SingleUnits=dict()),
                               sessions=session_db,
                               overwrite=overwrite)

@@ -14,10 +14,10 @@ from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
-from update_project.base_analysis_interface import BaseAnalysisInterface
+from update_project.base_analysis_class import BaseAnalysisClass
 
 
-class BayesianDecoderAnalysisInterface(BaseAnalysisInterface):
+class BayesianDecoderAnalyzer(BaseAnalysisClass):
     def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
         # setup parameters
         self.units_types = params.get('units_types',
@@ -26,7 +26,7 @@ class BayesianDecoderAnalysisInterface(BaseAnalysisInterface):
         self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.decoder_test_size = params.get('decoder_test_size', 0.2)  # prop of trials for testing on train/test split
-        self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],
+        self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1, 2, 3],  # TODO - test and then replace
                                                                           correct=[0, 1]))  # trial filters
         self.encoder_bin_num = params.get('encoder_bin_num', 50)  # number of bins to build encoder
         self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
@@ -121,13 +121,13 @@ class BayesianDecoderAnalysisInterface(BaseAnalysisInterface):
                     if feat in ['turn_type'] and ~np.isnan(trial['t_update']) and trial['update_type'] == 2:
                         idx_switch = bisect_left(time_series.timestamps, trial['t_update'])
                         data[idx_switch:idx_stop] = -1 * choice_mapping[str(int(trial[feat]))]
-            elif feat in ['dynamic_choice', 'cue_bias']:
+            elif feat in ['choice', 'cue_bias']:
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
                 # load dynamic choice from saved output
                 data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type')
                 fname_tag = data_mapping[self.feature_names[0]]
-                choice_path = Path().absolute().parent.parent / 'results' / 'dynamic_choice'
+                choice_path = Path().absolute().parent.parent / 'results' / 'choice'
                 fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{fname_tag}',
                                                           results_type='session', format='pkl',
                                                           diff_base_path=choice_path)

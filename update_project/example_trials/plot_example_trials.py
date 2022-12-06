@@ -1,8 +1,8 @@
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.single_units.single_unit_analysis_interface import SingleUnitAnalysisInterface
-from update_project.decoding.bayesian_decoder_analysis_interface import BayesianDecoderAnalysisInterface
+from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
+from update_project.decoding.bayesian_decoder_analyzer import BayesianDecoderAnalyzer
 from update_project.example_trials.example_trial_visualizer import ExampleTrialVisualizer
 
 # setup sessions
@@ -29,14 +29,14 @@ for name in session_names:
         unit_types = dict(region=reg, cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron'])
 
         # load existing data
-        analyzer = SingleUnitAnalysisInterface(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature,
-                                               params=dict(align_window=align_window, align_times=align_times,
+        analyzer = SingleUnitAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature,
+                                      params=dict(align_window=align_window, align_times=align_times,
                                                   units_types=unit_types))
-        analyzer.run(overwrite=overwrite, export_data=False)  # don't use existing data but also don't save it
+        analyzer.run_analysis(overwrite=overwrite, export_data=False)  # don't use existing data but also don't save it
 
-        decoder = BayesianDecoderAnalysisInterface(nwbfile=nwbfile, session_id=session_db.get_session_id(name), features=[feature],
-                                                   params=dict(units_types=unit_types))
-        decoder.run_decoding(export_data=False)
+        decoder = BayesianDecoderAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), features=[feature],
+                                          params=dict(units_types=unit_types))
+        decoder.run_analysis(export_data=False)
 
         # save to group output
         session_data = dict(session_id=session_db.get_session_id(name),
@@ -50,4 +50,4 @@ for name in session_names:
 visualizer = ExampleTrialVisualizer(group_data, exclusion_criteria=exclusion_criteria, align_window=align_window,
                                     align_times=align_times)
 group_data = []  # clear out memory
-visualizer.plot()
+visualizer

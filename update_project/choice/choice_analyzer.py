@@ -10,10 +10,10 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 
 from update_project.general.results_io import ResultsIO
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
-from update_project.base_analysis_interface import BaseAnalysisInterface
+from update_project.base_analysis_class import BaseAnalysisClass
 
 
-class ChoiceAnalysisInterface(BaseAnalysisInterface):
+class ChoiceAnalyzer(BaseAnalysisClass):
 
     def __init__(self, nwbfile, session_id, target_var='choice', velocity_only=False):
         # based on grid search of subset of sessions (210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115),
@@ -53,7 +53,7 @@ class ChoiceAnalysisInterface(BaseAnalysisInterface):
 
         # get results to save
         add_tags = '_velocity_only' if self.velocity_only else ''
-        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='dynamic_choice',
+        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='choice',
                                     tags=f'{target_var}{add_tags}')
         self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'decoder_data', 'params',
                                                                 ],

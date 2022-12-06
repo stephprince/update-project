@@ -1,5 +1,4 @@
 import numpy as np
-import pickle
 import pandas as pd
 import warnings
 
@@ -10,11 +9,11 @@ from update_project.general.results_io import ResultsIO
 from update_project.general.virtual_track import UpdateTrack
 from update_project.general.timeseries import get_series_from_timeseries
 from update_project.general.trials import get_trials_dataframe
-from update_project.decoding.interpolate import interp_timeseries
-from update_project.base_analysis_interface import BaseAnalysisInterface
+from update_project.general.interpolate import interp_timeseries
+from update_project.base_analysis_class import BaseAnalysisClass
 
 
-class BehaviorAnalysisInterface(BaseAnalysisInterface):
+class BehaviorAnalyzer(BaseAnalysisClass):
     def __init__(self, nwbfile: NWBFile, session_id: str, params: dict = {}):
         # setup params
         self.virtual_track = UpdateTrack()

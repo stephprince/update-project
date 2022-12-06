@@ -62,7 +62,7 @@ class VirtualTrack:
         limits = dict()
         limits['x_position'] = [np.min(xs), np.max(xs)]
         limits['y_position'] = [5, np.max(ys)]  # mouse can never be behind 5 in the update track
-        limits['dynamic_choice'] = (-0.5, 0.5)
+        limits['choice'] = (-0.5, 0.5)
 
         return limits[dim]
 

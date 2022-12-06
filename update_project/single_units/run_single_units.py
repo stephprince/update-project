@@ -1,7 +1,7 @@
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.single_units.single_unit_analysis_interface import SingleUnitAnalysisInterface
+from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
 from update_project.single_units.single_unit_visualizer import SingleUnitVisualizer
 
 # setup sessions
@@ -23,9 +23,9 @@ for name in session_names:
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
-    analyzer = SingleUnitAnalysisInterface(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature,
-                                           params=params)
-    analyzer.run(overwrite=overwrite)
+    analyzer = SingleUnitAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature,
+                                  params=params)
+    analyzer.run_analysis(overwrite=overwrite)
 
     # save to group output
     session_data = dict(session_id=session_db.get_session_id(name),
@@ -37,4 +37,4 @@ for name in session_names:
 
 if plot:
     visualizer = SingleUnitVisualizer(group_data)
-    visualizer.plot()
+    visualizer

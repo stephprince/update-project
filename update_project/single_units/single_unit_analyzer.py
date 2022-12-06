@@ -18,10 +18,10 @@ from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.units import align_by_time_intervals as align_by_time_intervals_units
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
-from update_project.base_analysis_interface import BaseAnalysisInterface
+from update_project.base_analysis_class import BaseAnalysisClass
 
 
-class SingleUnitAnalysisInterface(BaseAnalysisInterface):
+class SingleUnitAnalyzer(BaseAnalysisClass):
     def __init__(self, nwbfile: NWBFile, session_id: str, feature: str, params=dict()):
         # setup parameters
         self.units_types = params.get('units_types',
@@ -119,13 +119,13 @@ class SingleUnitAnalysisInterface(BaseAnalysisInterface):
                 if self.feature_name in ['turn_type'] and ~np.isnan(trial['t_update']) and trial['update_type'] == 2:
                     idx_switch = bisect_left(time_series.timestamps, trial['t_update'])
                     data[idx_switch:idx_stop] = -1 * choice_mapping[str(int(trial[feat]))]
-        elif self.feature_name in ['dynamic_choice', 'cue_bias']:
+        elif self.feature_name in ['choice', 'cue_bias']:
             time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
             # load dynamic choice from saved output
             data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type')
             fname_tag = data_mapping[self.feature_name]
-            choice_path = Path().absolute().parent.parent / 'results' / 'dynamic_choice'
+            choice_path = Path().absolute().parent.parent / 'results' / 'choice'
             fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{fname_tag}',
                                                       results_type='session', format='pkl',
                                                       diff_base_path=choice_path)

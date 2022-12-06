@@ -4,8 +4,8 @@ from pathlib import Path
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.dynamic_choice.choice_analysis_interface import DynamicChoiceRNN
-from update_project.dynamic_choice.dynamic_choice_visualizer import DynamicChoiceVisualizer
+from update_project.choice.choice_analyzer import ChoiceAnalyzer
+from update_project.choice.choice_visualizer import ChoiceVisualizer
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 
@@ -29,7 +29,7 @@ for name in session_names:
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
-    rnn = DynamicChoiceRNN(nwbfile=nwbfile, session_id=session_db.get_session_id(name), target_var=target_var,
+    rnn = ChoiceAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), target_var=target_var,
                            velocity_only=velocity_only)
     rnn.run_analysis(overwrite=overwrite, grid_search=grid_search)
 
@@ -40,5 +40,5 @@ for name in session_names:
     group_data.append(session_data)
 
 if plot:
-    visualizer = DynamicChoiceVisualizer(group_data, grid_search=grid_search, target_var=target_var)
+    visualizer = ChoiceVisualizer(group_data, grid_search=grid_search, target_var=target_var)
     visualizer.plot()
