@@ -13,75 +13,57 @@ from statannotations.Annotator import Annotator
 
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, get_color_theme, \
-    plot_scatter_with_distributions
+from update_project.general.plots import plot_distributions, plot_scatter_with_distributions
 from update_project.statistics.statistics import Stats
-
-plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
-rcparams = mpl.rcParams
-new_line = '\n'
+from update_project.base_visualization_class import BaseVisualizationClass
 
 
-class BayesianDecoderVisualizer:
-    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None, overwrite=False):
-        self.data = data
-        self.data_exists = True
+class BayesianDecoderVisualizer(BaseVisualizationClass):
+    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None):
+        super().__init__(data)
         self.exclusion_criteria = exclusion_criteria
         self.params = params
         self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
                                                          num_trials=[self.exclusion_criteria['trials']])
-        self.colors = get_color_theme()
-        self.plot_groups = dict(update_type=[['non_update'], ['switch'], ['stay']],
-                                turn_type=[[1], [2], [1, 2]],
-                                correct=[[0], [1], [0, 1]])
-        self.plot_group_comparisons = dict(update_type=[['non_update'], ['switch'], ['stay']],
-                                           turn_type=[[1, 2]],
-                                           correct=[[0], [1]])
-        self.data_comparisons = dict(update_type=dict(update_type=['switch', 'stay', 'non_update'], correct=[1]),
-                                     correct=dict(update_type=['switch'], correct=[0, 1]))
-
         self.aggregator = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria)
         self.aggregator.run_df_aggregation(data, overwrite=True, window=2.5)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self, group_by=None):
-        if self.data_exists:
-            group_names = list(group_by.keys())
+        group_names = list(group_by.keys())
 
-            # make plots for different parameters, groups, features
-            groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
-            for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
-                tags = "_".join([str(n) for n in g_name])
-                kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-                self.plot_theta_data(data, kwargs)
-                self.plot_group_aligned_stats(data, **kwargs)
-                self.plot_group_aligned_comparisons(data, **kwargs)
-                self.plot_performance_comparisons(data, tags=tags)
+        # make plots for different parameters, groups, features
+        groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
+        for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
+            tags = "_".join([str(n) for n in g_name])
+            kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
+            self.plot_theta_data(data, kwargs)
+            # self.plot_group_aligned_stats(data, **kwargs)
+            self.plot_group_aligned_comparisons(data, **kwargs)
+            self.plot_performance_comparisons(data, tags=tags)
 
-                # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
-                for plot_types in list(itertools.product(*self.plot_groups.values())):
-                    plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
-                    title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-                    kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                    self.plot_group_aligned_data(data, **kwargs)
-                    # self.plot_scatter_dists_around_update(data, **kwargs)
-                    # self.plot_trial_by_trial_around_update(data, **kwargs)
+            # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
+            for plot_types in list(itertools.product(*self.plot_groups.values())):
+                plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
+                title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+                kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
+                self.plot_group_aligned_data(data, **kwargs)
+                # self.plot_scatter_dists_around_update(data, **kwargs)
+                # self.plot_trial_by_trial_around_update(data, **kwargs)
 
-            #  make plots with both brain regions
-            self.plot_multiregional_data()
-            self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
-            self.plot_all_groups_error(main_group=group_names, sub_group='animal')
-            self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
-            self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
+        #  make plots with both brain regions
+        self.plot_multiregional_data()
+        self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
+        self.plot_all_groups_error(main_group=group_names, sub_group='animal')
+        self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
+        self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
-            # plot model metrics (comparing parameters across brain regions and features)
-            for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
-                self.plot_group_confusion_matrices(data, name, )
-                self.plot_tuning_curves(data, name, )
-                self.plot_all_confusion_matrices(data, name)
-                self.plot_parameter_comparison(data, name, thresh_params=True)
-        else:
-            print(f'No data found to plot')
+        # plot model metrics (comparing parameters across brain regions and features)
+        for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
+            self.plot_group_confusion_matrices(data, name, )
+            self.plot_tuning_curves(data, name, )
+            self.plot_all_confusion_matrices(data, name)
+            self.plot_parameter_comparison(data, name, thresh_params=True)
 
     def plot_multiregional_data(self):
         if len(self.aggregator.group_aligned_df['region'].unique()) > 1:
@@ -448,12 +430,12 @@ class BayesianDecoderVisualizer:
                                          filename=f'compare_{comp}_interactions_{var}',
                                          additional_tags=tags, tight_layout=False)
 
-
     def plot_region_interaction_data(self, param_data, title, plot_groups=None, tags=''):
         interaction_data = self.aggregator.calc_region_interactions(param_data, plot_groups)
         if np.size(interaction_data):
             for g_name, g_data in interaction_data.groupby(['a_vs_b']):
-                corr_maps = (g_data.groupby(['time_label', 'choice'])['corr_sliding'].apply(lambda x: np.nanmean(np.stack(x), axis=0)))
+                corr_maps = (g_data.groupby(['time_label', 'choice'])['corr_sliding'].apply(
+                    lambda x: np.nanmean(np.stack(x), axis=0)))
                 times_sliding = g_data.groupby(['time_label', 'choice'])['times_sliding'].mean()
                 lags_sliding = g_data.groupby(['time_label', 'choice'])['lags_sliding'].mean()
                 g_data_by_time = (g_data
@@ -484,8 +466,8 @@ class BayesianDecoderVisualizer:
                                      xlabel='Time around cue', ylabel='corr lags')
                     axes[1][col].invert_yaxis()
 
-                plt.colorbar(im1, cax=caxes[0], label='initial corr', pad=0.01, fraction=0.04,)
-                plt.colorbar(im2, cax=caxes[1], label='switch corr', pad=0.01, fraction=0.04,)
+                plt.colorbar(im1, cax=caxes[0], label='initial corr', pad=0.01, fraction=0.04, )
+                plt.colorbar(im2, cax=caxes[1], label='switch corr', pad=0.01, fraction=0.04, )
 
                 (  # plot corr coeffs over time
                     so.Plot(g_data_by_time, x='times_sliding', y='corr_coeff_sliding', color='choice')
@@ -493,7 +475,8 @@ class BayesianDecoderVisualizer:
                         .add(so.Band(), so.Est(errorbar='se'), )
                         .add(so.Line(linewidth=2), so.Agg(), )
                         .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
-                        .limit(x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
+                        .limit(
+                        x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
                         .theme(rcparams)
                         .layout(engine='constrained')
                         .on(sfigs[1][0])
@@ -504,7 +487,8 @@ class BayesianDecoderVisualizer:
                 (  # plot initial - switch difference over time (averages with bar)
                     so.Plot(g_data, x='corr_coeff', color='choice')
                         .facet(col='time_label')
-                        .add(so.Bars(alpha=0.5, edgealpha=0.5), so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1),)
+                        .add(so.Bars(alpha=0.5, edgealpha=0.5),
+                             so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1), )
                         .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
                         .limit(x=(-1, 1))
                         .label(y='proportion')
@@ -516,7 +500,8 @@ class BayesianDecoderVisualizer:
                 add_lines = [[a.axvline(0, color='k', linestyle='dashed') for a in sf.axes]
                              for sf in [sfigs[2][0], sfigs[1][0], sfigs[0][0]]]
                 leg = fig.legends.pop(0)
-                sfigs[1][0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right', fontsize='large')
+                sfigs[1][0].legend(leg.legendHandles, [t.get_text() for t in leg.texts], loc='upper right',
+                                   fontsize='large')
 
                 # save figures
                 fig.suptitle(f'{title}_{g_name}')
@@ -538,7 +523,7 @@ class BayesianDecoderVisualizer:
         time_lims = (aligned_data['times'].apply(np.nanmin).min(), aligned_data['times'].apply(np.nanmax).max())
 
         # make figure
-        ncols, nrows = (len(self.aggregator.align_times), 6)  #heatmap, traces, probheatmaps, velocity, error
+        ncols, nrows = (len(self.aggregator.align_times), 6)  # heatmap, traces, probheatmaps, velocity, error
         fig, axes = plt.subplots(nrows, ncols, sharex='col', sharey='row', figsize=(20, 20), constrained_layout=True)
 
         for name, data in trial_data.groupby(['time_label'], sort=False):
@@ -636,7 +621,8 @@ class BayesianDecoderVisualizer:
                             .mean().reset_index())
                     if np.size(data):
                         plot_scatter_with_distributions(data=data,
-                                                        x='prob_sum_initial_stay', y='prob_sum_switch', hue='times_binned',
+                                                        x='prob_sum_initial_stay', y='prob_sum_switch',
+                                                        hue='times_binned',
                                                         fig=sfigs[0][i], title=label, kind=kind, plt_kwargs=plt_kwargs)
 
                         plot_scatter_with_distributions(data=data, hue='times_binned',
@@ -662,8 +648,8 @@ class BayesianDecoderVisualizer:
                 so.Plot(trial_data, x='times', color='choice')
                     .facet(col='time_label')
                     .pair(y=['prob_sum', 'diff_baseline'])
-                    .add(so.Band(), so.Est(errorbar='se'),)
-                    .add(so.Line(linewidth=2), so.Agg(),)
+                    .add(so.Band(), so.Est(errorbar='se'), )
+                    .add(so.Line(linewidth=2), so.Agg(), )
                     .scale(color=[self.colors[c] for c in trial_data['choice'].unique()])
                     .theme(rcparams)
                     .layout(engine='constrained')
@@ -697,7 +683,8 @@ class BayesianDecoderVisualizer:
                 for name, data in locations[kind]['df'].groupby(group_list, sort=False):
                     if len(group_list) > 1:
                         col = np.argwhere(locations[kind]['df'][group_list[0]].unique() == name[0])[0][0]
-                        row = np.argwhere(locations[kind]['df'][group_list[1]].unique() == name[1])[0][0]  # which row to plot
+                        row = np.argwhere(locations[kind]['df'][group_list[1]].unique() == name[1])[0][
+                            0]  # which row to plot
                         cmap = self.colors[f'{name[1]}_cmap']
                     else:
                         row, col = (0, np.argwhere(trial_data[group_list[0]].unique() == name)[0][0])
@@ -706,7 +693,7 @@ class BayesianDecoderVisualizer:
                     matrix = data.groupby([level, 'times'])[kind].mean().unstack().to_numpy()
                     im = axes[row][col].imshow(matrix, cmap=cmap, vmin=0, vmax=0.4, aspect='auto',
                                                origin='lower', extent=[data['times'].min(), data['times'].max(),
-                                                                       0, np.shape(matrix)[0]],)
+                                                                       0, np.shape(matrix)[0]], )
                     if col == 0:
                         axes[row][col].set_ylabel(level)
                     elif col == ncols - 1:
@@ -759,7 +746,8 @@ class BayesianDecoderVisualizer:
             time_lims = (v['aligned_data']['times'].apply(np.nanmin).min(),
                          v['aligned_data']['times'].apply(np.nanmax).max())
 
-            trial_mat = v['trial_data'].pivot(index=['choice', 'trial_index'], columns='times', values='prob_over_chance')
+            trial_mat = v['trial_data'].pivot(index=['choice', 'trial_index'], columns='times',
+                                              values='prob_over_chance')
             switch_mat = trial_mat.query('choice == "switch"').to_numpy()
             stay_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
             times = trial_mat.columns.to_numpy()
@@ -810,12 +798,14 @@ class BayesianDecoderVisualizer:
 
             veloc = np.stack(v['aligned_data']['rotational_velocity'])
             error = np.stack(v['aligned_data']['error'])
-            axes[4][ind].plot(v['aligned_data']['times'].values[0], np.nanmean(veloc, axis=0), color=self.colors['control'],
+            axes[4][ind].plot(v['aligned_data']['times'].values[0], np.nanmean(veloc, axis=0),
+                              color=self.colors['control'],
                               label='rotational velocity')
             axes[4][ind].fill_between(v['aligned_data']['times'].values[0], np.nanmean(veloc, axis=0) + sem(veloc),
                                       np.nanmean(veloc, axis=0) - sem(veloc), color=self.colors['control'],
                                       alpha=0.2)
-            axes[5][ind].plot(v['aligned_data']['times'].values[0], np.nanmean(error, axis=0), color=self.colors['error'],
+            axes[5][ind].plot(v['aligned_data']['times'].values[0], np.nanmean(error, axis=0),
+                              color=self.colors['error'],
                               label='decoding error')
             axes[5][ind].fill_between(v['aligned_data']['times'].values[0], np.nanmean(error, axis=0) + sem(error),
                                       np.nanmean(error, axis=0) - sem(error), color=self.colors['error'],
@@ -850,7 +840,8 @@ class BayesianDecoderVisualizer:
         windows = [(0, 1.5), (0, 1), (0, 2)]
         for win in windows:
             data_for_stats = (trial_data
-                              .query(f'times_binned > {win[0]} & times_binned < {win[1]}')        # only look at first two seconds, could do 1.75 too
+                              .query(
+                f'times_binned > {win[0]} & times_binned < {win[1]}')  # only look at first two seconds, could do 1.75 too
                               .groupby(groupby_cols)[['prob_over_chance', 'diff_baseline']]  # group by trial/trial type
                               .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                               .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
@@ -874,13 +865,16 @@ class BayesianDecoderVisualizer:
 
                 for var in dependent_vars:
                     fig, axes = plt.subplots(2, 2)
-                    for col, (approach, test) in enumerate([('bootstrap', 'direct_prob'), ('traditional', 'mann-whitney')]):
+                    for col, (approach, test) in enumerate(
+                            [('bootstrap', 'direct_prob'), ('traditional', 'mann-whitney')]):
                         stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
                                                           f'& variable == "{var}"')
                         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
 
-                        axes[0][col] = sns.violinplot(data=data_for_stats[mask], x=comp, y=var, hue=group, ax=axes[0][col])
-                        annot = Annotator(axes[0][col], pairs=pairs, data=data_for_stats[mask], x=comp, y=var, hue=group)
+                        axes[0][col] = sns.violinplot(data=data_for_stats[mask], x=comp, y=var, hue=group,
+                                                      ax=axes[0][col])
+                        annot = Annotator(axes[0][col], pairs=pairs, data=data_for_stats[mask], x=comp, y=var,
+                                          hue=group)
                         (annot
                          .configure(test=None, test_short_name=test, text_format='simple')
                          .set_pvalues(pvalues=pvalues)
@@ -895,7 +889,8 @@ class BayesianDecoderVisualizer:
                          .annotate())
 
                     fig.suptitle(f'{comp} - {var}')
-                    self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data_{var}_window_{win}',
+                    self.results_io.save_fig(fig=fig, axes=axes,
+                                             filename=f'compare_{comp}_aligned_data_{var}_window_{win}',
                                              additional_tags=tags, tight_layout=False)
 
     def plot_tuning_curves(self, data, name):
@@ -1072,10 +1067,11 @@ class BayesianDecoderVisualizer:
         # plot the data and accompanying stats
         for comp, filters in comparisons.items():
             mask = pd.concat([compiled_data_df[k].isin(v) for k, v in filters.items()], axis=1).all(axis=1)
-            data = compiled_data_df[mask].reset_index(drop=True)  # reset index so iteration through rows for each column
+            data = compiled_data_df[mask].reset_index(
+                drop=True)  # reset index so iteration through rows for each column
 
             # calculate difference
-            ncols, nrows = (np.shape(data)[0]*2, 2)  # cols for pre/post, g12 g_diff, row for each value
+            ncols, nrows = (np.shape(data)[0] * 2, 2)  # cols for pre/post, g12 g_diff, row for each value
             fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 5), squeeze=False, sharey='row')
             for col_add, v in data.iterrows():
                 r_data = v['data'].query('bin_name == "full"')
@@ -1087,15 +1083,16 @@ class BayesianDecoderVisualizer:
                         row_ind = [0 if loc == 'theta_amplitude' else 1][0]
                         mean_loc = d_time.groupby('phase_mid')[loc].mean()
                         err_loc = d_time.groupby('phase_mid')[loc].apply(sem)
-                        axes[row_ind][t_ind + 2*col_add].plot(mean_loc.index.to_numpy() / np.pi,
-                                                      mean_loc.to_numpy(), color=color,
-                                                      linestyle=lstyle,
-                                                      label=f'{loc}')
-                        axes[row_ind][t_ind + 2*col_add].fill_between(err_loc.index.to_numpy() / np.pi,
-                                                                    mean_loc.to_numpy() - err_loc.to_numpy(),
-                                                                    mean_loc.to_numpy() + err_loc.to_numpy(), alpha=0.2, color=color)
+                        axes[row_ind][t_ind + 2 * col_add].plot(mean_loc.index.to_numpy() / np.pi,
+                                                                mean_loc.to_numpy(), color=color,
+                                                                linestyle=lstyle,
+                                                                label=f'{loc}')
+                        axes[row_ind][t_ind + 2 * col_add].fill_between(err_loc.index.to_numpy() / np.pi,
+                                                                        mean_loc.to_numpy() - err_loc.to_numpy(),
+                                                                        mean_loc.to_numpy() + err_loc.to_numpy(),
+                                                                        alpha=0.2, color=color)
                         # NOTE err_lower/upper is STD for visualization purposes
-                        axes[row_ind][t_ind + 2*col_add].set(title=f'{v[comp]} - {time}', ylabel='mean probability')
+                        axes[row_ind][t_ind + 2 * col_add].set(title=f'{v[comp]} - {time}', ylabel='mean probability')
 
                 ax_list = axes.flat
                 for ax in ax_list:
@@ -1123,7 +1120,8 @@ class BayesianDecoderVisualizer:
                           .pivot(columns='variable_1', values='value')
                           .add_prefix('decoding_')
                           .reset_index())
-        data_for_stats['location'] = data_for_stats['location'].map({'initial_stay': 'initial', 'switch': 'new','home': 'home'})
+        data_for_stats['location'] = data_for_stats['location'].map(
+            {'initial_stay': 'initial', 'switch': 'new', 'home': 'home'})
         stats_tests = [('traditional', 'mann-whitney')]
 
         # loop through each comparison to get stats output
@@ -1219,9 +1217,9 @@ class BayesianDecoderVisualizer:
                          .annotate())
 
                     fig.suptitle(f'{comp}')
-                    self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_modulation_{var}_{g_name}',
+                    self.results_io.save_fig(fig=fig, axes=axes,
+                                             filename=f'compare_{comp}_theta_modulation_{var}_{g_name}',
                                              additional_tags=tags, tight_layout=False)
-
 
     def plot_performance_comparisons(self, param_data, plot_groups=None, tags=''):
         # load up data
@@ -1229,7 +1227,8 @@ class BayesianDecoderVisualizer:
                            turn_type=[1, 2],
                            correct=[0, 1],
                            time_label=['t_update'])  # use as default if no value given
-        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups=plot_groups, n_time_bins=6)
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, plot_groups=plot_groups,
+                                                                       n_time_bins=6)
         trial_data.dropna(subset='times_binned', inplace=True)
         trial_block = 40
 
@@ -1244,7 +1243,8 @@ class BayesianDecoderVisualizer:
                 # bin trials for percent correct calculations
                 col = np.argwhere(trial_data['update_type'].unique() == g_name)[0][0]
                 bins = np.hstack([g_data['index'].unique()[::trial_block], g_data['index'].unique()[-1]])
-                g_data['trials_binned'] = pd.cut(g_data['index'], bins=bins, include_lowest=True, labels=False, duplicates='drop')
+                g_data['trials_binned'] = pd.cut(g_data['index'], bins=bins, include_lowest=True, labels=False,
+                                                 duplicates='drop')
 
                 for row, level in enumerate(['trials_binned', 'session_id', 'animal']):
                     plot_data = g_data.groupby([level, 'choice', 'region']).mean().reset_index()
@@ -1253,7 +1253,7 @@ class BayesianDecoderVisualizer:
                         so.Plot(plot_data, x='correct', color='choice')
                             .pair(y=['diff_baseline', ])  # 'prob_over_chance' remove for now
                             .add(so.Dot(alpha=0.3))
-                            .add(so.Line(), so.PolyFit(order=1),)
+                            .add(so.Line(), so.PolyFit(order=1), )
                             .share(y='row')
                             .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
                             .theme(rcparams)
@@ -1262,7 +1262,7 @@ class BayesianDecoderVisualizer:
                             .label(title=g_name, x='proportion correct')
                             .on(sfigs[row][col])
                             .plot()
-                        )
+                    )
                     for ax in sfigs[row][col].axes:
                         metric = ax.get_ylabel().replace(' ', '_')
                         stats = plot_data.groupby('choice').apply(lambda x: pearsonr(x['correct'], x[metric])).to_dict()

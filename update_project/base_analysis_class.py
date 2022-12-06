@@ -1,10 +1,11 @@
+import numpy as np
 import pickle
-from pynwb import NWBFile
 
 from abc import abstractmethod, ABC
+from pynwb import NWBFile
 
 
-class BaseAnalysisInterface(ABC):
+class BaseAnalysisClass(ABC):
     def _load_data(self):
         print(f'Loading existing data for session {self.results_io.session_id}...')
 

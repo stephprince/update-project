@@ -11,23 +11,14 @@ from update_project.general.results_io import ResultsIO
 from update_project.general.plots import get_color_theme
 from update_project.single_units.psth_visualizer import show_psth_raster
 from update_project.single_units.single_unit_aggregator import SingleUnitAggregator
-
-plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
-rcparams = mpl.rcParams
-new_line = '\n'
+from update_project.base_visualization_class import BaseVisualizationClass
 
 
-class SingleUnitVisualizer:
+class SingleUnitVisualizer(BaseVisualizationClass):
 
     def __init__(self, data, session_id=None, grid_search=False, target_var='choice'):
-        self.data = data
-        self.colors = get_color_theme()
-        self.virtual_track = data[0]['analyzer'].virtual_track
+        super().__init__(data)
         self.align_times = data[0]['analyzer'].align_times
-        self.plot_groups = dict(update_type=[['non_update'], ['switch'], ['stay']],
-                                turn_type=[[1], [2], [1, 2]],  # combined trial types with 2x as many samples
-                                correct=[[0], [1]])
-
         self.aggregator = SingleUnitAggregator()
         self.aggregator.run_aggregation(data)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)

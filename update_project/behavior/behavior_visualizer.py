@@ -1,4 +1,3 @@
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -8,19 +7,14 @@ import seaborn.objects as so
 from pathlib import Path
 
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, get_color_theme
+from update_project.general.plots import plot_distributions
 from update_project.statistics.statistics import get_fig_stats
-from update_project.general.virtual_track import UpdateTrack
-
-plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
-rcparams = mpl.rcParams
+from update_project.base_visualization_class import BaseVisualizationClass
 
 
-class BehaviorVisualizer:
+class BehaviorVisualizer(BaseVisualizationClass):
     def __init__(self, data, session_id=None):
-        self.data = data
-        self.virtual_track = UpdateTrack()
-        self.colors = get_color_theme()
+        super().__init__(data)
 
         if session_id:
             self.results_type = 'session'

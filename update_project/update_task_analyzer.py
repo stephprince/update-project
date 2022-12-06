@@ -4,10 +4,14 @@ from pathlib import Path
 from pynwb import NWBHDF5IO
 
 from update_project.general.results_io import ResultsIO
-from update_project.behavior.behavior_analysis_interface import BehaviorAnalysisInterface  # TODO: fix and refactor these
-from update_project.decoding.bayesian_decoder_analysis_interface import BayesianDecoderAnalysisInterface
-from update_project.dynamic_choice.choice_analysis_interface import ChoiceAnalysisInterface
-from update_project.single_units.single_unit_analysis_interface import SingleUnitAnalysisInterface
+from update_project.behavior.behavior_analyzer import BehaviorAnalyzer
+from update_project.choice.choice_analyzer import ChoiceAnalyzer
+from update_project.decoding.bayesian_decoder_analyzer import BayesianDecoderAnalyzer
+from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
+from update_project.behavior.behavior_visualizer import BehaviorVisualizer
+from update_project.choice.choice_visualizer import ChoiceVisualizer
+from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
+from update_project.single_units.single_unit_visualizer import SingleUnitVisualizer
 
 
 class UpdateTaskAnalyzer:
@@ -19,14 +23,14 @@ class UpdateTaskAnalyzer:
         self.overwrite = overwrite
         self.results_io = ResultsIO(creator_file=__file__, folder_name='manuscript_figures')
 
-        self.analysis_interface_classes = dict(Behavior=BehaviorAnalysisInterface,
-                                               Choice=ChoiceAnalysisInterface,
-                                               Decoder=BayesianDecoderAnalysisInterface,
-                                               SingleUnits=SingleUnitAnalysisInterface)
-        self.visualization_interface_classes = dict(Behavior=BehaviorVisualizationInterface,
-                                                    Choice=ChoiceAnalysisInterface,
-                                                    Decoder=BayesianDecoderVisualizationInterface,
-                                                    SingleUnits=SingleUnitVisualizationInterface)
+        self.analysis_interface_classes = dict(Behavior=BehaviorAnalyzer,
+                                               Choice=ChoiceAnalyzer,
+                                               Decoder=BayesianDecoderAnalyzer,
+                                               SingleUnits=SingleUnitAnalyzer)
+        self.visualization_classes = dict(Behavior=BehaviorVisualizer,
+                                          Choice=ChoiceVisualizer,
+                                          Decoder=BayesianDecoderVisualizer,
+                                          SingleUnits=SingleUnitVisualizer)
 
     def plot_main_figures(self):
         self.plot_figure_1()  # figure 1 - experimental paradigm
@@ -86,7 +90,7 @@ class UpdateTaskAnalyzer:
         self.results_io.save_fig(fig=fig, filename=f'figure_1', tight_layout=False)
 
     def plot_figure_2(self):
-        visualizer = self.run_analysis_pipeline(analyses_to_run=['Decoder'])
+        visualizer = self.run_analysis_pipeline(analyses_to_run=['Decoder'])  # TODO - ad way to implement kwargs here
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
@@ -95,7 +99,7 @@ class UpdateTaskAnalyzer:
         axes_middle = sfigs[1].subplots(nrows=1, ncols=2)
         axes_bottom = sfigs[2].subplots(nrows=1, ncols=5)
 
-        axes_top['B'] = visualizer.plot_performance(ax=axes_top['B'])
+        axes_top = visualizer.plot_position(ax=axes_top)
         axes_middle = visualizer.plot_trajectories_by_position(ax=axes_middle)
         axes_bottom = visualizer.plot_trajectories_by_event(ax=axes_bottom)
 

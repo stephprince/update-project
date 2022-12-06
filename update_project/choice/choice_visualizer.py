@@ -3,25 +3,20 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import seaborn.objects as so
-import matplotlib as mpl
 import more_itertools as mit
 
 from pathlib import Path
 from scipy.stats import sem
 
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import get_color_theme
-
-plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
-rcparams = mpl.rcParams
+from update_project.base_visualization_class import BaseVisualizationClass
 
 
-class DynamicChoiceVisualizer:
+class ChoiceVisualizer(BaseVisualizationClass):
 
     def __init__(self, data, session_id=None, grid_search=False, target_var='choice'):
-        self.data = data
+        super().__init__(data)
         self.grid_search = grid_search
-        self.colors = get_color_theme()
 
         if session_id:
             self.results_type = 'session'
