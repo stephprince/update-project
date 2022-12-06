@@ -14,9 +14,10 @@ from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
+from update_project.base_analysis_interface import BaseAnalysisInterface
 
 
-class BayesianDecoder:
+class BayesianDecoderAnalysisInterface(BaseAnalysisInterface):
     def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
         # setup parameters
         self.units_types = params.get('units_types',
@@ -73,7 +74,7 @@ class BayesianDecoder:
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 2
 
-    def run_decoding(self, overwrite=False, export_data=True):
+    def run_analysis(self, overwrite=False, export_data=True):
         print(f'Decoding data for session {self.results_io.session_id}...')
 
         if overwrite:
@@ -85,7 +86,7 @@ class BayesianDecoder:
                 self._load_data()  # load data structure if it exists and matches the params
             else:
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
-                self.run_decoding(overwrite=True, export_data=export_data)
+                self.run_analysis(overwrite=True, export_data=export_data)
 
         return self
 
@@ -320,38 +321,3 @@ class BayesianDecoder:
 
         return self
 
-    def _load_data(self):
-        print(f'Loading existing data for session {self.results_io.session_id}...')
-
-        # load npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            if file_info['format'] == 'npz':
-                import_data = np.load(fname, allow_pickle=True)
-                for v in file_info['vars']:
-                    setattr(self, v, import_data[v])
-            elif file_info['format'] == 'pkl':
-                import_data = self.results_io.load_pickled_data(fname)
-                for v, data in zip(file_info['vars'], import_data):
-                    setattr(self, v, data)
-            else:
-                raise RuntimeError(f'{file_info["format"]} format is not currently supported for loading data')
-
-        return self
-
-    def _export_data(self):
-        print(f'Exporting data for session {self.results_io.session_id}...')
-
-        # save npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            if file_info['format'] == 'npz':
-                kwargs = {v: getattr(self, v) for v in file_info['vars']}
-                np.savez(fname, **kwargs)
-            elif file_info['format'] == 'pkl':
-                with open(fname, 'wb') as f:
-                    [pickle.dump(getattr(self, v), f) for v in file_info['vars']]
-            else:
-                raise RuntimeError(f'{file_info["format"]} format is not currently supported for exporting data')

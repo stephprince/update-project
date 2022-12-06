@@ -4,7 +4,7 @@ from pathlib import Path
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.dynamic_choice.dynamic_choice_rnn import DynamicChoiceRNN
+from update_project.dynamic_choice.choice_analysis_interface import DynamicChoiceRNN
 from update_project.dynamic_choice.dynamic_choice_visualizer import DynamicChoiceVisualizer
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')

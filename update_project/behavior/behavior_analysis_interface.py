@@ -11,9 +11,10 @@ from update_project.general.virtual_track import UpdateTrack
 from update_project.general.timeseries import get_series_from_timeseries
 from update_project.general.trials import get_trials_dataframe
 from update_project.decoding.interpolate import interp_timeseries
+from update_project.base_analysis_interface import BaseAnalysisInterface
 
 
-class BehaviorAnalysisInterface:
+class BehaviorAnalysisInterface(BaseAnalysisInterface):
     def __init__(self, nwbfile: NWBFile, session_id: str, params: dict = {}):
         # setup params
         self.virtual_track = UpdateTrack()
@@ -173,25 +174,3 @@ class BehaviorAnalysisInterface:
         self.event_durations = pd.concat([self.trials[['maze_id', 'turn_type', 'update_type', 'correct']], durations],
                                          axis=1)
 
-    def _load_data(self):
-        print(f'Loading existing data for session {self.results_io.session_id}...')
-
-        # load npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            import_data = self.results_io.load_pickled_data(fname)
-            for v, data in zip(file_info['vars'], import_data):
-                setattr(self, v, data)
-
-        return self
-
-    def _export_data(self):
-        print(f'Exporting data for session {self.results_io.session_id}...')
-
-        # save npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            with open(fname, 'wb') as f:
-                [pickle.dump(getattr(self, v), f) for v in file_info['vars']]

@@ -5,20 +5,20 @@ from pathos.pools import ProcessPool as Pool
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.decoding.bayesian_decoder import BayesianDecoder
+from update_project.decoding.bayesian_decoder_analysis_interface import BayesianDecoderAnalysisInterface
 from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
 
 
 def run_bayesian_decoding():
     # setup flags
-    overwrite = True  # when False, this will only load data if the parameters match
+    overwrite = False  # when False, this will only load data if the parameters match
     plot = False  # this only plots on a session by session basis
     group = True  # this compiles the data for group plotting
     parallel = False  # cannot be run in conjunction with group currently
 
     # setup sessions
     animals = [17, 20, 25, 28, 29, 33, 34]
-    dates_included = []
+    dates_included = [210913]
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
@@ -62,9 +62,9 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     params = dict(units_types=dict(region=reg, cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
                   encoder_bin_num=enc_bins,  # num feature bins
                   decoder_bin_size=dec_bins,)  # time length of decoding bins
-    decoder = BayesianDecoder(nwbfile=nwbfile, params=params, session_id=session_id,
-                              features=[feat])  # initialize decoder class
-    decoder.run_decoding(overwrite=overwrite)  # build decoding model
+    decoder = BayesianDecoderAnalysisInterface(nwbfile=nwbfile, params=params, session_id=session_id,
+                                               features=[feat])  # initialize decoder class
+    decoder.run_analysis(overwrite=overwrite)  # build decoding model
 
     # save to group output
     if parallel:

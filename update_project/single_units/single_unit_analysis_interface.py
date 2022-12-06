@@ -18,9 +18,10 @@ from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.units import align_by_time_intervals as align_by_time_intervals_units
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
+from update_project.base_analysis_interface import BaseAnalysisInterface
 
 
-class SingleUnitAnalyzer:
+class SingleUnitAnalysisInterface(BaseAnalysisInterface):
     def __init__(self, nwbfile: NWBFile, session_id: str, feature: str, params=dict()):
         # setup parameters
         self.units_types = params.get('units_types',
@@ -69,7 +70,7 @@ class SingleUnitAnalyzer:
         self.bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
         self.limits = self.virtual_track.get_limits(feature)
 
-    def run(self, overwrite=False, export_data=True):
+    def run_analysis(self, overwrite=False, export_data=True):
         print(f'Analyzing single unit data for session {self.results_io.session_id}...')
 
         if overwrite:
@@ -84,7 +85,7 @@ class SingleUnitAnalyzer:
                 self._load_data()  # load data structure if it exists and matches the params
             else:
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
-                self.run(overwrite=True, export_data=export_data)
+                self.run_analysis(overwrite=True, export_data=export_data)
 
         return self
 
@@ -410,39 +411,3 @@ class SingleUnitAnalyzer:
         err = sem(firing_rate, axis=0)  # just filled with nan values
 
         return dict(psth_mean=mean, psth_err=err, psth_times=tt)
-
-    def _load_data(self):
-        print(f'Loading existing data for session {self.results_io.session_id}...')
-
-        # load npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            if file_info['format'] == 'npz':
-                import_data = np.load(fname, allow_pickle=True)
-                for v in file_info['vars']:
-                    setattr(self, v, import_data[v])
-            elif file_info['format'] == 'pkl':
-                import_data = self.results_io.load_pickled_data(fname)
-                for v, data in zip(file_info['vars'], import_data):
-                    setattr(self, v, data)
-            else:
-                raise RuntimeError(f'{file_info["format"]} format is not currently supported for loading data')
-
-        return self
-
-    def _export_data(self):
-        print(f'Exporting data for session {self.results_io.session_id}...')
-
-        # save npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            if file_info['format'] == 'npz':
-                kwargs = {v: getattr(self, v) for v in file_info['vars']}
-                np.savez(fname, **kwargs)
-            elif file_info['format'] == 'pkl':
-                with open(fname, 'wb') as f:
-                    [pickle.dump(getattr(self, v), f) for v in file_info['vars']]
-            else:
-                raise RuntimeError(f'{file_info["format"]} format is not currently supported')

@@ -10,9 +10,10 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 
 from update_project.general.results_io import ResultsIO
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
+from update_project.base_analysis_interface import BaseAnalysisInterface
 
 
-class DynamicChoiceRNN:
+class ChoiceAnalysisInterface(BaseAnalysisInterface):
 
     def __init__(self, nwbfile, session_id, target_var='choice', velocity_only=False):
         # based on grid search of subset of sessions (210407, 210415, 210509, 210520, 210909, 210913, 211113, 211115),
@@ -314,26 +315,3 @@ class DynamicChoiceRNN:
             mean_data.append(np.mean(output_data, axis=0).squeeze())
 
         return np.array(mean_data)
-
-    def _load_data(self):
-        print(f'Loading existing data for session {self.results_io.session_id}...')
-
-        # load npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            import_data = self.results_io.load_pickled_data(fname)
-            for v, data in zip(file_info['vars'], import_data):
-                setattr(self, v, data)
-
-        return self
-
-    def _export_data(self):
-        print(f'Exporting data for session {self.results_io.session_id}...')
-
-        # save npz files
-        for name, file_info in self.data_files.items():
-            fname = self.results_io.get_data_filename(filename=name, results_type='session', format=file_info['format'])
-
-            with open(fname, 'wb') as f:
-                [pickle.dump(getattr(self, v), f) for v in file_info['vars']]

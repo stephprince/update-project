@@ -1,7 +1,7 @@
 from pynwb import NWBHDF5IO
 
 from update_project.general.session_loader import SessionLoader
-from update_project.behavior.behavior_analyzer import BehaviorAnalysisInterface
+from update_project.behavior.behavior_analysis_interface import BehaviorAnalysisInterface
 from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 
@@ -13,7 +13,7 @@ def run_behavior_analysis():
 
     # setup sessions
     animals = [17, 20, 25, 28, 29, 33, 34]
-    dates_included = []
+    dates_included = [210913]
     dates_excluded = []
     session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
     session_names = session_db.load_session_names()
