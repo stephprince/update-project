@@ -68,11 +68,11 @@ class VirtualTrack:
 
 
 class UpdateTrack(VirtualTrack):
-    coords = [[2, 1], [2, 245], [25, 275], [25, 285], [14, 285], [0.5, 265], [-0.5, 265], [-14, 285],
-              [-25, 285], [-25, 275], [-2, 245], [-2, 1], [2, 1]]
+    coords = [[2, 1], [2, 245], [25, 275], [33, 285], [14, 285], [0.5, 265], [-0.5, 265], [-14, 285],
+              [-33, 285], [-25, 275], [-2, 245], [-2, 1], [2, 1]]
     nodes = [(0, 0),  # start of home arm
              (0, 255),  # end of home arm, specify so that the lengths of arms are 42
-             (-30, 285),  # left arm
+             (-30, 285),  # left arm  # TODO - determine why this is 30 not 33
              (30, 285)]  # right arm = nodes
     edges = [(0, 1),
              (1, 2),
