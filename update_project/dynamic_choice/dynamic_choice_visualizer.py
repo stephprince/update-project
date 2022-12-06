@@ -4,15 +4,17 @@ import pandas as pd
 import seaborn as sns
 import seaborn.objects as so
 import matplotlib as mpl
+import more_itertools as mit
 
 from pathlib import Path
 from scipy.stats import sem
 
-from update_project.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, get_color_theme
+from update_project.general.results_io import ResultsIO
+from update_project.general.plots import get_color_theme
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 rcparams = mpl.rcParams
+
 
 class DynamicChoiceVisualizer:
 
@@ -43,6 +45,7 @@ class DynamicChoiceVisualizer:
         self.group_df.drop('rnn', axis='columns', inplace=True)
 
     def plot(self):
+        self.plot_choice_switches()
         self.plot_dynamic_choice_by_position()
 
         if self.grid_search:
@@ -244,3 +247,36 @@ class DynamicChoiceVisualizer:
         grid_search_results.reset_index()
         fname = self.results_io.get_data_filename(filename='grid_search_table', format='csv')
         grid_search_results.to_csv(fname, na_rep='nan')
+
+    def get_choice_switch_times(self, choice_estimate, timestamps, decision_thresholds=(0.1, 0.9), min_duration=100):
+        choice_switches = []
+        if (choice_estimate < decision_thresholds[0]).any() and (choice_estimate > decision_thresholds[1]).any():
+            choices = [list(mit.run_length.encode(choice_estimate > decision_thresholds[1])),
+                       list(mit.run_length.encode(choice_estimate < decision_thresholds[0]))]
+
+            for c_type, c in enumerate(choices):
+                valid_choices_left = [count if f and count > min_duration else False for f, count in c]
+                choice_ind = 0
+                for ind, count in enumerate(c):
+                    if (count[1] in valid_choices_left) and (ind in np.where(valid_choices_left)[0]):
+                        if ~np.isnan(timestamps[choice_ind]):
+                            choice_switches.append(dict(choice_type=c_type,
+                                                        choice_start_ind=choice_ind,
+                                                        choice_stop_ind=choice_ind + count[1] - 1,
+                                                        t_start_choice=timestamps[choice_ind],
+                                                        t_stop_choice=timestamps[choice_ind + count[1] - 1]))
+                    choice_ind = choice_ind + count[1]
+
+            if len(np.unique([c['choice_type'] for c in choice_switches])) > 1:  # at least one switch btwn choices
+                choice_df = pd.DataFrame(choice_switches)
+                choice_df.sort_values('t_start_choice', inplace=True)
+                diff_from_next = choice_df['t_start_choice'].shift - choice_df['t_stop_choice'].to_numpy()[0]
+
+        return choice_switches
+
+    def plot_choice_switches(self):
+        predict_df = self._get_group_prediction()
+        choice_switch_df = predict_df.apply(lambda x: self.get_choice_switch_times(x['predict'], x['timestamps'],),
+                                            axis=1)
+
+        self.results_io.save_fig(fig=fig, axes=axes, filename='choice_switches', results_type=self.results_type)

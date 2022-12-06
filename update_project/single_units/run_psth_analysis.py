@@ -5,7 +5,7 @@ from git import Repo
 from pynwb import NWBHDF5IO
 from pathlib import Path
 
-from update_project.session_loader import get_session_info
+from update_project.general.session_loader import get_session_info
 from plots import show_event_aligned_psth, show_start_aligned_psth
 from units import align_by_time_intervals
 

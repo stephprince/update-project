@@ -12,8 +12,8 @@ from scipy.stats import sem, pearsonr
 from statannotations.Annotator import Annotator
 
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
-from update_project.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, get_limits_from_data, get_color_theme, \
+from update_project.general.results_io import ResultsIO
+from update_project.general.plots import plot_distributions, get_color_theme, \
     plot_scatter_with_distributions
 from update_project.statistics.statistics import Stats
 
@@ -53,17 +53,17 @@ class BayesianDecoderVisualizer:
             for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
                 tags = "_".join([str(n) for n in g_name])
                 kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-                # self.plot_theta_data(data, kwargs)
+                self.plot_theta_data(data, kwargs)
                 self.plot_group_aligned_stats(data, **kwargs)
-                # self.plot_group_aligned_comparisons(data, **kwargs)
-                # self.plot_performance_comparisons(data, tags=tags)
+                self.plot_group_aligned_comparisons(data, **kwargs)
+                self.plot_performance_comparisons(data, tags=tags)
 
                 # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
                 for plot_types in list(itertools.product(*self.plot_groups.values())):
                     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                    # self.plot_group_aligned_data(data, **kwargs)
+                    self.plot_group_aligned_data(data, **kwargs)
                     # self.plot_scatter_dists_around_update(data, **kwargs)
                     # self.plot_trial_by_trial_around_update(data, **kwargs)
 
@@ -398,7 +398,7 @@ class BayesianDecoderVisualizer:
         data_for_stats = (interaction_data
                           .drop(['corr_coeff_sliding', 'corr_coeff', 'corr', 'corr_lags', 'times'], axis=1)
                           .explode(['corr_sliding', 'times_sliding'])
-                          .query('times_sliding > 0')
+                          .query('times_sliding > 0 & times_sliding < 1')
                           .explode(['corr_sliding', 'lags_sliding'])
                           .groupby(groupby_cols)['corr_sliding']
                           .agg(['mean', 'max'])
@@ -847,12 +847,12 @@ class BayesianDecoderVisualizer:
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
 
-        windows = [(-1, 0), (0, 1), (0, 2)]
+        windows = [(0, 1.5), (0, 1), (0, 2)]
         for win in windows:
             data_for_stats = (trial_data
                               .query(f'times_binned > {win[0]} & times_binned < {win[1]}')        # only look at first two seconds, could do 1.75 too
                               .groupby(groupby_cols)[['prob_over_chance', 'diff_baseline']]  # group by trial/trial type
-                              .agg(['mean', 'max'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                              .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                               .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
             dependent_vars = data_for_stats.columns.to_list()
             data_for_stats.reset_index(inplace=True)
@@ -1060,7 +1060,7 @@ class BayesianDecoderVisualizer:
         for plot_types in list(itertools.product(*plot_groups.values())):
             plot_group_dict = {k: v for k, v in zip(plot_groups.keys(), plot_types)}
             filter_dict = dict(time_label=['t_update'], **plot_group_dict)
-            theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict)
+            theta_phase_data = self.aggregator.calc_theta_phase_data(param_data, filter_dict, ret_by_trial=True)
             compiled_data.append(dict(data=theta_phase_data, **{k: v[0] for k, v in filter_dict.items()}))
 
         # compile data for comparisons
@@ -1075,8 +1075,8 @@ class BayesianDecoderVisualizer:
             data = compiled_data_df[mask].reset_index(drop=True)  # reset index so iteration through rows for each column
 
             # calculate difference
-            ncols, nrows = (np.shape(data)[0]*2, 3)  # cols for pre/post, g12 g_diff, row for each value
-            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False, sharey='row')
+            ncols, nrows = (np.shape(data)[0]*2, 2)  # cols for pre/post, g12 g_diff, row for each value
+            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 5), squeeze=False, sharey='row')
             for col_add, v in data.iterrows():
                 r_data = v['data'].query('bin_name == "full"')
                 for time, d_time in r_data.groupby('times'):
@@ -1084,14 +1084,16 @@ class BayesianDecoderVisualizer:
                     for loc in ['initial_stay', 'switch', 'home', 'theta_amplitude']:
                         lstyle = ['dashed' if time == 'pre' else 'solid'][0]
                         color = [self.colors[loc] if loc in ['switch', 'initial_stay'] else 'k'][0]
-                        row_ind = [0 if loc == 'theta_amplitude' else 1 if loc in ['initial_stay', 'switch'] else 2][0]
-                        axes[row_ind][t_ind + 2*col_add].plot(d_time['phase_mid'].to_numpy() / np.pi,
-                                                      d_time[loc].to_numpy(), color=color,
+                        row_ind = [0 if loc == 'theta_amplitude' else 1][0]
+                        mean_loc = d_time.groupby('phase_mid')[loc].mean()
+                        err_loc = d_time.groupby('phase_mid')[loc].apply(sem)
+                        axes[row_ind][t_ind + 2*col_add].plot(mean_loc.index.to_numpy() / np.pi,
+                                                      mean_loc.to_numpy(), color=color,
                                                       linestyle=lstyle,
                                                       label=f'{loc}')
-                        axes[row_ind][t_ind + 2*col_add].fill_between(d_time['phase_mid'] / np.pi,
-                                                                    d_time[f'{loc}_err_lower'],
-                                                                    d_time[f'{loc}_err_upper'], alpha=0.2, color=color)
+                        axes[row_ind][t_ind + 2*col_add].fill_between(err_loc.index.to_numpy() / np.pi,
+                                                                    mean_loc.to_numpy() - err_loc.to_numpy(),
+                                                                    mean_loc.to_numpy() + err_loc.to_numpy(), alpha=0.2, color=color)
                         # NOTE err_lower/upper is STD for visualization purposes
                         axes[row_ind][t_ind + 2*col_add].set(title=f'{v[comp]} - {time}', ylabel='mean probability')
 
@@ -1114,7 +1116,7 @@ class BayesianDecoderVisualizer:
         data_for_stats = (theta_data
                           .query('times == "post" & bin_name == "quarter"')  # only look at post update
                           .groupby(groupby_cols)[['initial_stay', 'switch', 'home']]  # group by trial/trial type
-                          .agg(['mean', 'max'])  # get mean, peak, or peak latency for each trial
+                          .agg(['mean'])  # get mean, had max, or peak latency for each trial
                           .melt(ignore_index=False)
                           .rename(columns={'variable_0': 'location'})
                           .set_index('location', append=True)
@@ -1122,12 +1124,13 @@ class BayesianDecoderVisualizer:
                           .add_prefix('decoding_')
                           .reset_index())
         data_for_stats['location'] = data_for_stats['location'].map({'initial_stay': 'initial', 'switch': 'new','home': 'home'})
-        stats_tests = [('bootstrap', 'direct_prob'), ('traditional', 'mann-whitney')]
+        stats_tests = [('traditional', 'mann-whitney')]
 
         # loop through each comparison to get stats output
-        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io)
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=[s[0] for s in stats_tests], tests=[s[1] for s in stats_tests])
         group = ['location', 'phase_mid']
-        dependent_vars = ['decoding_max', 'decoding_mean']
+        dependent_vars = ['decoding_mean']
 
         for comp, filters in self.data_comparisons.items():
             # define group variables, pairs to compare, and levels of hierarchical data
@@ -1136,6 +1139,47 @@ class BayesianDecoderVisualizer:
             group_list = list(data_to_plot.groupby(group).groups.keys())
             combos = list(itertools.combinations(filters[comp], r=2))
             pairs = [((c[0], *g), (c[1], *g)) for c in combos for g in group_list]
+
+            # run comparisons between theta phase
+            for f in filters[comp]:
+                data_to_comp = data_to_plot.query(f'{comp} == "{f}"')
+                group_list = list(data_to_plot.groupby('phase_mid').groups.keys())
+                combos = list(itertools.combinations(data_to_plot['location'].unique(), r=2))
+                pairs = [((c[0], g), (c[1], g)) for c in combos for g in group_list]
+                stats.run(data_to_comp, dependent_vars=dependent_vars, group_vars=['location', 'phase_mid'],
+                          pairs=pairs, filename=f'theta_quadrant_{comp}_{tags}_{f}')
+
+                for var in dependent_vars:
+                    fig, axes = plt.subplots(2, 2, figsize=(15, 15))
+
+                    for col, (approach, test) in enumerate(stats_tests):
+                        stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
+                                                          f'& variable == "{var}"')
+                        stats_data = stats_data[stats_data['pair'].isin(pairs)]
+                        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+
+                        axes[0][col] = sns.violinplot(data=data_to_comp, x='location', y=var, hue='phase_mid',
+                                                      ax=axes[0][col])
+                        annot = Annotator(axes[0][col], pairs=pairs, data=data_to_comp, x='location', y=var,
+                                          hue='phase_mid')
+                        (annot
+                         .configure(test=None, test_short_name=test, text_format='simple')
+                         .set_pvalues(pvalues=pvalues)
+                         .annotate())
+
+                        axes[1][col] = sns.boxplot(data=data_to_comp, x='location', y=var, hue='phase_mid',
+                                                   ax=axes[1][col], width=0.5, showfliers=False)
+                        annot.new_plot(axes[1][col], pairs=pairs, data=data_to_comp, x='location', y=var,
+                                       hue='phase_mid')
+                        (annot
+                         .configure(test=None, test_short_name=test, text_format='simple')
+                         .set_pvalues(pvalues=pvalues)
+                         .annotate())
+
+                    fig.suptitle(f'{f}')
+                    self.results_io.save_fig(fig=fig, axes=axes,
+                                             filename=f'compare_phase_{f}_theta_modulation_{var}_{comp}',
+                                             additional_tags=tags, tight_layout=False)
 
             # run comparisons between trial types
             stats.run(data_to_plot, dependent_vars=dependent_vars, group_vars=[comp, *group], pairs=pairs,
@@ -1178,46 +1222,6 @@ class BayesianDecoderVisualizer:
                     self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_modulation_{var}_{g_name}',
                                              additional_tags=tags, tight_layout=False)
 
-            # run comparisons between theta phase
-            for f in filters[comp]:
-                data_to_comp = data_to_plot.query(f'{comp} == "{f}"')
-                group_list = list(data_to_plot.groupby('phase_mid').groups.keys())
-                combos = list(itertools.combinations(data_to_plot['location'].unique(), r=2))
-                pairs = [((c[0], g), (c[1], g)) for c in combos for g in group_list]
-                stats.run(data_to_comp, dependent_vars=dependent_vars, group_vars=['location', 'phase_mid'],
-                          pairs=pairs, filename=f'theta_quadrant_{comp}_{tags}')
-
-                for var in dependent_vars:
-                    fig, axes = plt.subplots(2, 2, figsize=(15, 15))
-
-                    for col, (approach, test) in enumerate(stats_tests):
-                        stats_data = stats.stats_df.query(f'approach == "{approach}" & test == "{test}" '
-                                                          f'& variable == "{var}"')
-                        stats_data = stats_data[stats_data['pair'].isin(pairs)]
-                        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
-
-                        axes[0][col] = sns.violinplot(data=data_to_comp, x='location', y=var, hue='phase_mid',
-                                                      ax=axes[0][col])
-                        annot = Annotator(axes[0][col], pairs=pairs, data=data_to_comp, x='location', y=var,
-                                          hue='phase_mid')
-                        (annot
-                         .configure(test=None, test_short_name=test, text_format='simple')
-                         .set_pvalues(pvalues=pvalues)
-                         .annotate())
-
-                        axes[1][col] = sns.boxplot(data=data_to_comp, x='location', y=var, hue='phase_mid',
-                                                   ax=axes[1][col], width=0.5, showfliers=False)
-                        annot.new_plot(axes[1][col], pairs=pairs, data=data_to_comp, x='location', y=var,
-                                       hue='phase_mid')
-                        (annot
-                         .configure(test=None, test_short_name=test, text_format='simple')
-                         .set_pvalues(pvalues=pvalues)
-                         .annotate())
-
-                    fig.suptitle(f'{f}')
-                    self.results_io.save_fig(fig=fig, axes=axes,
-                                             filename=f'compare_phase_{f}_theta_modulation_{var}_{g_name}',
-                                             additional_tags=tags, tight_layout=False)
 
     def plot_performance_comparisons(self, param_data, plot_groups=None, tags=''):
         # load up data

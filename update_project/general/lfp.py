@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from update_project.results_io import ResultsIO
+from update_project.general.results_io import ResultsIO
 
 
 def get_theta(nwbfile, adjust_reference=False, session_id=''):

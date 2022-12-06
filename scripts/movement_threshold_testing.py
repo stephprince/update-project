@@ -6,8 +6,8 @@ from pathlib import Path
 from pynwb import NWBHDF5IO
 
 from update_project.general.plots import plot_distributions
-from update_project.session_loader import SessionLoader
-from update_project.results_io import ResultsIO
+from update_project.general.session_loader import SessionLoader
+from update_project.general.results_io import ResultsIO
 
 
 # define main plotting function

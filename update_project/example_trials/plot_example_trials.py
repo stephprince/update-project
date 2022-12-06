@@ -1,6 +1,6 @@
 from pynwb import NWBHDF5IO
 
-from update_project.session_loader import SessionLoader
+from update_project.general.session_loader import SessionLoader
 from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
 from update_project.decoding.bayesian_decoder import BayesianDecoder
 from update_project.example_trials.example_trial_visualizer import ExampleTrialVisualizer

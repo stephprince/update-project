@@ -1,14 +1,14 @@
 from pynwb import NWBHDF5IO
 
-from update_project.session_loader import SessionLoader
-from update_project.behavior.behavior_analyzer import BehaviorAnalyzer
+from update_project.general.session_loader import SessionLoader
+from update_project.behavior.behavior_analyzer import BehaviorAnalysisInterface
 from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 
 
 def run_behavior_analysis():
     # setup flags
-    overwrite = False  # when False, this will only load data if the parameters match
-    plot = True  # this only plots on a session by session basis
+    overwrite = True  # when False, this will only load data if the parameters match
+    plot = False  # this only plots on a session by session basis
     group = True  # this compiles the data for group plotting
 
     # setup sessions
@@ -27,7 +27,7 @@ def run_behavior_analysis():
         nwbfile = io.read()
 
         # run analysis
-        behavior = BehaviorAnalyzer(nwbfile=nwbfile, session_id=session_id)
+        behavior = BehaviorAnalysisInterface(nwbfile=nwbfile, session_id=session_id)
         behavior.run_analysis(overwrite=overwrite)  # build decoding model
 
         # save to group output

@@ -1,14 +1,12 @@
-import numpy as np
-
 from pynwb import NWBHDF5IO
 
-from update_project.session_loader import SessionLoader
+from update_project.general.session_loader import SessionLoader
 from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
 from update_project.single_units.single_unit_visualizer import SingleUnitVisualizer
 
 # setup sessions
 animals = [17, 20, 25, 28, 29, 33, 34]
-dates_included = []
+dates_included = [210913]
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()

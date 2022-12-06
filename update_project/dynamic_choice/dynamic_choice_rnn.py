@@ -8,7 +8,7 @@ import warnings
 from bisect import bisect, bisect_left
 from sklearn.model_selection import RepeatedStratifiedKFold
 
-from update_project.results_io import ResultsIO
+from update_project.general.results_io import ResultsIO
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
 
 
@@ -58,7 +58,7 @@ class DynamicChoiceRNN:
                                                                 ],
                                                           format='pkl'))
 
-    def run(self, overwrite=False, grid_search=False):
+    def run_analysis(self, overwrite=False, grid_search=False):
         if grid_search:
             self.data_files = dict(grid_search=dict(vars=['grid_search_data', 'grid_search_params'], format='pkl'))
 
@@ -75,7 +75,7 @@ class DynamicChoiceRNN:
                 self._load_data()  # load data structure if it exists and matches the params
             else:
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
-                self.run(overwrite=True)
+                self.run_analysis(overwrite=True)
 
     def _grid_search(self):
         grid_search_data = []

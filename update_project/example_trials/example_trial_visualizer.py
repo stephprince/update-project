@@ -4,13 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 import pandas as pd
-import seaborn as sns
 
 from pathlib import Path
 from scipy.stats import sem
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
-from update_project.results_io import ResultsIO
+from update_project.general.results_io import ResultsIO
 from update_project.general.plots import get_color_theme
 from update_project.example_trials.example_trial_aggregator import ExampleTrialAggregator
 from update_project.single_units.psth_visualizer import show_psth_raster

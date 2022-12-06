@@ -8,8 +8,8 @@ from pathlib import Path
 from pynwb import NWBHDF5IO
 from matplotlib import ticker
 
-from update_project.session_loader import SessionLoader
-from update_project.results_io import ResultsIO
+from update_project.general.session_loader import SessionLoader
+from update_project.general.results_io import ResultsIO
 from update_project.general.units import bin_spikes
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity

@@ -4,8 +4,8 @@ import pandas as pd
 
 from pynwb import NWBHDF5IO
 
-from update_project.session_loader import SessionLoader
-from update_project.results_io import ResultsIO
+from update_project.general.session_loader import SessionLoader
+from update_project.general.results_io import ResultsIO
 from update_project.general.plots import get_color_theme
 from update_project.single_units.psth_visualizer import show_start_aligned_psth, get_annotation_times
 from update_project.general.units import align_by_time_intervals as align_by_time_intervals_units

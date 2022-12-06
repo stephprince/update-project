@@ -12,7 +12,7 @@ from scipy import signal
 
 from update_project.decoding.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
-from update_project.results_io import ResultsIO
+from update_project.general.results_io import ResultsIO
 from update_project.statistics.statistics import get_fig_stats, get_comparative_stats
 
 
@@ -177,9 +177,9 @@ class BayesianDecoderAggregator:
             if not theta_phase_df.empty:
                 mean = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(lambda x: np.mean(x))
                 err_upper = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
-                    lambda x: np.mean(x) + np.std(x.astype(float)))
+                    lambda x: np.mean(x) + sem(x.astype(float)))
                 err_lower = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
-                    lambda x: np.mean(x) - np.std(x.astype(float)))
+                    lambda x: np.mean(x) - sem(x.astype(float)))
                 t_df = err_lower.join(err_upper, lsuffix='_err_lower', rsuffix='_err_upper')
                 t_df = mean.join(t_df).reset_index()
                 t_df['phase_mid'] = t_df['theta_phase'].astype('interval').apply(lambda x: x.mid)

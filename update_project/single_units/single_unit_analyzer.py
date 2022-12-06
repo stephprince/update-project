@@ -8,11 +8,11 @@ import more_itertools as mit
 from bisect import bisect, bisect_left
 from pathlib import Path
 from pynwb import NWBFile
-from scipy.stats import sem, ranksums
+from scipy.stats import sem
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
-from update_project.results_io import ResultsIO
-from update_project.virtual_track import UpdateTrack
+from update_project.general.results_io import ResultsIO
+from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe

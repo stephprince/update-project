@@ -7,7 +7,7 @@ import seaborn.objects as so
 from pathlib import Path
 from scipy.stats import sem
 
-from update_project.results_io import ResultsIO
+from update_project.general.results_io import ResultsIO
 from update_project.general.plots import get_color_theme
 from update_project.single_units.psth_visualizer import show_psth_raster
 from update_project.single_units.single_unit_aggregator import SingleUnitAggregator

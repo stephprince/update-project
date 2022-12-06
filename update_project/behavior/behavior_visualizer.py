@@ -7,10 +7,10 @@ import seaborn.objects as so
 
 from pathlib import Path
 
-from update_project.results_io import ResultsIO
+from update_project.general.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, get_color_theme
 from update_project.statistics.statistics import get_fig_stats
-from update_project.virtual_track import UpdateTrack
+from update_project.general.virtual_track import UpdateTrack
 
 plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
 rcparams = mpl.rcParams
