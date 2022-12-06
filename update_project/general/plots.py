@@ -65,8 +65,9 @@ def get_color_theme():
     color_theme_dict['Wide Interneuron'] = '#20a0a8'
 
     color_theme_dict['control'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
-    color_theme_dict['nan'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
-    color_theme_dict['home'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
+    color_theme_dict['nan'] = color_theme_dict['control']
+    color_theme_dict['home'] = color_theme_dict['control']
+    color_theme_dict['non_update'] = color_theme_dict['control']
     color_theme_dict['left'] = '#2594f6'  # 250 in degrees, 95 saturation, 60 light
     color_theme_dict['right'] = '#da3b46'  # 12 in degrees, 95 saturation, 60 light
     color_theme_dict['stay'] = '#1ea477'  # 152 in degrees, 95 saturation, 60 light
@@ -74,13 +75,12 @@ def get_color_theme():
     color_theme_dict['stay_update'] = color_theme_dict['stay']
     color_theme_dict['switch_update'] = color_theme_dict['switch']
     color_theme_dict['initial_stay'] = color_theme_dict['stay']
-    color_theme_dict['non_update'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
     color_theme_dict['all'] = '#f26b49'  # 12 in degrees, 0 saturation, 30 light
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['cmap_r'] = sns.color_palette("rocket", as_cmap=True)
-    color_theme_dict['all_cmap'] = sns.color_palette("rocket_r", as_cmap=True)
+    color_theme_dict['all_cmap'] = color_theme_dict['cmap']
     color_theme_dict['div_cmap'] = sns.diverging_palette(240, 10, s=75, l=60, n=5, center='light', as_cmap=True)
     color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
     color_theme_dict['home_cmap'] = sns.color_palette("Greys", as_cmap=True)
