@@ -20,11 +20,11 @@ class ChoiceVisualizer(BaseVisualizationClass):
 
         if session_id:
             self.results_type = 'session'
-            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem,
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem,
                                         session_id=session_id, tags=target_var)
         else:
             self.results_type = 'group'
-            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem,
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem,
                                         tags=target_var)
 
         # get session visualization info

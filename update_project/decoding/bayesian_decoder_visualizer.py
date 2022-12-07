@@ -27,7 +27,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                          num_trials=[self.exclusion_criteria['trials']])
         self.aggregator = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria)
         self.aggregator.run_df_aggregation(data, overwrite=True, window=2.5)
-        self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
+        self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 
     def plot(self, group_by=None):
         group_names = list(group_by.keys())

@@ -1,10 +1,10 @@
 import itertools
 import numpy as np
-import pickle
 import pandas as pd
 import tensorflow as tf
 import warnings
 
+from pathlib import Path
 from bisect import bisect, bisect_left
 from sklearn.model_selection import RepeatedStratifiedKFold
 
@@ -53,7 +53,7 @@ class ChoiceAnalyzer(BaseAnalysisClass):
 
         # get results to save
         add_tags = '_velocity_only' if self.velocity_only else ''
-        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name='choice',
+        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem,
                                     tags=f'{target_var}{add_tags}')
         self.data_files = dict(dynamic_choice_output=dict(vars=['output_data', 'agg_data', 'decoder_data', 'params',
                                                                 ],

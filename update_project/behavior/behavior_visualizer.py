@@ -18,10 +18,10 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         if session_id:
             self.results_type = 'session'
-            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem, session_id=session_id)
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem, session_id=session_id)
         else:
             self.results_type = 'group'
-            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 
         # get session visualization info
         for sess_dict in self.data:

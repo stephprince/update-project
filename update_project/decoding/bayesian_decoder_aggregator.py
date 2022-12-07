@@ -541,6 +541,7 @@ class BayesianDecoderAggregator:
         actual_series = pd.Series(feature_means, index=np.round(time_index, 4), name='actual_feature')
         if decoder.decoded_values.any().any():
             decoded_series = decoder.decoded_values.as_series()
+            decoded_series.index = np.round(decoded_series.index.to_numpy(), 4)
         else:
             decoded_series = pd.Series()
         df_decode_results = pd.merge(decoded_series.rename('decoded_feature'), actual_series, how='left',

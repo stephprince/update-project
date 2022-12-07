@@ -48,7 +48,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         self.results_tags = f"{'_'.join(feature)}_regions_{'_'.join(self.units_types['region'])}_" \
                             f"enc_bins{self.encoder_bin_num}_speed_thresh" \
                             f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"
-        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem,
+        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem,
                                     tags=self.results_tags)
         self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'goal_selectivity',
                                                              'update_selectivity', 'aligned_data', 'bins',

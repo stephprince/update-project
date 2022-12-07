@@ -32,7 +32,7 @@ class BehaviorAnalyzer(BaseAnalysisClass):
         self.data = self._setup_data(nwbfile)
 
         # setup I/O
-        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path().absolute().stem)
+        self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem)
         self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories',
                                                           'event_durations'],
                                                     format='pkl'))

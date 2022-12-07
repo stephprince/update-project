@@ -8,7 +8,6 @@ from pathlib import Path
 from scipy.stats import sem
 
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import get_color_theme
 from update_project.single_units.psth_visualizer import show_psth_raster
 from update_project.single_units.single_unit_aggregator import SingleUnitAggregator
 from update_project.base_visualization_class import BaseVisualizationClass
@@ -21,7 +20,7 @@ class SingleUnitVisualizer(BaseVisualizationClass):
         self.align_times = data[0]['analyzer'].align_times
         self.aggregator = SingleUnitAggregator()
         self.aggregator.run_aggregation(data)
-        self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
+        self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 
         self.cutoffs = [0.25, 0.5]
         self.update_plot_dict = dict(

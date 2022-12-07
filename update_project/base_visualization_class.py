@@ -11,7 +11,7 @@ from update_project.general.virtual_track import UpdateTrack
 class BaseVisualizationClass(ABC):
 
     # setup style sheet and matplotlib plotting parameters
-    plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
+    plt.style.use(Path(__file__).parent / 'prince-paper.mplstyle')
     rcparams = mpl.rcParams
     new_line = '\n'
 
