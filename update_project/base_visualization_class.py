@@ -9,13 +9,12 @@ from update_project.general.virtual_track import UpdateTrack
 
 
 class BaseVisualizationClass(ABC):
-
-    # setup style sheet and matplotlib plotting parameters
-    plt.style.use(Path(__file__).parent / 'prince-paper.mplstyle')
-    rcparams = mpl.rcParams
-    new_line = '\n'
-
     def __init__(self, data):
+        # setup style sheet and matplotlib plotting parameters
+        plt.style.use(Path(__file__).parent / 'general' / 'prince-paper.mplstyle')
+        self.rcparams = mpl.rcParams
+        self.new_line = '\n'
+
         self.data = data
         self.colors = get_color_theme()
         self.virtual_track = UpdateTrack()

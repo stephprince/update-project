@@ -9,7 +9,7 @@ from update_project.general.plots import clean_plot
 
 class ResultsIO:
     git_hash = Repo(search_parent_directories=True).head.object.hexsha[:10]
-    base_path = Path().absolute().parent.parent / 'results'
+    base_path = Path(__file__).absolute().parent.parent.parent / 'results'
 
     def __init__(self, creator_file, git_hash=git_hash, base_path=base_path, session_id='', folder_name='', tags=''):
         self.creator_file = creator_file  # to add to metadata to know which script generated the figure
@@ -58,6 +58,8 @@ class ResultsIO:
         elif results_type == 'session':
             assert self.session_id is not None, "No session id provided so cannot create session folder"
             results_path = base_path / self.session_id / results_name
+        elif results_type == 'manuscript':
+            results_path = base_path / results_name
 
         Path(results_path).mkdir(parents=True, exist_ok=True)
 
