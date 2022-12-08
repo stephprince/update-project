@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 
-from matplotlib.transforms import Affine2D
+from matplotlib.transforms import Affine2D, offset_copy
 import mpl_toolkits.axisartist.floating_axes as floating_axes
 from mpl_toolkits.axisartist.grid_finder import FixedLocator, MaxNLocator
 
@@ -68,13 +68,18 @@ def get_color_theme():
     color_theme_dict['nan'] = color_theme_dict['control']
     color_theme_dict['home'] = color_theme_dict['control']
     color_theme_dict['non_update'] = color_theme_dict['control']
+    color_theme_dict['non update'] = color_theme_dict['control']
+    color_theme_dict['switch_trials'] = '#d33a8a'
+    color_theme_dict['stay_trials'] = '#3e5ba9'
     color_theme_dict['left'] = '#2594f6'  # 250 in degrees, 95 saturation, 60 light
+    color_theme_dict['switch'] = color_theme_dict['switch_trials']
+    color_theme_dict['stay'] = color_theme_dict['stay_trials']
     color_theme_dict['right'] = '#da3b46'  # 12 in degrees, 95 saturation, 60 light
-    color_theme_dict['stay'] = '#1ea477'  # 152 in degrees, 95 saturation, 60 light
-    color_theme_dict['switch'] = '#927ff9'  # 270 in degrees, 95 saturation, 60 light
-    color_theme_dict['stay_update'] = color_theme_dict['stay']
-    color_theme_dict['switch_update'] = color_theme_dict['switch']
-    color_theme_dict['initial_stay'] = color_theme_dict['stay']
+    color_theme_dict['initial'] = '#1ea477'  # 152 in degrees, 95 saturation, 60 light  # TODO - rename initial/new
+    color_theme_dict['new'] = '#927ff9'  # 270 in degrees, 95 saturation, 60 light  # TODO - rename initial/new
+    color_theme_dict['stay_update'] = color_theme_dict['initial']
+    color_theme_dict['switch_update'] = color_theme_dict['new']
+    color_theme_dict['initial_stay'] = color_theme_dict['initial']
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
     color_theme_dict['all'] = '#f26b49'  # 12 in degrees, 0 saturation, 30 light
 
@@ -94,7 +99,8 @@ def get_color_theme():
 
     color_theme_dict['animals'] = sns.color_palette("husl", 7)
     color_theme_dict['general'] = sns.color_palette("husl", 10)
-    color_theme_dict['trials'] = [color_theme_dict['non_update'], color_theme_dict['switch'], color_theme_dict['stay']]
+    color_theme_dict['trials'] = [color_theme_dict['non_update'], color_theme_dict['switch_trials'],
+                                  color_theme_dict['stay_trials']]
 
     return color_theme_dict
 
@@ -246,3 +252,55 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter',fig=None, ti
     fig.suptitle(title)
 
     return fig
+
+
+def rainbow_text(x, y, strings, colors, orientation='stacked',
+                 ax=None, **kwargs):
+    """
+    Take a list of *strings* and *colors* and place them next to each
+    other, with text strings[i] being shown in colors[i].
+
+    Parameters
+    ----------
+    x, y : float
+        Text position in data coordinates.
+    strings : list of str
+        The strings to draw.
+    colors : list of color
+        The colors to use.
+    orientation : {'horizontal', 'vertical'}
+    ax : Axes, optional
+        The Axes to draw into. If None, the current axes will be used.
+    **kwargs
+        All other keyword arguments are passed to plt.text(), so you can
+        set the font size, family, etc.
+    """
+    if ax is None:
+        ax = plt.gca()
+    t = ax.transAxes
+    fig = ax.figure
+    canvas = fig.canvas
+
+    assert orientation in ['horizontal', 'vertical', 'stacked']
+    if orientation == 'vertical':
+        kwargs.update(rotation=90, verticalalignment='bottom')
+
+    for s, c in zip(strings, colors):
+        text = ax.text(x, y, s + " ", color=c, transform=t, **kwargs)
+
+        # Need to draw to update the text position.
+        text.draw(canvas.get_renderer())
+        ex = text.get_window_extent()
+        # Convert window extent from pixels to inches
+        # to avoid issues displaying at different dpi
+        ex = fig.dpi_scale_trans.inverted().transform_bbox(ex)
+
+        if orientation == 'horizontal':
+            t = text.get_transform() + \
+                offset_copy(Affine2D(), fig=fig, x=ex.width, y=0)
+        elif orientation == 'vertical':
+            t = text.get_transform() + \
+                offset_copy(Affine2D(), fig=fig, x=0, y=ex.height)
+        elif orientation == 'stacked':
+            t = text.get_transform() + \
+                offset_copy(Affine2D(), fig=fig, x=0, y=-ex.height*0.5)  # adjust to make gap smaller
