@@ -33,7 +33,7 @@ def run_behavior_analysis():
         # save to group output
         session_data = dict(session_id=session_id,
                             animal=session_db.get_animal_id(name),
-                            behavior=behavior)
+                            analyzer=behavior)
         group_data.append(session_data)
 
         # plot data
