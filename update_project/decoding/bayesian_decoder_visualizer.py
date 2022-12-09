@@ -13,7 +13,7 @@ from statannotations.Annotator import Annotator
 
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, plot_scatter_with_distributions
+from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text
 from update_project.statistics.statistics import Stats
 from update_project.base_visualization_class import BaseVisualizationClass
 
@@ -21,11 +21,11 @@ from update_project.base_visualization_class import BaseVisualizationClass
 class BayesianDecoderVisualizer(BaseVisualizationClass):
     def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None):
         super().__init__(data)
-        self.exclusion_criteria = exclusion_criteria
+        self.exclusion_criteria = exclusion_criteria or dict(units=20, trials=50)
         self.params = params
         self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
                                                          num_trials=[self.exclusion_criteria['trials']])
-        self.aggregator = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria)
+        self.aggregator = BayesianDecoderAggregator(exclusion_criteria=self.exclusion_criteria)
         self.aggregator.run_df_aggregation(data, overwrite=True, window=2.5)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 
@@ -64,6 +64,139 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             self.plot_tuning_curves(data, name, )
             self.plot_all_confusion_matrices(data, name)
             self.plot_parameter_comparison(data, name, thresh_params=True)
+
+    def plot_decoding_output_heatmap(self, sfig):
+        # load up data
+        plot_groups = dict(update_type=['switch'], turn_type=[1, 2], correct=[1], time_label=['t_update'])
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups)
+        aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups, ret_df=True)
+
+        prob_map = np.nanmean(np.stack(aligned_data['probability']), axis=0)
+        true_feat = np.nanmean(np.stack(aligned_data['feature']), axis=0)
+        time_bins = np.linspace(aligned_data['times'].apply(np.nanmin).min(),
+                                aligned_data['times'].apply(np.nanmax).max(),
+                                np.shape(prob_map)[1])
+        feat_bins = np.linspace(aligned_data['bins'].apply(np.nanmin).min(),
+                                aligned_data['bins'].apply(np.nanmax).max(),
+                                np.shape(prob_map)[0])
+        track_fraction = (feat_bins - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+                  for b in trial_data['bound_values'].unique()]
+        bounds = [(track_fraction[0], bounds[0][0]), *bounds]
+
+        # plot figure
+        ax = sfig.subplots(nrows=1, ncols=1)
+        im_times = (time_bins[0] - np.diff(time_bins)[0] / 2, time_bins[-1] + np.diff(time_bins)[0] / 2)
+        clipping_masks, images = dict(), dict()
+        for b, arm in zip(bounds, ['home', 'initial', 'new']):
+            mask = mpl.patches.Rectangle(xy=(0, b[0]), width=1, height=b[1] - b[0],
+                                         facecolor='white', alpha=0, transform=ax.get_yaxis_transform())
+            clipping_masks[arm] = mask
+            images[arm] = ax.imshow(prob_map, cmap=self.colors[f'{arm}_cmap'], aspect='auto',
+                                    origin='lower', vmin=0.02, vmax=0.056,
+                                    extent=[im_times[0], im_times[-1], track_fraction[0], track_fraction[-1]])
+            images[arm].set_clip_path(clipping_masks[arm])
+            ticks = None if arm == 'home' else []
+            label = f'prob.{self.new_line}density' if arm == 'home' else ''
+            cbar = plt.colorbar(images[arm], ax=ax, pad=0.01, fraction=0.046, shrink=0.5,  aspect=12,
+                                ticks=ticks)
+            cbar.ax.set_title(label, fontsize=8, ha='center')
+            for line in b:
+                ax.axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75,)
+        ax.plot(time_bins, true_feat, color=self.colors['switch'], linestyle='dotted', linewidth=0.75,
+                label='actual position')
+
+        # plot edge spaces in track
+        spaces = getattr(self.aggregator.group_aligned_df['virtual_track'].values[0], 'edge_spacing', [])
+        for s in spaces:
+            ax.axhspan(*s, color='white', edgecolor=None,)
+        ax.axvline(0, color='k', linestyle='dashed', alpha=0.5)
+
+        ax.set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
+               xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
+        ax.set_title('switch', color=self.colors['switch'])
+        ax.legend(loc='lower right', labelcolor='linecolor')
+        sfig.suptitle('Decoded position', fontsize=12)
+
+        return sfig
+
+    def plot_goal_coding(self, sfig):
+        # load up data
+        plot_groups = dict(update_type=['switch', 'stay', 'non_update'], turn_type=[1, 2], correct=[1],
+                           time_label=['t_update'])
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups)
+
+        # plot figure
+        ax = sfig.subplots(nrows=1, ncols=3, sharey=True)
+        for update, data in trial_data.groupby('update_type'):
+            trial_mat = data.pivot(index=['choice', 'trial_index'], columns='times', values='prob_over_chance')
+            new_mat = trial_mat.query('choice == "switch"').to_numpy()
+            initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+            time_bins = trial_mat.columns.to_numpy()
+
+            ax_id = np.argwhere(np.array(['switch', 'stay', 'non_update']) == update)[0][0]
+            ax[ax_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'], label='new')
+            ax[ax_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
+                                   np.nanmean(new_mat, axis=0) - sem(new_mat), color=self.colors['new'], alpha=0.2)
+            ax[ax_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'], label='initial')
+            ax[ax_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat),
+                                   np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=self.colors['initial'],
+                                   alpha=0.2)
+            ax[ax_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+            ax[ax_id].set_title(update.replace('_', ' '), color=self.colors[update])
+            # ax[ax_id].set(ylabel='prob. density', xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
+        sfig.suptitle('Goal arm representations', fontsize=12)
+        sfig.supylabel('prob. density', fontsize=10)
+        sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
+
+        colors = [self.colors[t] for t in ['initial', 'new']]
+        rainbow_text(0.05, 0.85, ['initial', 'new'], colors, ax=ax[0], size=10)
+
+        return sfig
+
+    def plot_goal_coding_stats(self, sfig):
+        # get data
+        plot_groups = dict(update_type=['switch', 'stay', 'non_update'], turn_type=[1, 2], correct=[1],
+                           time_label=['t_update'])
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       n_time_bins=11, time_window=(-2.5, 2.5))
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
+                        'choice']
+        data_for_stats = (trial_data
+                          .query(f'times_binned > 0 & times_binned < 1.5')  # only look at first 1.5 seconds
+                          .groupby(groupby_cols)[['prob_over_chance', 'diff_baseline']]  # group by trial/trial type
+                          .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
+        data_for_stats.reset_index(inplace=True)
+        data_for_stats['choice'] = data_for_stats['choice'].map({'initial_stay': 'initial', 'switch': 'new'})
+
+        # setup stats - group variables, pairs to compare, and levels of hierarchical data
+        var = 'diff_baseline_mean'
+        group = 'choice'
+        comp = 'update_type'
+        group_list = data_for_stats['choice'].unique()
+        combos = list(itertools.combinations(plot_groups['update_type'], r=2))
+        pairs = [((c[0], g), (c[1], g)) for c in combos for g in group_list]
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['traditional'], tests=['mann-whitney'])
+        stats.run(data_for_stats, dependent_vars=[var], group_vars=[comp, 'choice'],
+                  pairs=pairs, filename=f'goal_coding_stats')
+
+        # plot data TODO - make this mixed effects models
+        ax = sfig.subplots(nrows=1, ncols=1)
+        stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
+                                          f'& variable == "{var}"')
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+        annot = Annotator(ax, pairs=pairs, data=data_for_stats, x=comp, y=var, hue=group)
+        sns.boxplot(data=data_for_stats, x=comp, y=var, hue=group, ax=ax, width=0.5, showfliers=False)
+        annot.new_plot(ax, pairs=pairs, data=data_for_stats, x=comp, y=var, hue=group)
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='simple')
+         .set_pvalues(pvalues=pvalues)
+         .annotate())
+
+        return sfig
 
     def plot_multiregional_data(self):
         if len(self.aggregator.group_aligned_df['region'].unique()) > 1:

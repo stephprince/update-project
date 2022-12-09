@@ -15,8 +15,7 @@ from update_project.single_units.single_unit_visualizer import SingleUnitVisuali
 
 
 class UpdateTaskFigureGenerator:
-    def __init__(self, analysis, sessions, overwrite=False):
-        self.analysis_kwargs = analysis
+    def __init__(self, sessions, overwrite=False):
         self.sessions = sessions
         self.overwrite = overwrite
         self.results_io = ResultsIO(creator_file=__file__, folder_name='manuscript_figures')
@@ -42,7 +41,7 @@ class UpdateTaskFigureGenerator:
         self.plot_supp_figure_3()  # supp figure 3
         self.plot_supp_figure_4()  # supp figure 4
 
-    def run_analysis_pipeline(self, analysis_to_run, overwrite=False):
+    def run_analysis_pipeline(self, analysis_to_run, analysis_kwargs=dict(), overwrite=False):
         print(f'Running {analysis_to_run} analysis interface')
         session_names = self.sessions.load_session_names()
         analysis_interface = self.analysis_classes[analysis_to_run]
@@ -57,7 +56,7 @@ class UpdateTaskFigureGenerator:
             # run analysis
             analyzer = analysis_interface(nwbfile=nwbfile,
                                           session_id=self.sessions.get_session_id(name),
-                                          **self.analysis_kwargs[analysis_to_run])
+                                          **analysis_kwargs)
             analyzer.run_analysis(overwrite=overwrite)
             session_data = dict(session_id=self.sessions.get_session_id(name),
                                 animal=self.sessions.get_animal_id(name),
@@ -73,44 +72,49 @@ class UpdateTaskFigureGenerator:
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 5))
-        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[2.25, 1], height_ratios=[1, 1.25])
-        axes_top_left = sfigs[0][0].subplots(nrows=1, ncols=1)
-        axes_top_right = sfigs[0][1].subplots(nrows=1, ncols=1)
-        axes_bottom_left = sfigs[1][0].subplots(nrows=1, ncols=3, sharey=True)
-        axes_bottom_right = sfigs[1][1].subplots(nrows=1, ncols=1)
+        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[2.25, 1], height_ratios=[1, 1.1])
 
         # plot data
-        axes_top_left.axis('off')
-        axes_top_left.annotate('Task schematic with example trial types', xycoords='axes fraction', xy=(0.4, 0.5),
-                             horizontalalignment='center')
-        axes_top_right = visualizer.plot_performance(ax=axes_top_right)  # behavioral performance distributions
-        axes_bottom_left = visualizer.plot_trajectories_by_position(ax=axes_bottom_left)  # 20 example view trajectories of each trial type
-        sfigs[1][0].suptitle('Example trial trajectories', fontsize=12)
-        sfigs[1][0].supxlabel('fraction of track', fontsize=10)
-        sfigs[1][0].axes[0].set(ylabel='view angle (degrees)')
-        axes_bottom_right = visualizer.plot_trajectories_by_event(ax=axes_bottom_right)  # average trajectories aligned to update
-
-        # add text annotations
-        sfig_list = dict(A=sfigs[0][0], B=sfigs[0][1], C=sfigs[1][0], D=sfigs[1][1])
-        for label, s in sfig_list.items():
-            s.text(0, 0.94, label, weight='bold', fontsize=12, transform=s.transSubfigure)
+        sfigs[0][0] = self.plot_placeholder(sfigs[0][0], text='Task schematic with example trial types')
+        sfigs[0][1] = visualizer.plot_performance(sfigs[0][1])  # behavioral performance distributions
+        sfigs[1][0] = visualizer.plot_trajectories_by_position(sfigs[1][0])  # 20 example view trajectories of each trial type
+        sfigs[1][1] = visualizer.plot_trajectories_by_event(sfigs[1][1])  # average trajectories aligned to update
 
         # figure saving
+        self.add_panel_labels(sfigs)
         self.results_io.save_fig(fig=fig, filename=f'figure_1', tight_layout=False, results_type='manuscript')
 
-    def plot_figure_2(self):
-        visualizer = self.run_analysis_pipeline(analyses_to_run=['Decoder'])  # TODO - ad way to implement kwargs here
+    def plot_figure_2(self, overwrite=False):
+        analysis_params=dict(units_types=dict(region=['CA1'],
+                                              cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),)
+        visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                analysis_kwargs=dict(features=['y_position'],
+                                                                     params=analysis_params),
+                                                overwrite=overwrite)
 
         # figure structure
-        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=3, ncols=1)
-        axes_top = sfigs[0].subplot_mosaic('AABBCCDD')
-        axes_middle = sfigs[1].subplots(nrows=1, ncols=2)
-        axes_bottom = sfigs[2].subplots(nrows=1, ncols=5)
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 5))
+        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[1, 1.5], height_ratios=[1, 1])
 
-        axes_top = visualizer.plot_position(ax=axes_top)
-        axes_middle = visualizer.plot_trajectories_by_position(ax=axes_middle)
-        axes_bottom = visualizer.plot_trajectories_by_event(ax=axes_bottom)
+        sfigs[0][0] = visualizer.plot_decoding_output_heatmap(sfigs[0][0])
+        sfigs[0][1] = visualizer.plot_goal_coding(sfigs[0][1])
+        sfigs[1][0] = visualizer.plot_goal_coding_stats(sfigs[1][0])
+        # sfigs[1][1] = visualizer.plot_tuning_curves(sfigs[1][1])
 
         # figure saving
-        self.results_io.save_fig(fig=fig, filename=f'figure_2', tight_layout=False)
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'figure_2', tight_layout=False, results_type='manuscript')
+
+    @staticmethod
+    def plot_placeholder(sfig, text):
+        axes = sfig.subplots(nrows=1, ncols=1)  # TODO - move this part to inside the visualization
+        axes.axis('off')
+        axes.annotate(text, xycoords='axes fraction', xy=(0.4, 0.5), horizontalalignment='center')
+
+        return sfig
+
+    @staticmethod
+    def add_panel_labels(sfigs):
+        panel_list = {k: v for k, v in zip('ABCDEFGHIJKLMNOPQRSTUVWXYZ', sfigs.flatten())}
+        for label, s in panel_list.items():
+            s.text(0, 0.94, label, weight='bold', fontsize=12, transform=s.transSubfigure)
