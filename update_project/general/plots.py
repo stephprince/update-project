@@ -19,17 +19,20 @@ def clean_plot(fig, axes, tight_layout):
         ax_list = [axes]
 
     for axi in ax_list:
-        xlim = axi.get_xlim()
-        ylim = axi.get_ylim()
+        if hasattr(axi, '_colorbar_info'):
+            pass
+        else:
+            xlim = axi.get_xlim()
+            ylim = axi.get_ylim()
+            #
+            # axi.set_xlabel(axi.get_xlabel().replace("_", " "))
+            # axi.set_ylabel(axi.get_ylabel().replace("_", " "))
+            # axi.set_title(axi.get_title().replace("_", " "))
 
-        axi.set_xlabel(axi.get_xlabel().replace("_", " "))
-        axi.set_ylabel(axi.get_ylabel().replace("_", " "))
-        axi.set_title(axi.get_title().replace("_", " "))
+            axi.spines['left'].set_bounds(ylim)
+            axi.spines['bottom'].set_bounds(xlim)
 
-        axi.spines['left'].set_bounds(ylim)
-        axi.spines['bottom'].set_bounds(xlim)
-
-        sns.despine(ax=axi, offset=5)
+            sns.despine(ax=axi, offset=5)
     # sns.despine(fig=fig, offset=5)
 
     if tight_layout:
@@ -64,38 +67,33 @@ def get_color_theme():
     color_theme_dict['Pyramidal Cell'] = '#da3b46'
     color_theme_dict['Wide Interneuron'] = '#20a0a8'
 
-    color_theme_dict['control'] = '#474747'  # 12 in degrees, 0 saturation, 30 light
-    color_theme_dict['nan'] = color_theme_dict['control']
-    color_theme_dict['home'] = color_theme_dict['control']
-    color_theme_dict['non_update'] = color_theme_dict['control']
-    color_theme_dict['non update'] = color_theme_dict['control']
-    color_theme_dict['switch_trials'] = '#d33a8a'
-    color_theme_dict['stay_trials'] = '#3e5ba9'
     color_theme_dict['left'] = '#2594f6'  # 250 in degrees, 95 saturation, 60 light
-    color_theme_dict['switch'] = color_theme_dict['switch_trials']
-    color_theme_dict['stay'] = color_theme_dict['stay_trials']
     color_theme_dict['right'] = '#da3b46'  # 12 in degrees, 95 saturation, 60 light
-    color_theme_dict['initial'] = '#1ea477'  # 152 in degrees, 95 saturation, 60 light  # TODO - rename initial/new
-    color_theme_dict['new'] = '#927ff9'  # 270 in degrees, 95 saturation, 60 light  # TODO - rename initial/new
-    color_theme_dict['stay_update'] = color_theme_dict['initial']
-    color_theme_dict['switch_update'] = color_theme_dict['new']
-    color_theme_dict['initial_stay'] = color_theme_dict['initial']
+    color_theme_dict['left_cmap'] = sns.light_palette(color_theme_dict['left'], as_cmap=True)
+    color_theme_dict['right_cmap'] = sns.light_palette(color_theme_dict['right'], as_cmap=True)
+    color_theme_dict['left_right_cmap_div'] = sns.diverging_palette(250, 12, s=95, l=60, as_cmap=True)
+
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
-    color_theme_dict['all'] = '#f26b49'  # 12 in degrees, 0 saturation, 30 light
+    color_theme_dict['phase_dividers'] = '#ececec'
+
+    for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all']:
+        color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
+        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#000000', as_cmap=True)
+    for key in ['switch_trials', 'switch']:
+        color_theme_dict[key] = '#785cf7'  # purple - 270 in degrees, 95 saturation, 50 light
+    for key in ['stay_trials', 'stay']:
+        color_theme_dict[key] = '#178761'  # green - 152 in degrees, 95 saturation, 50 light (was 60)
+    for key in ['initial', 'initial_stay', 'stay_update']:
+        color_theme_dict[key] = '#2459bd'  # blue - 258 degrees, 85 saturation, 40 light
+        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#2459bd', as_cmap=True)  # start at dark blue (30 light)
+    for key in ['new', 'switch_update']:
+        color_theme_dict[key] = '#b01e70'  # pink - 345 degrees, 90 saturation, 40 light (was 30, testing out)
+        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#b01e70', as_cmap=True)  # start at dark pink (30 light)
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['cmap_r'] = sns.color_palette("rocket", as_cmap=True)
-    color_theme_dict['all_cmap'] = color_theme_dict['cmap']
     color_theme_dict['div_cmap'] = sns.diverging_palette(240, 10, s=75, l=60, n=5, center='light', as_cmap=True)
-    color_theme_dict['plain_cmap'] = sns.color_palette("Greys_r", as_cmap=True)
-    color_theme_dict['home_cmap'] = sns.color_palette("Greys", as_cmap=True)
-    color_theme_dict['switch_cmap'] = sns.light_palette(color_theme_dict['switch'], as_cmap=True)
-    color_theme_dict['stay_cmap'] = sns.light_palette(color_theme_dict['stay'], as_cmap=True)
-    color_theme_dict['initial_stay_cmap'] = color_theme_dict['stay_cmap']
-    color_theme_dict['left_cmap'] = sns.light_palette(color_theme_dict['left'], as_cmap=True)
-    color_theme_dict['right_cmap'] = sns.light_palette(color_theme_dict['right'], as_cmap=True)
-    color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(270, 152, s=95, l=60, as_cmap=True)
-    color_theme_dict['left_right_cmap_div'] = sns.diverging_palette(250, 12, s=95, l=60, as_cmap=True)
+    color_theme_dict['switch_stay_cmap_div'] = sns.diverging_palette(345, 258, s=90, l=50, as_cmap=True)
 
     color_theme_dict['animals'] = sns.color_palette("husl", 7)
     color_theme_dict['general'] = sns.color_palette("husl", 10)
@@ -275,6 +273,7 @@ def rainbow_text(x, y, strings, colors, orientation='stacked',
         All other keyword arguments are passed to plt.text(), so you can
         set the font size, family, etc.
     """
+    new_line = '\n'
     if ax is None:
         ax = plt.gca()
     t = ax.transAxes
@@ -286,7 +285,7 @@ def rainbow_text(x, y, strings, colors, orientation='stacked',
         kwargs.update(rotation=90, verticalalignment='bottom')
 
     for s, c in zip(strings, colors):
-        text = ax.text(x, y, s + " ", color=c, transform=t, **kwargs)
+        text = ax.text(x, y, f'{s} {new_line}', color=c, transform=t, **kwargs)
 
         # Need to draw to update the text position.
         text.draw(canvas.get_renderer())
