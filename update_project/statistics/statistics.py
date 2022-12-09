@@ -26,13 +26,13 @@ from update_project.general.results_io import ResultsIO
 rng = np.random.default_rng(12345)
 
 class Stats:
-    def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None):
+    def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None, nboot=1000):
         # setup defaults unless given otherwise
         self.levels = levels or ['animal', 'session_id']  # append levels needed (e.g., trials, units)
         self.approaches = approaches or ['bootstrap', 'traditional']  # 'summary' as other option
         self.tests = tests or ['direct_prob', 'mann-whitney']  # 'wilcoxon' as other option
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
-        self.nboot = 1000  # number of iterations to perform for bootstrapping default should be 1000
+        self.nboot = nboot  # number of iterations to perform for bootstrapping default should be 1000
         self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def run(self, df, dependent_vars=None, group_vars='group', pairs=None, filename=''):
