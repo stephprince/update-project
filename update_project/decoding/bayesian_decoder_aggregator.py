@@ -32,30 +32,32 @@ class BayesianDecoderAggregator:
         self.window = window
         for sess_dict in data:
             # get aggregate data and add to session dictionary
-            bins = [[-1, 0, 1] if sess_dict['decoder'].convert_to_binary else sess_dict['decoder'].bins][0]
-            summary_df = self._summarize(sess_dict['decoder'])
-            session_error = self._get_session_error(sess_dict['decoder'], summary_df)
-            session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['decoder'], window=window),
+            bins = [[-1, 0, 1] if sess_dict['analyzer'].convert_to_binary else sess_dict['analyzer'].bins][0]
+            summary_df = self._summarize(sess_dict['analyzer'])
+            session_error = self._get_session_error(sess_dict['analyzer'], summary_df)
+            session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['analyzer'], window=window),
                                           summary_df=summary_df,
                                           confusion_matrix=self._get_confusion_matrix(summary_df, bins),
                                           confusion_matrix_sum=session_error['confusion_matrix_sum'],
                                           rmse=session_error['rmse'],
                                           raw_error=session_error['raw_error_median'],
-                                          num_units=len(sess_dict['decoder'].spikes),
-                                          num_trials=len(sess_dict['decoder'].train_df),
-                                          excluded_session=self._meets_exclusion_criteria(sess_dict['decoder']),)
+                                          region=tuple(sess_dict['analyzer'].units_types.any()['region']),
+                                          feature=sess_dict['analyzer'].feature_names[0],
+                                          num_units=len(sess_dict['analyzer'].spikes),
+                                          num_trials=len(sess_dict['analyzer'].train_df),
+                                          excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer']),)
             metadata_keys = ['bins', 'virtual_track', 'model', 'results_io', 'results_tags', 'convert_to_binary',
                              'encoder_bin_num', 'decoder_bin_size',]
-            metadata_dict = {k: getattr(sess_dict['decoder'], k) for k in metadata_keys}
-            if hasattr(sess_dict['decoder'].encoder_bin_num, 'item'):
-                metadata_dict['encoder_bin_num'] = sess_dict['decoder'].encoder_bin_num.item()
-                metadata_dict['decoder_bin_size'] = sess_dict['decoder'].decoder_bin_size.item()
+            metadata_dict = {k: getattr(sess_dict['analyzer'], k) for k in metadata_keys}
+            if hasattr(sess_dict['analyzer'].encoder_bin_num, 'item'):
+                metadata_dict['encoder_bin_num'] = sess_dict['analyzer'].encoder_bin_num.item()
+                metadata_dict['decoder_bin_size'] = sess_dict['analyzer'].decoder_bin_size.item()
             sess_dict.update({**session_aggregate_dict, **metadata_dict})
 
         # get group dataframe
         group_df_raw = pd.DataFrame(data)
         self.group_df = group_df_raw[~group_df_raw['excluded_session']]  # only keep non-excluded sessions
-        self.group_df.drop('decoder', axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
+        self.group_df.drop('analyzer', axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
 
         # get aligned dataframe:
         self.group_aligned_df = self._get_aligned_data(self.group_df)

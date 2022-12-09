@@ -25,13 +25,13 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.decoder_test_size = params.get('decoder_test_size', 0.2)  # prop of trials for testing on train/test split
-        self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1, 2, 3],  # TODO - test and then replace
+        self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],  # TODO - test and then replace
                                                                           correct=[0, 1]))  # trial filters
         self.encoder_bin_num = params.get('encoder_bin_num', 50)  # number of bins to build encoder
         self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
                                                                           correct=[0, 1]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
-        self.decoder_bin_size = params.get('decoder_bin_size', 0.25)  # time to use for decoder
+        self.decoder_bin_size = params.get('decoder_bin_size', 0.2)  # time to use for decoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.prior = params.get('prior', 'uniform')  # whether to use uniform or history-dependent prior
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))

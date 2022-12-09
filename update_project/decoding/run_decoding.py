@@ -45,8 +45,7 @@ def run_decoding():
     if group:
         group_visualizer = BayesianDecoderVisualizer(group_data,
                                                      exclusion_criteria=exclusion_criteria,
-                                                     params=list(testing_params.keys()),
-                                                     overwrite=overwrite)
+                                                     params=list(testing_params.keys()),)
         group_visualizer.plot(group_by=dict(region=regions, feature=features))
 
     print(f'Finished running {__file__}')
@@ -62,9 +61,9 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     params = dict(units_types=dict(region=reg, cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
                   encoder_bin_num=enc_bins,  # num feature bins
                   decoder_bin_size=dec_bins,)  # time length of decoding bins
-    decoder = BayesianDecoderAnalyzer(nwbfile=nwbfile, params=params, session_id=session_id,
+    analyzer = BayesianDecoderAnalyzer(nwbfile=nwbfile, params=params, session_id=session_id,
                                       features=[feat])  # initialize decoder class
-    decoder.run_analysis(overwrite=overwrite)  # build decoding model
+    analyzer.run_analysis(overwrite=overwrite)  # build decoding model
 
     # save to group output
     if parallel:
@@ -73,9 +72,7 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
         params = {k: v for k, v in zip(testing_params.keys(), [enc_bins, dec_bins])}
         session_decoder_output = dict(session_id=session_id,
                                       animal=session_db.get_animal_id(name),
-                                      region=tuple(reg),  # convert to tuple for later grouping
-                                      feature=feat,
-                                      decoder=decoder,
+                                      analyzer=analyzer,
                                       **params)
         return session_decoder_output
 
