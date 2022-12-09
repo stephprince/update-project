@@ -126,7 +126,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
             trajectory = np.rad2deg(np.array(y_position).T[:, random_samples])
             clipping_mask = mpl.patches.Rectangle(xy=(cue_locations['delay cue'], 0),
                                                   width=cue_locations['delay2 cue'] - cue_locations['delay cue'],
-                                                  height=122, facecolor='white', alpha=0,
+                                                  height=1, facecolor='white', alpha=0,
                                                   transform=ax[ax_id].transAxes)
             ax[ax_id].add_patch(clipping_mask)
             ax[ax_id].plot(track_fraction, trajectory, color=self.colors['nan'], alpha=0.2, linestyle=linestyle, label=turn)
