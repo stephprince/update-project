@@ -43,7 +43,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         self.plot_trajectories()
         self.plot_aligned_data()
 
-    def plot_performance(self, ax):
+    def plot_performance(self, sfig):
         """plot performance for manuscript figure"""
         temp_df = (self.group_df[['animal', 'session_id', 'proportion_correct']]
                    .explode('proportion_correct')
@@ -61,6 +61,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                  .reset_index(drop=True)
                                  .to_dict())  # convert to dict and back bc violin plot has object format err otherwise
 
+        ax = sfig.subplots(nrows=1, ncols=1)
         sns.boxplot(data=df_by_bin, x='trial type', y='proportion correct', ax=ax, width=0.5,
                     palette=self.colors['trials'], medianprops={'color': 'white'})
         box_patches = [patch for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
@@ -76,9 +77,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance', xlabel=None, ylim=(0, 1))
 
-        return ax
+        return sfig
 
-    def plot_trajectories_by_position(self, ax, var='view_angle', num_trials=20):
+    def plot_trajectories_by_position(self, sfig, var='view_angle', num_trials=20):
+        """plot trajectories for manuscript figure"""
+
         # get data for example trial
         example_animal, example_session = (25, 'S25_210913')  # TODO - find good representative session
         temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
@@ -90,6 +93,8 @@ class BehaviorVisualizer(BaseVisualizationClass):
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'non update',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
+
+        ax = sfig.subplots(nrows=1, ncols=3, sharey=True)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
             ax_id = np.argwhere(trajectory_df['update_type'].unique() == update)[0][0]
             linestyle = 'dotted' if turn == 'right' else 'solid'
@@ -142,9 +147,14 @@ class BehaviorVisualizer(BaseVisualizationClass):
         [h.set_alpha(1) for h in handles]
         ax[0].legend(list(handles), list(labels), loc='lower left')
 
-        return ax
+        sfig.suptitle('Example trial trajectories', fontsize=12)
+        sfig.supxlabel('fraction of track', fontsize=10)
+        sfig.axes[0].set(ylabel='view angle (degrees)')
 
-    def plot_trajectories_by_event(self, ax, var='view_angle'):
+        return sfig
+
+    def plot_trajectories_by_event(self, sfig, var='view_angle'):
+        """plot trajectories aligned to update time for manuscript figure"""
         # get data for example trial
         temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
                    .explode('trajectories')
@@ -154,6 +164,8 @@ class BehaviorVisualizer(BaseVisualizationClass):
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'non update',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
+
+        ax = sfig.subplots(nrows=1, ncols=1)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
             ax_id = np.argwhere(trajectory_df['update_type'].unique() == update)[0][0]
             linestyle = 'dotted' if turn == 'right' else 'solid'
@@ -165,7 +177,8 @@ class BehaviorVisualizer(BaseVisualizationClass):
                              for k, v in self.virtual_track.cue_start_locations['y_position'].items()}
             for i, (cue_name, cue_loc) in enumerate(cue_locations.items()):
                 if cue_name in ['delay cue', 'update cue', 'delay2 cue'] and turn == 'right':
-                    ax.axvline(cue_loc - cue_locations['update cue'], linestyle='solid', color='#ececec', zorder=0, linewidth=0.75)
+                    ax.axvline(cue_loc - cue_locations['update cue'], linestyle='solid',
+                               color=self.colors['phase_dividers'], zorder=0, linewidth=0.75)
             track_fraction = (y_labels - np.min(y_labels)) / np.max(y_labels - np.min(y_labels))
             track_fraction = track_fraction - cue_locations['update cue']
 
@@ -179,11 +192,10 @@ class BehaviorVisualizer(BaseVisualizationClass):
         ax.set(title='Trajectories', ylabel='view angle (degrees)', xlabel='position relative to update',
                ylim=(-35, 35), xlim=(cue_locations['delay cue'] - cue_locations['update cue'],
                                      cue_locations['delay2 cue'] - cue_locations['update cue']))
-        label_text = [f'{t} {self.new_line}' for t in trajectory_df['update_type'].unique()]
         colors = [self.colors[t] for t in trajectory_df['update_type'].unique()]
-        rainbow_text(0.05, 0.85, label_text, colors, ax=ax, size=10)
+        rainbow_text(0.05, 0.85, trajectory_df['update_type'].unique(), colors, ax=ax, size=10)
 
-        return ax
+        return sfig
 
     def plot_trajectories_by_times(self, ax, var='view_angle', event='t_update'):
         temp_df = self.group_df[['animal', 'session_id', 'aligned_data']].explode('aligned_data').reset_index(drop=True)
@@ -212,9 +224,8 @@ class BehaviorVisualizer(BaseVisualizationClass):
             ax.fill_between(times, mean - err, mean + err, alpha=0.2, color=self.colors[update])
 
         ax.axvline(0, linestyle='dashed', color=self.colors['nan'])
-        turn_label_text = [f'{t} {self.new_line}' for t in aligned_df['update_type'].unique()]
         colors = [self.colors[t] for t in aligned_df['update_type'].unique()]
-        rainbow_text(0.05, 0.85, turn_label_text, colors, ax=ax[-1], size=10)
+        rainbow_text(0.05, 0.85, aligned_df['update_type'].unique(), colors, ax=ax[-1], size=10)
 
         return ax
 

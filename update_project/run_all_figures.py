@@ -7,12 +7,7 @@ dates_included = [210913, 210521]
 session_db = SessionLoader(animals=animals, dates_included=dates_included)
 
 # initialize general analysis class and run for each of the specificed steps
-analyzer = UpdateTaskFigureGenerator(analysis=dict(Behavior=dict(),
-                                                   ChoiceEstimate=dict(target_var='choice'),
-                                                   Decoder=dict(features=['y_position', 'x_position', 'choice'], ),
-                                                   SingleUnits=dict()),
-                                     sessions=session_db,
-                                     overwrite=overwrite)
+analyzer = UpdateTaskFigureGenerator(sessions=session_db, overwrite=overwrite)
 
 # generate all manuscript figures
 analyzer.plot_main_figures()
