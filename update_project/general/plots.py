@@ -76,7 +76,7 @@ def get_color_theme():
     color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
     color_theme_dict['phase_dividers'] = '#ececec'
 
-    for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all']:
+    for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all', 'delay only']:
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#000000', as_cmap=True)
     for key in ['switch_trials', 'switch']:

@@ -54,7 +54,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
                                  .query('type == "binned"')
-                                 .assign(update_type=lambda x: x.update_type.map({'non_update': 'non update',
+                                 .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
                                                                                   'switch_update': 'switch',
                                                                                   'stay_update': 'stay'}))
                                  .rename(columns={'prop_correct': 'proportion correct', 'update_type': 'trial type'})
@@ -90,7 +90,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
-        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'non update',
+        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
 
@@ -161,7 +161,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
-        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'non update',
+        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
 
