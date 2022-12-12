@@ -163,13 +163,21 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                        n_time_bins=11, time_window=(-2.5, 2.5))
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
+        time_window = (0, 1.5)
         data_for_stats = (trial_data
-                          .query(f'times_binned > 0 & times_binned < 1.5')  # only look at first 1.5 seconds
+                          .query(f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
                           .groupby(groupby_cols)[['prob_over_chance', 'diff_baseline']]  # group by trial/trial type
                           .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                           .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
         data_for_stats.reset_index(inplace=True)
         data_for_stats['choice'] = data_for_stats['choice'].map({'initial_stay': 'initial', 'switch': 'new'})
+        diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
+                                          values=['prob_over_chance_mean'])
+                     .reset_index())
+        diff_data[('initial_vs_new','')] = diff_data[('prob_over_chance_mean', 'initial')] - \
+                                           diff_data[('prob_over_chance_mean', 'new')]
+        diff_data = diff_data.droplevel(1, axis=1)
+        diff_data['update_type'] = diff_data['update_type'].map({'switch': 'switch', 'stay':'stay', 'non_update':'delay only'})
 
         # setup stats - group variables, pairs to compare, and levels of hierarchical data
         var = 'diff_baseline_mean'
@@ -177,26 +185,75 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         comp = 'update_type'
         group_list = data_for_stats['choice'].unique()
         combos = list(itertools.combinations(plot_groups['update_type'], r=2))
-        pairs = [((c[0], g), (c[1], g)) for c in combos for g in group_list]
+        pairs = [((g, c[0]), (g, c[1], )) for c in combos for g in group_list]
         stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                       approaches=['traditional'], tests=['mann-whitney'])
-        stats.run(data_for_stats, dependent_vars=[var], group_vars=[comp, 'choice'],
+        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comp],
                   pairs=pairs, filename=f'goal_coding_stats')
 
         # plot data TODO - make this mixed effects models
-        ax = sfig.subplots(nrows=1, ncols=1)
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[2, 1]))
+        colors = [self.colors[t] for t in ['switch', 'stay', 'non_update']]
+        sns.boxplot(data=data_for_stats, x=group, y=var, hue=comp, ax=ax[0], width=0.5, showfliers=False,
+                    palette=colors, medianprops={'color': 'white'}, hue_order=['switch', 'stay', 'non_update'])
+        ax[0] = self.clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
+        ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density from t={time_window[0]} to t={time_window[-1]}')
+        ax[0].get_legend().remove()
+        rainbow_text(0.5, 0.9, ['switch', 'stay', 'delay only'], colors, ax=ax[0], size=8)
+
+        # add stats annotations
         stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
                                           f'& variable == "{var}"')
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
-        annot = Annotator(ax, pairs=pairs, data=data_for_stats, x=comp, y=var, hue=group)
-        sns.boxplot(data=data_for_stats, x=comp, y=var, hue=group, ax=ax, width=0.5, showfliers=False)
-        annot.new_plot(ax, pairs=pairs, data=data_for_stats, x=comp, y=var, hue=group)
+        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comp,
+                          hue_order=['switch', 'stay', 'non_update'])
+        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comp)
         (annot
-         .configure(test=None, test_short_name='mann-whitney', text_format='simple')
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
-         .annotate())
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
+        # plot the difference between initial and new probabilities
+        sns.boxplot(data=diff_data, x=comp, y='initial_vs_new', ax=ax[1], width=0.5, showfliers=False,
+                    palette=colors, medianprops={'color': 'white'}, order=['switch', 'stay', 'delay only'])
+        ax[1] = self.clean_box_plot(ax[1])
+        ax[1].set(xlabel='update type', ylabel=f'initial - new prob. density')
+
+        combos = list(itertools.combinations(['switch', 'stay', 'delay only'], r=2))
+        diff_pairs = [((c[0],), (c[1],)) for c in combos]
+        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comp], pairs=diff_pairs, filename='goal_diff_stats')
+        stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
+                                          f'& variable == "initial_vs_new"')
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
+        annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comp, y='initial_vs_new',
+                          order=['switch', 'stay', 'delay only'])
+        annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comp, y='initial_vs_new')
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        sfig.suptitle('Goal representation quantification', fontsize=12)
         return sfig
+
+    def clean_box_plot(self, ax, labelcolors=None):
+        box_patches = [patch for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
+        colors = [patch.get_facecolor() for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
+        colors = colors * int(len(box_patches) / len(colors))
+        lines_per_boxplot = len(ax.lines) // len(box_patches)
+        for i, (box, color) in enumerate(zip(box_patches, colors)):
+            box.set_edgecolor(color)
+            for line in ax.lines[i * lines_per_boxplot: (i + 1) * lines_per_boxplot]:
+                if line.get_color() != 'white':  # leave the median white
+                    line.set_color(color)
+
+        if labelcolors:
+            colors = labelcolors  # get new list of colors if different labelcolors provided
+
+        for ticklabel, color in zip(ax.get_xticklabels(), colors):
+            ticklabel.set_color(color)
+
+        return ax
 
     def plot_multiregional_data(self):
         if len(self.aggregator.group_aligned_df['region'].unique()) > 1:
