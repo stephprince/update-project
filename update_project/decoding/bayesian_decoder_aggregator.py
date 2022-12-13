@@ -35,13 +35,17 @@ class BayesianDecoderAggregator:
             bins = [[-1, 0, 1] if sess_dict['analyzer'].convert_to_binary else sess_dict['analyzer'].bins][0]
             summary_df = self._summarize(sess_dict['analyzer'])
             session_error = self._get_session_error(sess_dict['analyzer'], summary_df)
+            if hasattr(sess_dict['analyzer'].units_types, 'any'):
+                region = tuple(sess_dict['analyzer'].units_types.any()['region'])
+            else:
+                region = tuple(sess_dict['analyzer'].units_types['region'])
             session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['analyzer'], window=window),
                                           summary_df=summary_df,
                                           confusion_matrix=self._get_confusion_matrix(summary_df, bins),
                                           confusion_matrix_sum=session_error['confusion_matrix_sum'],
                                           rmse=session_error['rmse'],
                                           raw_error=session_error['raw_error_median'],
-                                          region=tuple(sess_dict['analyzer'].units_types.any()['region']),
+                                          region=region,
                                           feature=sess_dict['analyzer'].feature_names[0],
                                           num_units=len(sess_dict['analyzer'].spikes),
                                           num_trials=len(sess_dict['analyzer'].train_df),
