@@ -13,7 +13,7 @@ from statannotations.Annotator import Annotator
 
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text
+from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text, clean_box_plot
 from update_project.statistics.statistics import Stats
 from update_project.base_visualization_class import BaseVisualizationClass
 
@@ -125,8 +125,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # load up data
         plot_groups = dict(update_type=['switch', 'stay', 'non_update'], turn_type=[1, 2], correct=[1],
                            time_label=['t_update'])
-        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups)
-
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value='prob_sum')
+        label_map = dict(switch='switch', stay='stay', non_update='delay only')
         # plot figure
         ax = sfig.subplots(nrows=1, ncols=3, sharey=True)
         for update, data in trial_data.groupby('update_type'):
@@ -144,7 +145,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                    np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=self.colors['initial'],
                                    alpha=0.2)
             ax[ax_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
-            ax[ax_id].set_title(update.replace('_', ' '), color=self.colors[update])
+            ax[ax_id].set_title(label_map[update], color=self.colors[update])
             # ax[ax_id].set(ylabel='prob. density', xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
         sfig.suptitle('Goal arm representations', fontsize=12)
         sfig.supylabel('prob. density', fontsize=10)
@@ -160,7 +161,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         plot_groups = dict(update_type=['switch', 'stay', 'non_update'], turn_type=[1, 2], correct=[1],
                            time_label=['t_update'])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
-                                                                       n_time_bins=11, time_window=(-2.5, 2.5))
+                                                                       n_time_bins=11, time_window=(-2.5, 2.5),
+                                                                       prob_value='prob_sum')
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
         time_window = (0, 1.5)
@@ -196,7 +198,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         colors = [self.colors[t] for t in ['switch', 'stay', 'non_update']]
         sns.boxplot(data=data_for_stats, x=group, y=var, hue=comp, ax=ax[0], width=0.5, showfliers=False,
                     palette=colors, medianprops={'color': 'white'}, hue_order=['switch', 'stay', 'non_update'])
-        ax[0] = self.clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
+        ax[0] = clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
         ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density from t={time_window[0]} to t={time_window[-1]}')
         ax[0].get_legend().remove()
         rainbow_text(0.5, 0.9, ['switch', 'stay', 'delay only'], colors, ax=ax[0], size=8)
@@ -216,7 +218,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # plot the difference between initial and new probabilities
         sns.boxplot(data=diff_data, x=comp, y='initial_vs_new', ax=ax[1], width=0.5, showfliers=False,
                     palette=colors, medianprops={'color': 'white'}, order=['switch', 'stay', 'delay only'])
-        ax[1] = self.clean_box_plot(ax[1])
+        ax[1] = clean_box_plot(ax[1])
         ax[1].set(xlabel='update type', ylabel=f'initial - new prob. density')
 
         combos = list(itertools.combinations(['switch', 'stay', 'delay only'], r=2))
@@ -236,24 +238,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sfig.suptitle('Goal representation quantification', fontsize=12)
         return sfig
 
-    def clean_box_plot(self, ax, labelcolors=None):
-        box_patches = [patch for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
-        colors = [patch.get_facecolor() for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
-        colors = colors * int(len(box_patches) / len(colors))
-        lines_per_boxplot = len(ax.lines) // len(box_patches)
-        for i, (box, color) in enumerate(zip(box_patches, colors)):
-            box.set_edgecolor(color)
-            for line in ax.lines[i * lines_per_boxplot: (i + 1) * lines_per_boxplot]:
-                if line.get_color() != 'white':  # leave the median white
-                    line.set_color(color)
+    def plot_decoding_validation(self, sfig):
 
-        if labelcolors:
-            colors = labelcolors  # get new list of colors if different labelcolors provided
-
-        for ticklabel, color in zip(ax.get_xticklabels(), colors):
-            ticklabel.set_color(color)
-
-        return ax
+        return sfig
 
     def plot_multiregional_data(self):
         if len(self.aggregator.group_aligned_df['region'].unique()) > 1:

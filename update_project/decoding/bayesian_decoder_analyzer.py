@@ -69,7 +69,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
 
         # setup feature specific settings
         self.convert_to_binary = params.get('convert_to_binary', False)  # convert decoded outputs to binary (e.g., L/R)
-        if self.feature_names[0] in ['choice', 'turn_type']:
+        if self.feature_names[0] in ['choice_binarized', 'turn_type']:
             self.convert_to_binary = True  # always convert choice to binary
             self.encoder_bin_num = 2
 
@@ -103,7 +103,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
             elif feat in ['view_angle']:
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
                 data = time_series.data[:]
-            elif feat in ['choice', 'turn_type']:
+            elif feat in ['choice_binarized', 'turn_type']:
                 choice_mapping = {'0': np.nan, '1': -1, '2': 1}  # convert to negative/non-negative for flipping
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
@@ -124,9 +124,10 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                 time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
                 # load dynamic choice from saved output
-                data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type')
+                data_mapping = dict(dynamic_choice='choice', choice='choice',
+                                    cue_bias='turn_type')
                 fname_tag = data_mapping[self.feature_names[0]]
-                choice_path = Path().absolute().parent.parent / 'results' / 'choice'
+                choice_path = Path(__file__).parent.parent.parent / 'results' / 'choice'
                 fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{fname_tag}',
                                                           results_type='session', format='pkl',
                                                           diff_base_path=choice_path)

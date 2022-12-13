@@ -87,7 +87,8 @@ class UpdateTrack(VirtualTrack):
     choice_boundaries = dict(x_position={'left': (-33, -1), 'right': (1, 33)},
                              y_position={'left': (255, 298), 'right': (298, 341)},  # TODO - change this part
                              view_angle={'left': (np.pi,  2 * np.pi / 9), 'right': (-2 * np.pi/9, -np.pi)},  # 40 deg
-                             choice={'left': (-2, 0), 'right': (0, 2)},
+                             choice_binarized={'left': (-2, 0), 'right': (0, 2)},
+                             choice={'left': (-0.5, -0.4), 'right': (0.4, 0.5)},
                              turn_type={'left': (-2, 0), 'right': (0, 2)},
                              dynamic_choice={'left': (-0.5, -0.4), 'right': (0.4, 0.5)})
     mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},

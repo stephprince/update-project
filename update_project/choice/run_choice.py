@@ -29,14 +29,14 @@ for name in session_names:
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
     nwbfile = io.read()
 
-    rnn = ChoiceAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), target_var=target_var,
-                           velocity_only=velocity_only)
-    rnn.run_analysis(overwrite=overwrite, grid_search=grid_search)
+    analyzer = ChoiceAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), target_var=target_var,
+                              velocity_only=velocity_only)
+    analyzer.run_analysis(overwrite=overwrite, grid_search=grid_search)
 
     # save to group output
     session_data = dict(session_id=session_db.get_session_id(name),
                         animal=session_db.get_animal_id(name),
-                        rnn=rnn)
+                        analyzer=analyzer)
     group_data.append(session_data)
 
 if plot:
