@@ -9,8 +9,10 @@ from pathlib import Path
 from scipy.stats import sem
 
 from update_project.general.results_io import ResultsIO
+from update_project.general.plots import rainbow_text, clean_box_plot, add_task_phase_lines
 from update_project.base_visualization_class import BaseVisualizationClass
 
+rng = np.random.default_rng(12345)
 
 class ChoiceVisualizer(BaseVisualizationClass):
 
@@ -30,14 +32,14 @@ class ChoiceVisualizer(BaseVisualizationClass):
         # get session visualization info
         for sess_dict in self.data:
             if grid_search:
-                sess_dict.update(dict(grid_search_data=sess_dict['rnn'].grid_search_data,
-                                      grid_search_params=sess_dict['rnn'].grid_search_params))
-            sess_dict.update(dict(agg_data=sess_dict['rnn'].agg_data,
-                                  # vis_data=sess_dict['rnn'].vis_data,
-                                  output_data=sess_dict['rnn'].output_data))
+                sess_dict.update(dict(grid_search_data=sess_dict['analyzer'].grid_search_data,
+                                      grid_search_params=sess_dict['analyzer'].grid_search_params))
+            sess_dict.update(dict(agg_data=sess_dict['analyzer'].agg_data,
+                                  # vis_data=sess_dict['analyzer'].vis_data,
+                                  output_data=sess_dict['analyzer'].output_data))
 
         self.group_df = pd.DataFrame(self.data)
-        self.group_df.drop('rnn', axis='columns', inplace=True)
+        self.group_df.drop('analyzer', axis='columns', inplace=True)
 
     def plot(self):
         self.plot_choice_switches()
@@ -45,6 +47,58 @@ class ChoiceVisualizer(BaseVisualizationClass):
 
         if self.grid_search:
             self.plot_grid_search_results()
+
+    def plot_choice_commitment(self, sfig, num_trials=20):
+        # get data
+        predict_df = self._get_group_prediction().reset_index(drop=True)
+        predict_df = predict_df.rename_axis('trial').reset_index()
+        predict_df_by_time = (predict_df
+                              .explode(['predict', 'y_position', 'timestamps', 'log_likelihood']))
+
+        # split up into bins by cues and by y_position
+        y_lims = (self.virtual_track.cue_start_locations['y_position']['initial cue'],
+                  np.max(self.virtual_track.coords))
+        cue_fractions = dict()
+        for cue_name, loc in self.virtual_track.cue_start_locations['y_position'].items():
+            cue_fractions[cue_name] = (loc - y_lims[0]) / (y_lims[-1] - y_lims[0])
+        cue_bins = pd.cut(predict_df_by_time['y_position'], [*list(cue_fractions.values()), 1],
+                                 labels=list(cue_fractions.keys()))
+        predict_df_by_time['cue'] = cue_bins
+        predict_df_by_time['target'] = predict_df_by_time['target'].map({0: 'left', 1: 'right'})
+        cue_performance = predict_df_by_time.groupby(['cue', 'session_id'])['log_likelihood'].mean().reset_index()
+
+        example_animal, example_session = (25, 'S25_210913')  # TODO - find good representative session
+        y_position_bins = pd.cut(predict_df_by_time['y_position'], np.linspace(0, 1.01, 30))
+        predict_df_by_time['y_position_binned'] = y_position_bins.apply(lambda x: x.mid)
+        trial_performance = (predict_df_by_time
+                      .query(f'animal == {example_animal} & session_id == "{example_session}"')
+                      .groupby(['session_id', 'trial', 'target', 'y_position_binned'])[['predict']]
+                      .mean().reset_index())
+
+        # plot example trials
+        ax = sfig.subplots(nrows=1, ncols=2)
+        for g_name, g_data in trial_performance.groupby('target'):
+            indiv_mat = g_data.pivot(index=['trial'], columns=['y_position_binned'], values='predict').dropna(axis=0)  # drop extra trial/target grouping artifacts
+            pos_bins = indiv_mat.columns.to_numpy()
+            random_samples = rng.choice(range(np.shape(indiv_mat)[0]), num_trials)  # TODO - only full delay non-update
+            trials = np.stack(indiv_mat.to_numpy()).T[:, random_samples]
+
+            linestyle = 'solid' if g_name == 'right' else 'dashed'
+            ax[0].plot(pos_bins, trials, color=self.colors[g_name], linestyle=linestyle, alpha=0.5)
+        ax[0] = add_task_phase_lines(ax[0], cue_locations=cue_fractions, text_brackets=True)
+        ax[0].set(title=f'Example trials', xlabel='fraction of track', ylabel='p(right choice)', ylim=(0, 1.1))
+
+        # plot session averages
+        sns.boxplot(cue_performance, x='cue', y='log_likelihood', ax=ax[1], width=0.5, medianprops={'color': 'white'},
+                    showfliers=False, palette=self.colors['choice_commitment'][1:])
+        ax[1].set(title='Accuracy', xlabel='task phase', ylabel='log likelihood')
+        ax[1].axhline(-1, linestyle='dashed', color='k', label='chance', alpha=0.5, zorder=0)
+        ax[1].axhline(0, linestyle='dashed', color='k', label='perfect', alpha=0.5, zorder=0)
+        clean_box_plot(ax[1])
+
+        sfig.suptitle('Choice commitment estimation', fontsize=12)
+
+        return sfig
 
     def _get_group_prediction(self):
         # df_list = []

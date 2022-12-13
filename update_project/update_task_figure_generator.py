@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 
-from pathlib import Path
 from pynwb import NWBHDF5IO
 
 from update_project.general.results_io import ResultsIO
@@ -33,7 +32,7 @@ class UpdateTaskFigureGenerator:
         self.plot_figure_1()  # figure 1 - experimental paradigm
         self.plot_figure_2()  # figure 2 - HPC position coding during decision updating
         self.plot_figure_3()  # figure 3 - PFC choice coding during decision updating
-        self.plot_figure_4()  # figure 4 - HPC + PFC contributions to accurate decision updating
+        # self.plot_figure_4()  # figure 4 - HPC + PFC contributions to accurate decision updating
 
     def plot_supplemental_figures(self):
         self.plot_supp_figure_1()  # supp figure 1
@@ -67,11 +66,11 @@ class UpdateTaskFigureGenerator:
 
         return visualizer
 
-    def plot_figure_1(self, overwrite=False):
-        visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=overwrite)
+    def plot_figure_1(self):
+        visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
 
         # figure structure
-        fig = plt.figure(constrained_layout=True, figsize=(6.5, 5))
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
         sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[2.25, 1], height_ratios=[1, 1.1])
 
         # plot data
@@ -84,26 +83,70 @@ class UpdateTaskFigureGenerator:
         self.add_panel_labels(sfigs)
         self.results_io.save_fig(fig=fig, filename=f'figure_1', tight_layout=False, results_type='manuscript')
 
-    def plot_figure_2(self, overwrite=False):
+    def plot_figure_2(self):
         analysis_params=dict(units_types=dict(region=['CA1'],
                                               cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),)
         visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
                                                 analysis_kwargs=dict(features=['y_position'],
                                                                      params=analysis_params),
-                                                overwrite=overwrite)
+                                                overwrite=self.overwrite)
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 5))
-        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[1, 1.5], height_ratios=[1, 1])
+        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[1, 1], height_ratios=[1, 1])
 
-        sfigs[0][0] = visualizer.plot_decoding_output_heatmap(sfigs[0][0])
-        sfigs[0][1] = visualizer.plot_goal_coding(sfigs[0][1])
-        sfigs[1][0] = visualizer.plot_goal_coding_stats(sfigs[1][0])
-        # sfigs[1][1] = visualizer.plot_tuning_curves(sfigs[1][1])
+        sfigs[0][0] = self.plot_placeholder(sfigs[0][0], text='Recording setup + position schematic')
+        sfigs[0][1] = visualizer.plot_decoding_output_heatmap(sfigs[0][1])
+        sfigs[1][0] = visualizer.plot_goal_coding(sfigs[1][0])
+        sfigs[1][1] = visualizer.plot_goal_coding_stats(sfigs[1][1])
+        # sfigs[2][0] = visualizer.plot_tuning_curves(sfigs[2][0])
+        # sfigs[2][1] = visualizer.plot_theta_modulation(sfigs[2][1])
 
         # figure saving
         self.add_panel_labels(sfigs)
         self.results_io.save_fig(fig=fig, filename=f'figure_2', tight_layout=False, results_type='manuscript')
+
+    def plot_figure_3(self):
+        analysis_params = dict(units_types=dict(region=['PFC'],
+                                                cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),)
+        visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                analysis_kwargs=dict(features=['choice'],
+                                                                     params=analysis_params),
+                                                overwrite=self.overwrite)
+        choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Choice', overwrite=self.overwrite)
+
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 8.5))
+        sfigs = fig.subfigures(nrows=3, ncols=2, width_ratios=[1, 1], height_ratios=[1, 1, 1])
+
+        sfigs[0][0] = self.plot_placeholder(sfigs[0][0], text='LSTM network schematic')
+        sfigs[0][1] = choice_visualizer.plot_choice_commitment(sfigs[0][1])
+        sfigs[1][0] = self.plot_placeholder(sfigs[1][0], text='Recording setup + choice schematic')
+        sfigs[1][1] = visualizer.plot_decoding_output_heatmap(sfigs[1][1])
+        sfigs[2][0] = visualizer.plot_goal_coding(sfigs[2][0])
+        sfigs[2][1] = visualizer.plot_goal_coding_stats(sfigs[2][1])
+        # sfigs[1][1] = visualizer.plot_tuning_curves(sfigs[1][1])
+
+        # figure saving
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'figure_3', tight_layout=False, results_type='manuscript')
+
+    def plot_supp_figure_1(self):
+        visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
+
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+        sfigs = fig.subfigures(nrows=3, ncols=2, width_ratios=[2.25, 1], height_ratios=[1, 1.1, 1])
+
+        # plot data
+        sfigs[0][0] = visualizer.plot_event_durations(sfigs[0][0])  # average trajectories aligned to update
+        sfigs[0][1] = visualizer.plot_performance_by_animals(sfigs[0][1])  # behavioral performance distributions
+        sfigs[1][0] = visualizer.plot_trajectories_by_position(sfigs[1][0])  # 20 example view trajectories of each trial type
+        sfigs[1][1] = visualizer.plot_trajectories_by_event(sfigs[1][1])  # average trajectories aligned to update
+
+        # figure saving
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'figure_1', tight_layout=False, results_type='manuscript')
 
     @staticmethod
     def plot_placeholder(sfig, text):
