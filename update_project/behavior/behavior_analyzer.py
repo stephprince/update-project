@@ -121,6 +121,8 @@ class BehaviorAnalyzer(BaseAnalysisClass):
                 agg_data = trial_df.groupby(bins).agg([lambda x: np.nanmean(x)])
                 agg_data.columns = trial_df.columns.values
                 trajectories.append(dict(**dict(trial_id=ind,
+                                                maze_id=trial['maze_id'],
+                                                correct=trial['correct'],
                                                 update_type=self.virtual_track.mappings['update_type'][str(name[0])],
                                                 turn_type=self.virtual_track.mappings['turn_type'][str(name[1])]),
                                          **agg_data.to_dict()))

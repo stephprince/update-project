@@ -9,7 +9,7 @@ from pathlib import Path
 from scipy.stats import sem
 
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, rainbow_text
+from update_project.general.plots import plot_distributions, rainbow_text, clean_box_plot, add_task_phase_lines
 from update_project.statistics.statistics import get_fig_stats
 from update_project.base_visualization_class import BaseVisualizationClass
 
@@ -63,19 +63,38 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         ax = sfig.subplots(nrows=1, ncols=1)
         sns.boxplot(data=df_by_bin, x='trial type', y='proportion correct', ax=ax, width=0.5,
-                    palette=self.colors['trials'], medianprops={'color': 'white'})
-        box_patches = [patch for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
-        for i, (box, ticklabel, color) in enumerate(zip(box_patches, ax.get_xticklabels(), self.colors['trials'])):
-            box.set_edgecolor(color)
-            ticklabel.set_color(color)
-            for l in range(i * 6, i * 6 + 6):
-                if ax.lines[l].get_color() != 'white':  # leave the median white
-                    ax.lines[l].set_color(color)
+                    palette=self.colors['trials'], medianprops={'color': 'white'}, showfliers=False)
+        clean_box_plot(ax)
 
-        ax = sns.stripplot(data=df_by_bin, x='trial type', y='proportion correct', size=3, jitter=True, ax=ax,
-                           palette=self.colors['trials'])
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance', xlabel=None, ylim=(0, 1))
+
+        return sfig
+
+    def plot_performance_by_animals(self, sfig):
+        temp_df = (self.group_df[['animal', 'session_id', 'proportion_correct']]
+                   .explode('proportion_correct')
+                   .reset_index(drop=True))
+
+        df_by_update_type = pd.concat([temp_df[['animal', 'session_id']],
+                                       pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
+        df_by_bin = pd.DataFrame(df_by_update_type
+                                 .explode('prop_correct')
+                                 .query('type == "binned"')
+                                 .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
+                                                                                  'switch_update': 'switch',
+                                                                                  'stay_update': 'stay'}))
+                                 .rename(columns={'prop_correct': 'proportion correct', 'update_type': 'trial type'})
+                                 .reset_index(drop=True)
+                                 .to_dict())  # convert to dict and back bc violin plot has object format err otherwise
+
+        ax = sfig.subplots(nrows=1, ncols=1)
+        sns.boxplot(data=df_by_bin, x='trial type', y='proportion correct', hue='animal', ax=ax, width=0.5,
+                    palette=self.colors['animals'], medianprops={'color': 'white'}, showfliers=False)
+        clean_box_plot(ax)
+
+        ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
+        ax.set(title='Task performance per animal', xlabel=None, ylim=(0, 1))
 
         return sfig
 
@@ -93,6 +112,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
+        trajectory_df = trajectory_df.query('correct == 1')
 
         ax = sfig.subplots(nrows=1, ncols=3, sharey=True)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
@@ -106,25 +126,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
             cue_locations = {k: np.round((v - np.min(y_labels)) / np.max(y_labels - np.min(y_labels)), 4)
                              for k, v in self.virtual_track.cue_start_locations['y_position'].items()}
             if turn == 'right':
-                cue_details = dict()
-                name_remapping = {'initial cue': 'sample', 'delay cue': 'delay', 'update cue': 'update',
-                                  'delay2 cue': 'delay'}
-                for i, cue_loc in enumerate([*list(cue_locations.values()), 1][1:]):
-                    cue_name = list(cue_locations.keys())[i]
-                    cue_details[cue_name] = dict(middle=(cue_loc + list(cue_locations.values())[i]) / 2,
-                                                 start=list(cue_locations.values())[i], end=cue_loc,
-                                                 label=name_remapping[cue_name])
-                for i, (cue_name, cue_loc) in enumerate(cue_locations.items()):
-                    ax[ax_id].axvline(cue_loc, linestyle='solid', color='#ececec', zorder=0, linewidth=0.75)
-
-                for cue_name, cue_loc in cue_details.items():
-                    ax[ax_id].text(cue_details[cue_name]['middle'], 0.95, cue_details[cue_name]['label'], ha='center',
-                                   va='bottom', transform=ax[ax_id].get_xaxis_transform(), fontsize=7)
-                    ax[ax_id].annotate('', xy=(cue_details[cue_name]['start'], 0.925),
-                                       xycoords=ax[ax_id].get_xaxis_transform(),
-                                       xytext=(cue_details[cue_name]['end'], 0.925),
-                                       textcoords=ax[ax_id].get_xaxis_transform(),
-                                       arrowprops=dict(arrowstyle='|-|, widthA=0.15, widthB=0.15', shrinkA=1, shrinkB=1, lw=1))
+                ax[ax_id] = add_task_phase_lines(ax[ax_id], cue_locations=cue_locations, text_brackets=True)
 
             # plot data
             random_samples = rng.choice(range(np.shape(y_position)[0]), num_trials)  # TODO - only full delay non-update
@@ -150,6 +152,59 @@ class BehaviorVisualizer(BaseVisualizationClass):
         sfig.suptitle('Example trial trajectories', fontsize=12)
         sfig.supxlabel('fraction of track', fontsize=10)
         sfig.axes[0].set(ylabel='view angle (degrees)')
+
+        return sfig
+
+    def plot_trajectories_all_metrics(self, sfig, vars=['x_position', 'rotational_velocity', 'translational_velocity']):
+        # get data for example trial
+        temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
+                   .explode('trajectories')
+                   .reset_index(drop=True))
+        trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
+                                   pd.DataFrame(list(temp_df['trajectories']))], axis=1)
+        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
+                                                                         'switch_update': 'switch',
+                                                                         'stay_update': 'stay'})
+        var_mapping = dict(x_position=dict(title='lateral position', ylabel='fraction of lateral distance'),
+                           rotational_velocity=dict(title='rotational velocity', ylabel='roll (a.u.'),
+                           translational_velocity=dict(title='forward velocity', ylabel='pitch (a.u.)'))
+
+        # plot data
+        ax = sfig.subplots(nrows=3, ncols=3)
+        for ax_id, var in enumerate(vars):
+            for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
+                type_id = np.argwhere(trajectory_df['update_type'].unique() == update)[0][0]
+                linestyle = 'dotted' if turn == 'right' else 'solid'
+
+                # transform y data to fraction of track
+                y_position = pd.DataFrame(list(group[var]))
+                y_labels = y_position.columns.mid.values  # TODO - check same across animals
+                cue_locations = {k: np.round((v - np.min(y_labels)) / np.max(y_labels - np.min(y_labels)), 4)
+                                 for k, v in self.virtual_track.cue_start_locations['y_position'].items()}
+                for i, (cue_name, cue_loc) in enumerate(cue_locations.items()):
+                    if turn == 'right':
+                        ax.axvline(cue_loc, linestyle='solid', color=self.colors['phase_dividers'], zorder=0,
+                                   linewidth=0.75)
+                track_fraction = (y_labels - np.min(y_labels)) / (np.max(y_labels) - np.min(y_labels))
+
+                # plot data
+                trajectory_mean = np.rad2deg(np.nanmean(np.array(y_position), 0))
+                trajectory_err = np.rad2deg(sem(np.array(y_position), 0))
+                ax[ax_id].plot(track_fraction, trajectory_mean, color=self.colors['trials'][type_id],
+                               linestyle=linestyle, label=update)
+                ax[ax_id].fill_between(track_fraction, trajectory_mean - trajectory_err,
+                                       trajectory_mean + trajectory_err, alpha=0.2,
+                                       color=self.colors['trials'][type_id])
+            ax.set(title=var_mapping[var]['title'], ylabel=var_mapping[var]['ylabel'],
+                   xlabel='fraction of track', xlim=(0, 1))
+        colors = [self.colors[t] for t in trajectory_df['update_type'].unique()]
+        rainbow_text(0.05, 0.85, trajectory_df['update_type'].unique(), colors, ax=ax, size=10)
+
+        handles, labels = ax.get_legend_handles_labels()
+        which_handles = np.where(np.array(labels) == 'delay only')[0]
+        handles, labels = np.array([[handles[i], turn] for i, turn in zip(which_handles,
+                                                                          trajectory_df['turn_type'].unique())]).T
+        ax.legend(list(handles), list(labels), loc='lower left')
 
         return sfig
 
@@ -185,7 +240,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
             # plot data
             trajectory_mean = np.rad2deg(np.nanmean(np.array(y_position), 0))
             trajectory_err = np.rad2deg(sem(np.array(y_position), 0))
-            ax.plot(track_fraction, trajectory_mean, color=self.colors['trials'][ax_id], linestyle=linestyle)
+            ax.plot(track_fraction, trajectory_mean, color=self.colors['trials'][ax_id], linestyle=linestyle, label=update)
             ax.fill_between(track_fraction, trajectory_mean - trajectory_err, trajectory_mean + trajectory_err,
                             alpha=0.2, color=self.colors['trials'][ax_id])
 
@@ -194,6 +249,51 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                      cue_locations['delay2 cue'] - cue_locations['update cue']))
         colors = [self.colors[t] for t in trajectory_df['update_type'].unique()]
         rainbow_text(0.05, 0.85, trajectory_df['update_type'].unique(), colors, ax=ax, size=10)
+
+        handles, labels = ax.get_legend_handles_labels()
+        which_handles = np.where(np.array(labels) == 'delay only')[0]
+        handles, labels = np.array([[handles[i], turn] for i, turn in zip(which_handles,
+                                                                          trajectory_df['turn_type'].unique())]).T
+        ax.legend(list(handles), list(labels), loc='lower left')
+
+        return sfig
+
+    def plot_event_durations(self, sfig):
+        # get data
+        group_durations = pd.concat(self.group_df['event_durations'].to_list(), axis=0)
+        durations = (group_durations
+                     .assign(sample_to_choice=lambda x: np.nansum([x['delay1'], x['delay2'], x['update']], axis=0))
+                     .assign(delay1=lambda x: [np.nan if u == 1 else d for d, u in zip(x['delay1'], x['update_type'])])
+                     .melt(var_name='event', value_name='duration', id_vars='update_type',
+                           value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'sample_to_choice', 'total_trial'])
+                     .dropna(subset='duration', axis=0)
+                     .assign(update_type=lambda x: x['update_type'].map({1: 'delay only', 2: 'switch', 3: 'stay'}))
+                     .assign(event=lambda x: x['event'].map({'initial_cue': 'sample',
+                                                             'delay1': '1st delay',
+                                                             'update': 'update',
+                                                             'delay2': '2nd delay',
+                                                             'sample_to_choice': 'sample to choice',
+                                                             'total_trial': 'total trial'})))
+
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[1, 4]))
+
+        # plot total trial duration
+        sns.boxplot(data=durations.query('event == "total trial"'), x='update_type', y='duration', ax=ax[0], width=0.5,
+                    palette=self.colors['trials'], medianprops={'color': 'white'}, showfliers=False)
+        ax[0].set(title='Total trial length', ylabel='duration (s)', xlabel='')
+        ax[0].set_xticklabels(ax[0].get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
+
+        # breakdown by task phase
+        sns.boxplot(data=durations.query('event not in ["total trial"]'), x='event', y='duration', hue='update_type',
+                    ax=ax[1], width=0.5, palette=self.colors['trials'], medianprops={'color': 'white'},
+                    showfliers=False, order=['sample', 'sample to choice', '1st delay', 'update', '2nd delay'])
+        ax[1].set(title='Event lengths', ylabel='duration (s)')
+        ax[1].get_legend().remove()
+        colors = [self.colors[t] for t in durations['update_type'].unique()]
+        rainbow_text(0.85, 0.85, durations['update_type'].unique(), colors, ax=ax[1], size=10)
+
+        for a in ax:
+            clean_box_plot(a, labelcolors=[self.colors['nan']] * len(durations['event'].unique()))
 
         return sfig
 
@@ -365,7 +465,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
             fig.suptitle(f'Aligned data')
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'aligned_data_{var}', results_type=self.results_type)
 
-    def plot_event_durations(self):
+    def plot_all_event_durations(self, ):
         group_durations = pd.concat(self.group_df['event_durations'].to_list(), axis=0)
         durations = pd.melt(group_durations, var_name='event', value_name='duration', id_vars='update_type',
                             value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'total_trial'])
@@ -382,7 +482,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                 .add(so.Dots(marker="o", pointsize=10, fillalpha=1), so.Agg())
                 .add(so.Range(), so.Est(errorbar="sd"))
                 .share(y=True)
-                .theme(rcparams)
+                .theme(self.rcparams)
                 .on(fig)
                 .plot()
         )
