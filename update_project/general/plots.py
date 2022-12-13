@@ -1,6 +1,7 @@
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import warnings
 
 from matplotlib.transforms import Affine2D, offset_copy
@@ -40,6 +41,49 @@ def clean_plot(fig, axes, tight_layout):
 
     fig.align_labels()
 
+
+def clean_box_plot(ax, labelcolors=None):
+    box_patches = [patch for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
+    colors = [patch.get_facecolor() for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
+    colors = colors * int(len(box_patches) / len(colors))
+    lines_per_boxplot = len(ax.lines) // len(box_patches)
+    for i, (box, color) in enumerate(zip(box_patches, colors)):
+        box.set_edgecolor(color)
+        for line in ax.lines[i * lines_per_boxplot: (i + 1) * lines_per_boxplot]:
+            if line.get_color() != 'white':  # leave the median white
+                line.set_color(color)
+
+    if labelcolors:
+        colors = labelcolors  # get new list of colors if different labelcolors provided
+
+    for ticklabel, color in zip(ax.get_xticklabels(), colors):
+        ticklabel.set_color(color)
+
+    return ax
+
+def add_task_phase_lines(ax, cue_locations=dict(), text_brackets=False):
+    name_remapping = {'initial cue': 'sample', 'delay cue': 'delay', 'update cue': 'update',
+                      'delay2 cue': 'delay'}
+    cue_details = dict()
+    for i, cue_loc in enumerate([*list(cue_locations.values()), 1][1:]):
+        cue_name = list(cue_locations.keys())[i]
+        cue_details[cue_name] = dict(middle=(cue_loc + list(cue_locations.values())[i]) / 2,
+                                     start=list(cue_locations.values())[i], end=cue_loc,
+                                     label=name_remapping[cue_name])
+    for i, (cue_name, cue_loc) in enumerate(cue_locations.items()):
+        ax.axvline(cue_loc, linestyle='solid', color='#ececec', zorder=0, linewidth=0.75)
+
+    if text_brackets:
+        for cue_name, cue_loc in cue_details.items():
+            ax.text(cue_details[cue_name]['middle'], 0.95, cue_details[cue_name]['label'], ha='center',
+                           va='bottom', transform=ax.get_xaxis_transform(), fontsize=7)
+            ax.annotate('', xy=(cue_details[cue_name]['start'], 0.925),
+                               xycoords=ax.get_xaxis_transform(),
+                               xytext=(cue_details[cue_name]['end'], 0.925),
+                               textcoords=ax.get_xaxis_transform(),
+                               arrowprops=dict(arrowstyle='|-|, widthA=0.15, widthB=0.15', shrinkA=1, shrinkB=1, lw=1),
+                               ha='left', rotation=30)
+    return ax
 
 def get_limits_from_data(data, balanced=True):
     mins = []
@@ -85,10 +129,12 @@ def get_color_theme():
         color_theme_dict[key] = '#178761'  # green - 152 in degrees, 95 saturation, 50 light (was 60)
     for key in ['initial', 'initial_stay', 'stay_update']:
         color_theme_dict[key] = '#2459bd'  # blue - 258 degrees, 85 saturation, 40 light
-        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#2459bd', as_cmap=True)  # start at dark blue (30 light)
+        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#2459bd',
+                                                            as_cmap=True)  # start at dark blue (30 light)
     for key in ['new', 'switch_update']:
         color_theme_dict[key] = '#b01e70'  # pink - 345 degrees, 90 saturation, 40 light (was 30, testing out)
-        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#b01e70', as_cmap=True)  # start at dark pink (30 light)
+        color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#b01e70',
+                                                            as_cmap=True)  # start at dark pink (30 light)
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['cmap_r'] = sns.color_palette("rocket", as_cmap=True)
@@ -99,12 +145,14 @@ def get_color_theme():
     color_theme_dict['general'] = sns.color_palette("husl", 10)
     color_theme_dict['trials'] = [color_theme_dict['non_update'], color_theme_dict['switch_trials'],
                                   color_theme_dict['stay_trials']]
+    color_theme_dict['choice_commitment'] = sns.light_palette("#9119cf", 5)  # 285 degrees, 95 saturation, 40 light
 
     return color_theme_dict
 
 
-def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True, show_median=True,
-                       palette=None, histstat='proportion',):
+def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel, title, stripplot=True,
+                       show_median=True,
+                       palette=None, histstat='proportion', ):
     if group:
         palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
         if len(palette) > len(data[group].unique()):
@@ -144,11 +192,12 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
                                                   palette=palette)
     plt.setp(axes[row_ids[2]][col_ids[2]].collections, alpha=.25)
     if stripplot:
-        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]], palette=palette)
+        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],
+                      palette=palette)
     axes[row_ids[2]][col_ids[2]].set_title(title)
 
 
-def plot_scatter_with_distributions(data, x, y, hue, kind='scatter',fig=None, title=None,
+def plot_scatter_with_distributions(data, x, y, hue, kind='scatter', fig=None, title=None,
                                     plt_kwargs={'alpha': 0.5, 'palette': sns.color_palette('mako')}):
     """
     based on this example: https://gist.github.com/LegrandNico/2b201863dc7ae28d568573c66047dd86
@@ -170,7 +219,7 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter',fig=None, ti
                                               'height_ratios': [0.2, 0.8]})
     else:
         axes = fig.subplots(nrows=2, ncols=2, gridspec_kw={'wspace': 0, 'hspace': -0, 'width_ratios': [0.8, 0.2],
-                                              'height_ratios': [0.2, 0.8]})
+                                                           'height_ratios': [0.2, 0.8]})
     ax_joint = axes[1][0]
     ax_marg_x = axes[0][0]
     ax_marg_y = axes[1][1]
@@ -196,9 +245,10 @@ def plot_scatter_with_distributions(data, x, y, hue, kind='scatter',fig=None, ti
     bin_range = [-hist_range / 2, hist_range / 2]
 
     # setup diagonal histogram
-    transform = Affine2D().scale(diag_plot_extent/(1.5*hist_range*np.sqrt(2)), 1/np.sqrt(2)).rotate_deg(-45)
+    transform = Affine2D().scale(diag_plot_extent / (1.5 * hist_range * np.sqrt(2)), 1 / np.sqrt(2)).rotate_deg(-45)
     helper = floating_axes.GridHelperCurveLinear(transform, extremes=plot_extents, grid_locator1=MaxNLocator(4))
-    inset = floating_axes.FloatingAxes(fig, [dist_from_corner, dist_from_corner, hist_size, hist_size], grid_helper=helper)
+    inset = floating_axes.FloatingAxes(fig, [dist_from_corner, dist_from_corner, hist_size, hist_size],
+                                       grid_helper=helper)
     bar_ax = inset.get_aux_axes(transform)
     fig.add_axes(inset)
 
@@ -302,4 +352,4 @@ def rainbow_text(x, y, strings, colors, orientation='stacked',
                 offset_copy(Affine2D(), fig=fig, x=0, y=ex.height)
         elif orientation == 'stacked':
             t = text.get_transform() + \
-                offset_copy(Affine2D(), fig=fig, x=0, y=-ex.height*0.5)  # adjust to make gap smaller
+                offset_copy(Affine2D(), fig=fig, x=0, y=-ex.height * 0.5)  # adjust to make gap smaller
