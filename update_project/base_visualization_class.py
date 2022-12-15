@@ -27,6 +27,13 @@ class BaseVisualizationClass(ABC):
                                            correct=[[0], [1]])
         self.data_comparisons = dict(update_type=dict(update_type=['switch', 'stay', 'non_update'], correct=[1]),
                                      correct=dict(update_type=['switch'], correct=[0, 1]))
+        self.plot_group_comparisons_full = dict(update_type=dict(update_type=['switch', 'stay', 'non_update'],
+                                                                 turn_type=[1, 2], correct=[1],
+                                                                 time_label=['t_update']),
+                                                correct=dict(update_type=['switch'], turn_type=[1, 2], correct=[1, 0],
+                                                             time_label=['t_update']))
+        self.label_maps = dict(update_type=dict(switch='switch', stay='stay', non_update='delay only'),
+                               correct={1: 'correct', 0: 'incorrect'})
 
     @abstractmethod
     def plot(self):

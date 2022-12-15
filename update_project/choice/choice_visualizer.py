@@ -14,6 +14,7 @@ from update_project.base_visualization_class import BaseVisualizationClass
 
 rng = np.random.default_rng(12345)
 
+
 class ChoiceVisualizer(BaseVisualizationClass):
 
     def __init__(self, data, session_id=None, grid_search=False, target_var='choice'):
@@ -84,9 +85,15 @@ class ChoiceVisualizer(BaseVisualizationClass):
             trials = np.stack(indiv_mat.to_numpy()).T[:, random_samples]
 
             linestyle = 'solid' if g_name == 'right' else 'dashed'
-            ax[0].plot(pos_bins, trials, color=self.colors[g_name], linestyle=linestyle, alpha=0.5)
+            ax[0].plot(pos_bins, trials, color=self.colors[g_name], linestyle=linestyle, alpha=0.5, label=g_name)
         ax[0] = add_task_phase_lines(ax[0], cue_locations=cue_fractions, text_brackets=True)
         ax[0].set(title=f'Example trials', xlabel='fraction of track', ylabel='p(right choice)', ylim=(0, 1.1))
+
+        handles, labels = ax[0].get_legend_handles_labels()
+        which_handles = [np.where(np.array(labels) == t)[0][0] for t in trial_performance['target'].unique()]
+        handles, labels = np.array([[handles[i], labels[i]] for i in which_handles]).T
+        [h.set_alpha(1) for h in handles]
+        ax[0].legend(list(handles), list(labels), loc='lower left')
 
         # plot session averages
         sns.boxplot(cue_performance, x='cue', y='log_likelihood', ax=ax[1], width=0.5, medianprops={'color': 'white'},
