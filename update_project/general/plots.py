@@ -117,10 +117,9 @@ def get_color_theme():
     color_theme_dict['right_cmap'] = sns.light_palette(color_theme_dict['right'], as_cmap=True)
     color_theme_dict['left_right_cmap_div'] = sns.diverging_palette(250, 12, s=95, l=60, as_cmap=True)
 
-    color_theme_dict['error'] = '#a150db'  # 285 degrees, 75 saturation, 50 light
     color_theme_dict['phase_dividers'] = '#ececec'
 
-    for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all', 'delay only']:
+    for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all', 'delay only', 'correct']:
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#000000', as_cmap=True)
     for key in ['switch_trials', 'switch']:
@@ -135,6 +134,8 @@ def get_color_theme():
         color_theme_dict[key] = '#b01e70'  # pink - 345 degrees, 90 saturation, 40 light (was 30, testing out)
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#b01e70',
                                                             as_cmap=True)  # start at dark pink (30 light)
+    for key in ['error', 'incorrect']:
+        color_theme_dict[key] = '#bc1026'  # 10 degrees, 95 saturation, 40 light
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['cmap_r'] = sns.color_palette("rocket", as_cmap=True)
