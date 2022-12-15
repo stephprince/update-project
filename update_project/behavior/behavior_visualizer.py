@@ -91,7 +91,9 @@ class BehaviorVisualizer(BaseVisualizationClass):
         ax = sfig.subplots(nrows=1, ncols=1)
         sns.boxplot(data=df_by_bin, x='trial type', y='proportion correct', hue='animal', ax=ax, width=0.5,
                     palette=self.colors['animals'], medianprops={'color': 'white'}, showfliers=False)
-        clean_box_plot(ax)
+        clean_box_plot(ax, labelcolors=[self.colors[c] for c in df_by_bin['trial type'].unique()])
+        ax.get_legend().remove()
+        rainbow_text(0.85, 0.85, df_by_bin['animal'].unique(), self.colors['animals'], ax=ax, size=10)
 
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance per animal', xlabel=None, ylim=(0, 1))
@@ -165,46 +167,52 @@ class BehaviorVisualizer(BaseVisualizationClass):
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
-        var_mapping = dict(x_position=dict(title='lateral position', ylabel='fraction of lateral distance'),
-                           rotational_velocity=dict(title='rotational velocity', ylabel='roll (a.u.'),
-                           translational_velocity=dict(title='forward velocity', ylabel='pitch (a.u.)'))
+        var_mapping = dict(x_position=dict(title='lateral position', ylabel='fraction of lateral distance', norm=60),
+                           rotational_velocity=dict(title='rotational velocity', ylabel='roll (a.u.)', norm=False),
+                           translational_velocity=dict(title='forward velocity', ylabel='pitch (a.u.)', norm=False),)
 
         # plot data
-        ax = sfig.subplots(nrows=3, ncols=3)
+        ax = sfig.subplots(nrows=3, ncols=1, sharex=True)
         for ax_id, var in enumerate(vars):
             for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
                 type_id = np.argwhere(trajectory_df['update_type'].unique() == update)[0][0]
                 linestyle = 'dotted' if turn == 'right' else 'solid'
 
                 # transform y data to fraction of track
-                y_position = pd.DataFrame(list(group[var]))
-                y_labels = y_position.columns.mid.values  # TODO - check same across animals
+                var_df = pd.DataFrame(list(group[var]))
+                y_labels = var_df.columns.mid.values  # TODO - check same across animals
                 cue_locations = {k: np.round((v - np.min(y_labels)) / np.max(y_labels - np.min(y_labels)), 4)
                                  for k, v in self.virtual_track.cue_start_locations['y_position'].items()}
                 for i, (cue_name, cue_loc) in enumerate(cue_locations.items()):
                     if turn == 'right':
-                        ax.axvline(cue_loc, linestyle='solid', color=self.colors['phase_dividers'], zorder=0,
+                        ax[ax_id].axvline(cue_loc, linestyle='solid', color=self.colors['phase_dividers'], zorder=0,
                                    linewidth=0.75)
                 track_fraction = (y_labels - np.min(y_labels)) / (np.max(y_labels) - np.min(y_labels))
 
+                if var_mapping[var]['norm']:
+                    mat = np.array(var_df) / var_mapping[var]['norm']
+                else:
+                    mat = np.array(var_df)
+
                 # plot data
-                trajectory_mean = np.rad2deg(np.nanmean(np.array(y_position), 0))
-                trajectory_err = np.rad2deg(sem(np.array(y_position), 0))
+                trajectory_mean = np.nanmean(mat, 0)
+                trajectory_err = sem(mat, 0)
                 ax[ax_id].plot(track_fraction, trajectory_mean, color=self.colors['trials'][type_id],
                                linestyle=linestyle, label=update)
                 ax[ax_id].fill_between(track_fraction, trajectory_mean - trajectory_err,
                                        trajectory_mean + trajectory_err, alpha=0.2,
                                        color=self.colors['trials'][type_id])
-            ax.set(title=var_mapping[var]['title'], ylabel=var_mapping[var]['ylabel'],
+            ax[ax_id].set(title=var_mapping[var]['title'], ylabel=var_mapping[var]['ylabel'],
                    xlabel='fraction of track', xlim=(0, 1))
-        colors = [self.colors[t] for t in trajectory_df['update_type'].unique()]
-        rainbow_text(0.05, 0.85, trajectory_df['update_type'].unique(), colors, ax=ax, size=10)
 
-        handles, labels = ax.get_legend_handles_labels()
+        handles, labels = ax[0].get_legend_handles_labels()
         which_handles = np.where(np.array(labels) == 'delay only')[0]
         handles, labels = np.array([[handles[i], turn] for i, turn in zip(which_handles,
                                                                           trajectory_df['turn_type'].unique())]).T
-        ax.legend(list(handles), list(labels), loc='lower left')
+        ax[0].legend(list(handles), list(labels), loc='lower left')
+
+        colors = [self.colors[t] for t in trajectory_df['update_type'].unique()]
+        rainbow_text(0.05, 0.85, trajectory_df['update_type'].unique(), colors, ax=ax[0], size=10)
 
         return sfig
 
