@@ -37,10 +37,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
             tags = "_".join([str(n) for n in g_name])
             kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
-            self.plot_theta_data(data, kwargs)
+            # self.plot_theta_data(data, kwargs)
             # self.plot_group_aligned_stats(data, **kwargs)
             self.plot_group_aligned_comparisons(data, **kwargs)
-            self.plot_performance_comparisons(data, tags=tags)
+            # self.plot_performance_comparisons(data, tags=tags)
 
             # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
             for plot_types in list(itertools.product(*self.plot_groups.values())):
@@ -51,19 +51,19 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 # self.plot_scatter_dists_around_update(data, **kwargs)
                 # self.plot_trial_by_trial_around_update(data, **kwargs)
 
-        #  make plots with both brain regions
-        self.plot_multiregional_data()
-        self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
-        self.plot_all_groups_error(main_group=group_names, sub_group='animal')
-        self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
-        self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
-
         # plot model metrics (comparing parameters across brain regions and features)
         for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
             self.plot_group_confusion_matrices(data, name, )
             self.plot_tuning_curves(data, name, )
             self.plot_all_confusion_matrices(data, name)
             self.plot_parameter_comparison(data, name, thresh_params=True)
+
+        #  make plots with both brain regions
+        self.plot_multiregional_data()
+        self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
+        self.plot_all_groups_error(main_group=group_names, sub_group='animal')
+        self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
+        self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
     def plot_decoding_output_heatmap(self, sfig):
         # load up data
@@ -83,7 +83,12 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
         bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
                   for b in trial_data['bound_values'].unique()]
-        bounds = [(track_fraction[0], bounds[0][0]), *bounds]
+        if aligned_data['feature_name'].values[0] == 'choice':  # if bounds are on ends of track, make home between
+            bounds = [(bounds[0][1], bounds[1][0]), *bounds]
+            ylabel = 'p(new choice)'
+        else:
+            bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+            ylabel = 'fraction of track'
 
         # plot figure
         ax = sfig.subplots(nrows=1, ncols=1)
@@ -104,7 +109,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             cbar.ax.set_title(label, fontsize=8, ha='center')
             for line in b:
                 ax.axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75,)
-        ax.plot(time_bins, true_feat, color=self.colors['switch'], linestyle='dotted', linewidth=0.75,
+        ax.plot(time_bins, true_feat, color=self.colors['switch'], linestyle='dotted', linewidth=1,
                 label='actual position')
 
         # plot edge spaces in track
@@ -113,7 +118,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             ax.axhspan(*s, color='white', edgecolor=None,)
         ax.axvline(0, color='k', linestyle='dashed', alpha=0.5)
 
-        ax.set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
+        ax.set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
                xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
         ax.set_title('switch', color=self.colors['switch'])
         ax.legend(loc='lower right', labelcolor='linecolor')
@@ -121,22 +126,22 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_goal_coding(self, sfig):
+    def plot_goal_coding(self, sfig, comparison='update_type'):
         # load up data
-        plot_groups = dict(update_type=['switch', 'stay', 'non_update'], turn_type=[1, 2], correct=[1],
-                           time_label=['t_update'])
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        label_map = self.label_maps[comparison]
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value='prob_sum')
-        label_map = dict(switch='switch', stay='stay', non_update='delay only')
+
         # plot figure
-        ax = sfig.subplots(nrows=1, ncols=3, sharey=True)
+        ax = sfig.subplots(nrows=1, ncols=len(label_map.keys()), sharey=True)
         for update, data in trial_data.groupby('update_type'):
             trial_mat = data.pivot(index=['choice', 'trial_index'], columns='times', values='prob_over_chance')
             new_mat = trial_mat.query('choice == "switch"').to_numpy()
             initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
             time_bins = trial_mat.columns.to_numpy()
 
-            ax_id = np.argwhere(np.array(['switch', 'stay', 'non_update']) == update)[0][0]
+            ax_id = np.argwhere(np.array(list(label_map.keys())) == update)[0][0]
             ax[ax_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'], label='new')
             ax[ax_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
                                    np.nanmean(new_mat, axis=0) - sem(new_mat), color=self.colors['new'], alpha=0.2)
@@ -156,10 +161,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_goal_coding_stats(self, sfig):
+    def plot_goal_coding_stats(self, sfig, comparison='update_type'):
         # get data
-        plot_groups = dict(update_type=['switch', 'stay', 'non_update'], turn_type=[1, 2], correct=[1],
-                           time_label=['t_update'])
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        label_map = self.label_maps[comparison]
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
                                                                        prob_value='prob_sum')
@@ -179,57 +184,56 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         diff_data[('initial_vs_new','')] = diff_data[('prob_over_chance_mean', 'initial')] - \
                                            diff_data[('prob_over_chance_mean', 'new')]
         diff_data = diff_data.droplevel(1, axis=1)
-        diff_data['update_type'] = diff_data['update_type'].map({'switch': 'switch', 'stay':'stay', 'non_update':'delay only'})
+        diff_data['update_type'] = diff_data['update_type'].map(label_map)
 
         # setup stats - group variables, pairs to compare, and levels of hierarchical data
         var = 'diff_baseline_mean'
         group = 'choice'
-        comp = 'update_type'
         group_list = data_for_stats['choice'].unique()
-        combos = list(itertools.combinations(plot_groups['update_type'], r=2))
+        combos = list(itertools.combinations(plot_groups[comparison], r=2))
         pairs = [((g, c[0]), (g, c[1], )) for c in combos for g in group_list]
         stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                       approaches=['traditional'], tests=['mann-whitney'])
-        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comp],
-                  pairs=pairs, filename=f'goal_coding_stats')
+        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],
+                  pairs=pairs, filename=f'goal_coding_stats_{comparison}')
 
         # plot data TODO - make this mixed effects models
         ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[2, 1]))
-        colors = [self.colors[t] for t in ['switch', 'stay', 'non_update']]
-        sns.boxplot(data=data_for_stats, x=group, y=var, hue=comp, ax=ax[0], width=0.5, showfliers=False,
-                    palette=colors, medianprops={'color': 'white'}, hue_order=['switch', 'stay', 'non_update'])
+        colors = [self.colors[t] for t in list(label_map.keys())]
+        sns.boxplot(data=data_for_stats, x=group, y=var, hue=comparison, ax=ax[0], width=0.5, showfliers=False,
+                    palette=colors, medianprops={'color': 'white'}, hue_order=list(label_map.values()))
         ax[0] = clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
         ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density from t={time_window[0]} to t={time_window[-1]}')
         ax[0].get_legend().remove()
-        rainbow_text(0.5, 0.9, ['switch', 'stay', 'delay only'], colors, ax=ax[0], size=8)
+        rainbow_text(0.5, 0.9, list(label_map.keys()), colors, ax=ax[0], size=8)
 
         # add stats annotations
         stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
                                           f'& variable == "{var}"')
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
-        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comp,
-                          hue_order=['switch', 'stay', 'non_update'])
-        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comp)
+        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+                          hue_order=list(label_map.keys()))
+        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison)
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
          .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
         # plot the difference between initial and new probabilities
-        sns.boxplot(data=diff_data, x=comp, y='initial_vs_new', ax=ax[1], width=0.5, showfliers=False,
-                    palette=colors, medianprops={'color': 'white'}, order=['switch', 'stay', 'delay only'])
+        sns.boxplot(data=diff_data, x=comparison, y='initial_vs_new', ax=ax[1], width=0.5, showfliers=False,
+                    palette=colors, medianprops={'color': 'white'}, order=list(label_map.values()))
         ax[1] = clean_box_plot(ax[1])
-        ax[1].set(xlabel='update type', ylabel=f'initial - new prob. density')
+        ax[1].set(xlabel=comparison, ylabel=f'initial - new prob. density')
 
-        combos = list(itertools.combinations(['switch', 'stay', 'delay only'], r=2))
+        combos = list(itertools.combinations(list(label_map.values()), r=2))
         diff_pairs = [((c[0],), (c[1],)) for c in combos]
-        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comp], pairs=diff_pairs, filename='goal_diff_stats')
+        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=diff_pairs, filename='goal_diff_stats')
         stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
                                           f'& variable == "initial_vs_new"')
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
-        annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comp, y='initial_vs_new',
-                          order=['switch', 'stay', 'delay only'])
-        annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comp, y='initial_vs_new')
+        annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
+                          order=list(label_map.values()))
+        annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new')
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
@@ -727,19 +731,19 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                     xmin, xmax = 0, 0.5
                 axes[0][col].axhspan(*s, color='#DDDDDD', edgecolor=None, xmin=xmin, xmax=xmax)
 
-            im_goal1 = axes[1][col].imshow(stay_mat, cmap=self.colors['stay_cmap'], aspect='auto', vmin=0, vmax=2.5,
+            im_goal1 = axes[1][col].imshow(stay_mat, cmap=self.colors['initial_cmap'], aspect='auto', vmin=0, vmax=2.5,
                                            origin='lower', extent=[im_times[0], im_times[-1], 0, np.shape(stay_mat)[0]])
-            im_goal2 = axes[2][col].imshow(switch_mat, cmap=self.colors['switch_cmap'], aspect='auto',
+            im_goal2 = axes[2][col].imshow(switch_mat, cmap=self.colors['new_cmap'], aspect='auto',
                                            vmin=0, vmax=2.5, origin='lower',
                                            extent=[im_times[0], im_times[-1], 0, np.shape(switch_mat)[0]], )
 
-            axes[3][col].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['switch'], label='switch')
+            axes[3][col].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['new'], label='new')
             axes[3][col].fill_between(times, np.nanmean(switch_mat, axis=0) + sem(switch_mat),
-                                      np.nanmean(switch_mat, axis=0) - sem(switch_mat), color=self.colors['switch'],
+                                      np.nanmean(switch_mat, axis=0) - sem(switch_mat), color=self.colors['new'],
                                       alpha=0.2)
-            axes[3][col].plot(times, np.nanmean(stay_mat, axis=0), color=self.colors['initial_stay'], label='initial')
+            axes[3][col].plot(times, np.nanmean(stay_mat, axis=0), color=self.colors['initial'], label='initial')
             axes[3][col].fill_between(times, np.nanmean(stay_mat, axis=0) + sem(stay_mat),
-                                      np.nanmean(stay_mat, axis=0) - sem(stay_mat), color=self.colors['initial_stay'],
+                                      np.nanmean(stay_mat, axis=0) - sem(stay_mat), color=self.colors['initial'],
                                       alpha=0.2)
             axes[3][col].axhline(1, linestyle='dashed', color='k', alpha=0.5)
             axes[0][col].set(ylim=(prob_lims[0], prob_lims[-1]), ylabel=param_data['feature_name'].values[0],
@@ -908,6 +912,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         fig, axes = plt.subplots(figsize=(22, 17), nrows=nrows, ncols=ncols, squeeze=False, sharey='row',
                                  constrained_layout=True)
         data.reset_index(drop=True, inplace=True)  # reset index so iteration through rows for each column
+        trial_lims = []
         for ind, v in data.iterrows():
             # load up data
             title = f'{"".join([f"{k}{f}" for k, f in filters.items()])}'
@@ -927,6 +932,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                               values='prob_over_chance')
             switch_mat = trial_mat.query('choice == "switch"').to_numpy()
             stay_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+            trial_lims.append(np.shape(switch_mat)[0])
             times = trial_mat.columns.to_numpy()
             im_times = (times[0] - np.diff(times)[0] / 2, times[-1] + np.diff(times)[0] / 2)
 
@@ -946,25 +952,25 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                     xmin, xmax = 0, 0.5
                 axes[0][ind].axhspan(*s, color='#DDDDDD', edgecolor=None, xmin=xmin, xmax=xmax)
 
-            im_goal1 = axes[1][ind].imshow(stay_mat, cmap=self.colors['stay_cmap'], aspect='auto', vmin=0,
+            im_goal1 = axes[1][ind].imshow(stay_mat, cmap=self.colors['initial_cmap'], aspect='auto', vmin=0,
                                            vmax=2.5,
                                            origin='lower',
                                            extent=[im_times[0], im_times[-1], 0, np.shape(stay_mat)[0]])
-            im_goal2 = axes[2][ind].imshow(switch_mat, cmap=self.colors['switch_cmap'], aspect='auto',
+            im_goal2 = axes[2][ind].imshow(switch_mat, cmap=self.colors['new_cmap'], aspect='auto',
                                            vmin=0, vmax=2.5, origin='lower',
                                            extent=[im_times[0], im_times[-1], 0, np.shape(switch_mat)[0]], )
 
-            axes[3][ind].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['switch'],
-                              label='switch')
+            axes[3][ind].plot(times, np.nanmean(switch_mat, axis=0), color=self.colors['new'],
+                              label='new')
             axes[3][ind].fill_between(times, np.nanmean(switch_mat, axis=0) + sem(switch_mat),
                                       np.nanmean(switch_mat, axis=0) - sem(switch_mat),
-                                      color=self.colors['switch'],
+                                      color=self.colors['new'],
                                       alpha=0.2)
-            axes[3][ind].plot(times, np.nanmean(stay_mat, axis=0), color=self.colors['initial_stay'],
+            axes[3][ind].plot(times, np.nanmean(stay_mat, axis=0), color=self.colors['initial'],
                               label='initial')
             axes[3][ind].fill_between(times, np.nanmean(stay_mat, axis=0) + sem(stay_mat),
                                       np.nanmean(stay_mat, axis=0) - sem(stay_mat),
-                                      color=self.colors['initial_stay'],
+                                      color=self.colors['initial'],
                                       alpha=0.2)
             axes[3][ind].axhline(1, linestyle='dashed', color='k', alpha=0.5)
             axes[0][ind].set(ylim=(prob_lims[0], prob_lims[-1]), ylabel=self.aggregator.group_df['feature'].values[0],
@@ -1001,6 +1007,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             axes[r][ind].legend(fontsize='large')
             for c in range(ncols):
                 axes[r][c].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                axes[1][c].set(ylim=(0, np.max(np.array(trial_lims))))
+                axes[2][c].set(ylim=(0, np.max(np.array(trial_lims))))
 
         fig.suptitle(title)
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_aligned_data', additional_tags=tags,
