@@ -18,11 +18,12 @@ from update_project.statistics.statistics import get_fig_stats, get_comparative_
 
 class BayesianDecoderAggregator:
 
-    def __init__(self, exclusion_criteria=None, align_times=None):
+    def __init__(self, exclusion_criteria=None, align_times=None, analyzer_name=None):
         self.exclusion_criteria = exclusion_criteria
         self.align_times = align_times or ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made']
         self.flip_trials_by_turn = True  # default false
         self.turn_to_flip = 2
+        self.analyzer_name = analyzer_name or 'analyzer'
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
         self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df', 'group_aligned_df'],  format='pkl'),
                                params=dict(vars=['exclusion_criteria', 'align_times', 'flip_trials_by_turn'], format='npz'))
@@ -32,36 +33,37 @@ class BayesianDecoderAggregator:
         self.window = window
         for sess_dict in data:
             # get aggregate data and add to session dictionary
-            bins = [[-1, 0, 1] if sess_dict['analyzer'].convert_to_binary else sess_dict['analyzer'].bins][0]
-            summary_df = self._summarize(sess_dict['analyzer'])
-            session_error = self._get_session_error(sess_dict['analyzer'], summary_df)
-            if hasattr(sess_dict['analyzer'].units_types, 'any'):
-                region = tuple(sess_dict['analyzer'].units_types.any()['region'])
+            bins = [[-1, 0, 1] if sess_dict[self.analyzer_name].convert_to_binary else sess_dict[self.analyzer_name].bins][0]
+            summary_df = self._summarize(sess_dict[self.analyzer_name])
+            session_error = self._get_session_error(sess_dict[self.analyzer_name], summary_df)
+            if hasattr(sess_dict[self.analyzer_name].units_types, 'any'):
+                region = tuple(sess_dict[self.analyzer_name].units_types.any()['region'])
             else:
-                region = tuple(sess_dict['analyzer'].units_types['region'])
-            session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict['analyzer'], window=window),
+                region = tuple(sess_dict[self.analyzer_name].units_types['region'])
+            session_aggregate_dict = dict(aligned_data=self._align_by_times(sess_dict[self.analyzer_name], window=window),
                                           summary_df=summary_df,
                                           confusion_matrix=self._get_confusion_matrix(summary_df, bins),
                                           confusion_matrix_sum=session_error['confusion_matrix_sum'],
                                           rmse=session_error['rmse'],
                                           raw_error=session_error['raw_error_median'],
                                           region=region,
-                                          feature=sess_dict['analyzer'].feature_names[0],
-                                          num_units=len(sess_dict['analyzer'].spikes),
-                                          num_trials=len(sess_dict['analyzer'].train_df),
-                                          excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer']),)
+                                          feature=sess_dict[self.analyzer_name].feature_names[0],
+                                          num_units=len(sess_dict[self.analyzer_name].spikes),
+                                          num_trials=len(sess_dict[self.analyzer_name].train_df),
+                                          excluded_session=self._meets_exclusion_criteria(sess_dict[self.analyzer_name]),)
             metadata_keys = ['bins', 'virtual_track', 'model', 'results_io', 'results_tags', 'convert_to_binary',
-                             'encoder_bin_num', 'decoder_bin_size',]
-            metadata_dict = {k: getattr(sess_dict['analyzer'], k) for k in metadata_keys}
-            if hasattr(sess_dict['analyzer'].encoder_bin_num, 'item'):
-                metadata_dict['encoder_bin_num'] = sess_dict['analyzer'].encoder_bin_num.item()
-                metadata_dict['decoder_bin_size'] = sess_dict['analyzer'].decoder_bin_size.item()
+                             'encoder_bin_num', 'decoder_bin_size', 'decoder_test_size']
+            metadata_dict = {k: getattr(sess_dict[self.analyzer_name], k) for k in metadata_keys}
+            if hasattr(sess_dict[self.analyzer_name].encoder_bin_num, 'item'):
+                metadata_dict['encoder_bin_num'] = sess_dict[self.analyzer_name].encoder_bin_num.item()
+                metadata_dict['decoder_bin_size'] = sess_dict[self.analyzer_name].decoder_bin_size.item()
+                metadata_dict['decoder_test_size'] = sess_dict[self.analyzer_name].decoder_test_size.item()
             sess_dict.update({**session_aggregate_dict, **metadata_dict})
 
         # get group dataframe
         group_df_raw = pd.DataFrame(data)
         self.group_df = group_df_raw[~group_df_raw['excluded_session']]  # only keep non-excluded sessions
-        self.group_df.drop('analyzer', axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
+        self.group_df.drop(self.analyzer_name, axis='columns', inplace=True)  # remove decoding section bc can't pickle h5py
 
         # get aligned dataframe:
         self.group_aligned_df = self._get_aligned_data(self.group_df)
@@ -459,7 +461,8 @@ class BayesianDecoderAggregator:
 
     @staticmethod
     def _get_aligned_data(param_data):
-        cols_to_keep = ['session_id', 'animal', 'region', 'bins', 'encoder_bin_num', 'decoder_bin_size', 'virtual_track', 'aligned_data']
+        cols_to_keep = ['session_id', 'animal', 'region', 'bins', 'encoder_bin_num', 'decoder_bin_size',
+                        'decoder_test_size', 'virtual_track', 'aligned_data']
         temp_data = param_data[cols_to_keep].explode('aligned_data').reset_index(drop=True)
         aligned_data = pd.json_normalize(temp_data['aligned_data'], max_level=0).drop(['stats'], axis='columns')
         aligned_data_df = pd.concat([temp_data, aligned_data], axis=1)
