@@ -19,17 +19,20 @@ from update_project.base_analysis_class import BaseAnalysisClass
 class BayesianDecoderAnalyzer(BaseAnalysisClass):
     def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
         # setup parameters
+        self.region = params.get('region', ['CA1', 'PFC'])
         self.units_types = params.get('units_types',
-                                      dict(region=['CA1', 'PFC'],  # dict of filters to apply to units table
+                                      dict(region=self.region,  # dict of filters to apply to units table
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
         self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.decoder_test_size = params.get('decoder_test_size', 0.2)  # prop of trials for testing on train/test split
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1],  # TODO - test and then replace
-                                                                          correct=[0, 1]))  # trial filters
+                                                                          correct=[0, 1],
+                                                                          maze_id=[3, 4]))  # trial filters
         self.encoder_bin_num = params.get('encoder_bin_num', 50)  # number of bins to build encoder
-        self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],
-                                                                          correct=[0, 1]))  # trial filters
+        self.decoder_trial_types = params.get('decoder_trial_types', dict(update_type=[1, 2, 3],  # TODO - test and replace
+                                                                          correct=[0, 1],
+                                                                          maze_id=[4]))  # trial filters
         self.decoder_bin_type = params.get('decoder_bin_type', 'time')  # time or theta phase to use for decoder
         self.decoder_bin_size = params.get('decoder_bin_size', 0.2)  # time to use for decoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
@@ -234,14 +237,20 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         # get encoder/training data times
         mask = pd.concat([self.trials[k].isin(v) for k, v in self.encoder_trial_types.items()], axis=1).all(axis=1)
         encoder_trials = self.trials[mask]
-        train_data, test_data = train_test_split(encoder_trials, test_size=self.decoder_test_size,
-                                                 random_state=random_state)
-        train_df = train_data.sort_index()
 
         # get decoder/testing data times (decoder conditions + remove any training data)
         mask = pd.concat([self.trials[k].isin(v) for k, v in self.decoder_trial_types.items()], axis=1).all(axis=1)
         decoder_trials = self.trials[mask]
-        test_df = decoder_trials[~decoder_trials.index.isin(train_df.index)]  # remove any training data
+
+        # split if needed
+        if self.decoder_test_size == 1:
+            train_df = encoder_trials
+            test_df = decoder_trials
+        else:
+            train_data, test_data = train_test_split(encoder_trials, test_size=self.decoder_test_size,
+                                                     random_state=random_state)
+            train_df = train_data.sort_index()
+            test_df = decoder_trials[~decoder_trials.index.isin(train_df.index)]  # remove any training data
 
         # check that split is ok for binarized data, run different random states until it is
         if self.convert_to_binary and not self._train_test_split_ok(train_df, test_df):
