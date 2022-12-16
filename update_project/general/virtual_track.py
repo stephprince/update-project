@@ -40,6 +40,8 @@ class VirtualTrack:
         left_arm_min = np.round(position_df.query('track_segment_id == 1')['linear_position'].min())
         right_arm_max = np.round(position_df.query('track_segment_id == 2')['linear_position'].max())
         right_arm_min = np.round(position_df.query('track_segment_id == 2')['linear_position'].min())
+        if right_arm_max < 379:
+            right_arm_max = 380  # catch for one session where value never reaches actual maximum (likely bc lat-travel)
         self.cue_end_locations['y_position'].update(dict(left_arm=left_arm_max, right_arm=right_arm_max))
 
         # set choice boundaries so left/right sides are equal
