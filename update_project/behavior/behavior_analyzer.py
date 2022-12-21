@@ -21,7 +21,7 @@ class BehaviorAnalyzer(BaseAnalysisClass):
         self.analog_vars = params.get('analog_vars', ['rotational_velocity', 'translational_velocity', 'licks'])
         self.maze_ids = params.get('maze_ids', [4])  # which virtual environments to use for analysis
         self.position_bins = params.get('position_bins', 50)  # number of bins to use for virtual track
-        self.trial_window = params.get('trial_window', 20)  # number of trials to use for rolling calculations
+        self.trial_window = params.get('trial_window', 15)  # number of trials to use for rolling calculations
         self.align_window_start = params.get('align_window_start', -5)  # seconds to add before/after aligning window
         self.align_window_stop = params.get('align_window_stop', 5)  # seconds to add before/after aligning window
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made',

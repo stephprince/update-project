@@ -53,7 +53,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                        pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
-                                 .query('type == "binned"')
+                                 .query('type == "rolling"')
                                  .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
                                                                                   'switch_update': 'switch',
                                                                                   'stay_update': 'stay'}))
@@ -80,7 +80,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                        pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
-                                 .query('type == "binned"')
+                                 .query('type == "rolling"')
                                  .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
                                                                                   'switch_update': 'switch',
                                                                                   'stay_update': 'stay'}))
