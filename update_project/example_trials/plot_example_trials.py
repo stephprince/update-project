@@ -16,8 +16,8 @@ feature = 'y_position'
 regions = [['CA1'], ['PFC']]
 exclusion_criteria = dict(units=50, trials=50)  # higher than others bc just plotting examples and both PFC + HPC
 overwrite = True
-align_window = 5
-align_times = ['t_update']
+single_unit_params = dict(align_window=2.5, align_times=['t_update'])
+decoding_params = dict(encoder_bin_num=50, decoder_bin_size=0.025, decoder_test_size=1)
 
 group_data = []
 for name in session_names:
@@ -26,16 +26,18 @@ for name in session_names:
     nwbfile = io.read()
 
     for reg in regions:
-        unit_types = dict(region=reg, cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron'])
+        decoding_params.update(units_types=dict(region=reg,
+                                               cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
+        single_unit_params.update(units_types=dict(region=reg,
+                                               cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
 
         # load existing data
         analyzer = SingleUnitAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), feature=feature,
-                                      params=dict(align_window=align_window, align_times=align_times,
-                                                  units_types=unit_types))
+                                      params=single_unit_params)
         analyzer.run_analysis(overwrite=overwrite, export_data=False)  # don't use existing data but also don't save it
 
         decoder = BayesianDecoderAnalyzer(nwbfile=nwbfile, session_id=session_db.get_session_id(name), features=[feature],
-                                          params=dict(units_types=unit_types))
+                                          params=decoding_params)
         decoder.run_analysis(export_data=False)
 
         # save to group output
@@ -47,7 +49,7 @@ for name in session_names:
                             feature_name=feature)
         group_data.append(session_data)
 
-visualizer = ExampleTrialVisualizer(group_data, exclusion_criteria=exclusion_criteria, align_window=align_window,
-                                    align_times=align_times)
+visualizer = ExampleTrialVisualizer(group_data, exclusion_criteria=exclusion_criteria, align_window=single_unit_params['align_window'],
+                                    align_times=single_unit_params['align_times'])
 group_data = []  # clear out memory
-visualizer
+visualizer.plot()

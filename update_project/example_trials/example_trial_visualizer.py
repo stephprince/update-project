@@ -14,13 +14,13 @@ from update_project.general.plots import get_color_theme
 from update_project.example_trials.example_trial_aggregator import ExampleTrialAggregator
 from update_project.single_units.psth_visualizer import show_psth_raster
 
-plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
+plt.style.use(Path(__file__).parent.parent / 'general' / 'prince-paper.mplstyle')
 rcparams = mpl.rcParams
 
 
 class ExampleTrialVisualizer:
 
-    def __init__(self, data, exclusion_criteria=None, align_window=10, align_times=['t_update']):
+    def __init__(self, data, exclusion_criteria=None, align_window=10, align_times=['t_update'], both_regions=False):
         self.data = data
         self.colors = get_color_theme()
         self.virtual_track = data[0]['analyzer'].virtual_track
@@ -30,6 +30,7 @@ class ExampleTrialVisualizer:
                                 turn_type=[[1, 2]],
                                 correct=[[0], [1]])
         self.n_example_trials = 10
+        self.both_regions = both_regions  # only plot session if it has data from both regions
 
         self.exclusion_criteria = exclusion_criteria
         self.aggregator = ExampleTrialAggregator()
@@ -52,7 +53,7 @@ class ExampleTrialVisualizer:
             trial_count = 0
 
             for g_name, g_data in data.groupby(['session_id', 'trial_id']):
-                if len(g_data['region'].unique()) == 2:
+                if not self.both_regions or (self.both_regions and len(g_data['region'].unique()) == 2):
                     if g_name[0] == prev_group:
                         trial_count += 1
                         if trial_count >= self.n_example_trials:
@@ -268,9 +269,7 @@ class ExampleTrialVisualizer:
 
             axes[ax_locs[r_name][3]].plot(decoding_times, gen_data['feature'].values[0], color='w', linestyle='dashed',
                                           label=f'true {feat}')
-            # axes[ax_locs[r_name][3]].plot(decoding_times, gen_data['decoding'].values[0], color='w',
-            #                               label=f'predicted {feat}')
-            axes[ax_locs[r_name][3]].plot(decoding_times, prob_lims[prob_map.argmax(axis=0)], color='w', label=f'predicted {feat}')
+            # axes[ax_locs[r_name][3]].plot(decoding_times, prob_lims[prob_map.argmax(axis=0)], color='w', label=f'predicted {feat}')
             plt.colorbar(im, ax=axes[ax_locs[r_name][3]], label='prob / chance', pad=0.01, fraction=0.046,
                          location='right')
             axes[ax_locs[r_name][3]].set(title=r_name, ylabel=gen_data['feature_name'].values[0])

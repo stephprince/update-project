@@ -23,7 +23,8 @@ class ExampleTrialAggregator:
 
         # get bayesian decoder aggregated data
         # note less trials in the decoder output bc some used for training the model and not included as output
-        self.decoder_agg = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria, align_times=align_times)
+        self.decoder_agg = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria, align_times=align_times,
+                                                     analyzer_name='decoder')
         self.decoder_agg.run_df_aggregation(data, window=align_window)
         decoding = self.decoder_agg.select_group_aligned_data(self.decoder_agg.group_aligned_df, self.plot_groups,
                                                                 ret_df=True)
