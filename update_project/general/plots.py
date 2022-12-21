@@ -7,6 +7,7 @@ import warnings
 from matplotlib.transforms import Affine2D, offset_copy
 import mpl_toolkits.axisartist.floating_axes as floating_axes
 from mpl_toolkits.axisartist.grid_finder import FixedLocator, MaxNLocator
+from matplotlib.collections import LineCollection
 
 
 def clean_plot(fig, axes, tight_layout):
@@ -136,6 +137,9 @@ def get_color_theme():
                                                             as_cmap=True)  # start at dark pink (30 light)
     for key in ['error', 'incorrect']:
         color_theme_dict[key] = '#bc1026'  # 10 degrees, 95 saturation, 40 light
+    for key in ['choice', 'choice_commitment']:
+        color_theme_dict[key] = sns.light_palette("#9119cf", 5)  # 285 degrees, 95 saturation, 40 light
+        color_theme_dict[f'{key}_cmap'] = sns.color_palette("blend:#d7c0e4,#6e119f", as_cmap=True)  # start at dark purple (30 light)
 
     color_theme_dict['cmap'] = sns.color_palette("rocket_r", as_cmap=True)
     color_theme_dict['cmap_r'] = sns.color_palette("rocket", as_cmap=True)
@@ -146,7 +150,6 @@ def get_color_theme():
     color_theme_dict['general'] = sns.color_palette("husl", 10)
     color_theme_dict['trials'] = [color_theme_dict['non_update'], color_theme_dict['switch_trials'],
                                   color_theme_dict['stay_trials']]
-    color_theme_dict['choice_commitment'] = sns.light_palette("#9119cf", 5)  # 285 degrees, 95 saturation, 40 light
 
     return color_theme_dict
 
@@ -354,3 +357,33 @@ def rainbow_text(x, y, strings, colors, orientation='stacked',
         elif orientation == 'stacked':
             t = text.get_transform() + \
                 offset_copy(Affine2D(), fig=fig, x=0, y=-ex.height * 0.5)  # adjust to make gap smaller
+
+
+def colorline(x, y, z=None, cmap=sns.color_palette('Greys'), norm=plt.Normalize(0.0, 1.0), linewidth=1,
+              linestyle='solid', alpha=1.0, label='', ax=plt.gca()):
+    '''
+    Plot a colored line with coordinates x and y
+    Optionally specify colors in the array z
+    Optionally specify a colormap, a norm function and a line width
+    '''
+
+    # Default colors equally spaced on [0,1]:
+    if z is None:
+        z = np.linspace(0.0, 1.0, len(x))
+
+    # Special case if a single number:
+    if not hasattr(z, "__iter__"):  # to check for numerical input -- this is a hack
+        z = np.array([z])
+
+    z = np.asarray(z)
+
+    # create list of line segments in correct format for line collection
+    points = np.array([x, y]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+    lc = LineCollection(segments, array=z, cmap=cmap, norm=norm, linewidth=linewidth, alpha=alpha, linestyle=linestyle,
+                        label=label)
+
+    ax.add_collection(lc)
+
+    return ax
