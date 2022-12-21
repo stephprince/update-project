@@ -3,7 +3,6 @@ import pickle
 import pandas as pd
 import pynapple as nap
 import warnings
-import more_itertools as mit
 
 from bisect import bisect, bisect_left
 from pathlib import Path
@@ -15,6 +14,7 @@ from update_project.general.results_io import ResultsIO
 from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
+from update_project.general.place_cells import get_place_fields, get_largest_field_loc
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.units import align_by_time_intervals as align_by_time_intervals_units
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
@@ -218,29 +218,9 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
 
         return self
 
-    @staticmethod
-    def _get_largest_field_loc(place_field_bool):
-        result = list(mit.run_length.encode(place_field_bool))
-        biggest_field = np.nanmax([count if f else np.nan for f, count in result])
-
-        field_ind = 0
-        largest_field_ind = np.nan
-        for f, count in result:
-            if f and (count == int(biggest_field)):
-                largest_field_ind = field_ind + 1
-            else:
-                field_ind = field_ind + count
-
-        return largest_field_ind
-
     def _get_goal_selectivity(self):
         if np.size(self.tuning_curves):
-            # get goal selective cells (cells with a place field in at least one of the choice locations)
-            place_field_thresholds = self.tuning_curves.apply(lambda x: x > (np.mean(x) + np.std(x)))
-            place_fields_2_bins = place_field_thresholds.rolling(window=2).mean() > 0.5
-            bins_shifted = place_fields_2_bins.shift(periods=-1, axis=0,)
-            bins_shifted.iloc[-1, :] = place_fields_2_bins.iloc[-1, :]
-            place_fields = np.logical_or(place_fields_2_bins, bins_shifted).astype(bool)
+            place_fields = get_place_fields(tuning_curves=self.tuning_curves)
 
             # get cells with place fields in goal arms but no fields in other parts of the track
             bounds_bool_1 = place_fields.apply(
@@ -267,7 +247,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
                                              left_index=True, right_index=True, how='left')
             self.goal_selectivity['unit_id'] = self.goal_selectivity.index
             self.goal_selectivity['place_field_threshold'] = self.tuning_curves.apply(lambda x: np.mean(x) + np.std(x))
-            self.goal_selectivity['place_field_peak_ind'] = place_fields.apply(lambda x: self._get_largest_field_loc(x),
+            self.goal_selectivity['place_field_peak_ind'] = place_fields.apply(lambda x: get_largest_field_loc(x),
                                                                                axis=0)
         else:
             self.goal_selectivity = pd.DataFrame()
