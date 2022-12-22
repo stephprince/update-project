@@ -24,15 +24,18 @@ from update_project.general.results_io import ResultsIO
 # report = importr('report')
 
 rng = np.random.default_rng(12345)
+new_line = '\n'
 
 class Stats:
-    def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None, nboot=1000):
+    def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None, units=None,
+                 nboot=1000):
         # setup defaults unless given otherwise
         self.levels = levels or ['animal', 'session_id']  # append levels needed (e.g., trials, units)
         self.approaches = approaches or ['bootstrap', 'traditional']  # 'summary' as other option
         self.tests = tests or ['direct_prob', 'mann-whitney']  # 'wilcoxon' as other option
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
         self.nboot = nboot  # number of iterations to perform for bootstrapping default should be 1000
+        self.units = units or 'trials'  # lowest hierarchical level of individual samples to use for description
         self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def run(self, df, dependent_vars=None, group_vars='group', pairs=None, filename=''):
@@ -135,6 +138,18 @@ class Stats:
     def _export_stats(self, filename):
         self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', format='csv')
         self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', format='csv')
+        # self.results_io.export_statistics(self._get_stats_text(), f'{filename}_text', format='txt')
+
+    def _get_stats_text(self):
+        descript_text = self.descript_df.apply(lambda x: self.series_to_text(x), axis=1)
+
+        return descript_text
+
+    def series_to_text(self, x):
+        text = f'{", ".join([x[v] for v in self.group_vars])}: {x["mean"]:.2f} ± {x["std"]:.2f}, ' \
+               f'n = {x["count"]:.0f} {self.units}, ' \
+               f'percentiles = {", ".join([f"{x:.2f}" for x in x.loc["min":"max"].to_list()])} {new_line}'
+        return text
 
     def _get_mixed_effects_model(self, data):
         data['predictor'] = data[self.group_vars].apply(tuple, axis=1)
