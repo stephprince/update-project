@@ -1,0 +1,32 @@
+animal,region,probe_or_shank,name,acronym,AP_location,DV_location,ML_location,avIndex
+S34,PFC,1,Infralimbic area layer 6a,ILA6a,1.81,3.79,0.77,251
+S34,PFC,2,Infralimbic area layer 6a,ILA6a,1.77,3.66,0.6,251
+S34,PFC,3,Infralimbic area layer 6a,ILA6a,1.8,3.73,-0.57,251
+S34,PFC,4,Infralimbic area layer 6a,ILA6a,1.83,3.46,-0.69,251
+S34,CA1,5,Field CA1,CA1,-1.58,1.61,-1.56,458
+S34,CA1,6,Field CA1,CA1,-1.65,1.72,-1.48,458
+S34,CA1,7,Field CA1,CA1,-1.88,1.58,1.32,458
+S34,CA1,8,Field CA1,CA1,-1.88,1.57,1.55,458
+S33,PFC,9,Infralimbic area layer 6a,ILA6a,1.74,3.49,-0.59,251
+S33,PFC,10,Infralimbic area layer 5,ILA5,1.74,3.45,-0.51,250
+S33,CA1,11,Field CA1,CA1,-2.32,1.51,-1.66,458
+S29,CA1,12,Field CA1,CA1,-1.78,1.78,-1.5,458
+S29,CA1,13,Field CA1,CA1,-1.78,1.72,-1.58,458
+S29,CA1,14,Field CA1,CA1,-1.52,1.72,1.37,458
+S29,CA1,15,Field CA1,CA1,-1.55,1.57,1.59,458
+S25,PFC,16,Prelimbic area layer 6a,PL6a,1.63,3.05,-0.74,244
+S25,PFC,17,Prelimbic area layer 2/3,PL2/3,1.62,2.89,0.25,242
+S25,PFC,18,Prelimbic area layer 1,PL1,1.62,2.74,0.15,240
+S25,CA1,19,Field CA1,CA1,-2.12,1.53,1.49,458
+S25,CA1,20,Field CA1,CA1,-2.13,1.4,1.59,458
+S20,PFC,21,Anterior cingulate area ventral part layer 5,ACAv5,1.38,3.41,-0.38,236
+S20,PFC,22,Anterior cingulate area ventral part layer 5,ACAv5,1.36,2.68,-0.58,236
+S20,CA1,23,Field CA1,CA1,-2.45,1.63,-1.26,458
+S20,CA1,24,Field CA1,CA1,-2.46,1.6,-1.35,458
+S17,PFC,25,Prelimbic area layer 6a,PL6a,2.02,2.94,-0.75,244
+S17,PFC,26,Anterior cingulate area dorsal part layer 6a,ACAd6a,2.02,2.52,-0.77,231
+S17,PFC,27,Prelimbic area layer 6a,PL6a,2,2.89,0.8,244
+S17,PFC,28,Anterior cingulate area dorsal part layer 6a,ACAd6a,1.91,2.64,0.99,231
+S17,CA1,29,Field CA1,CA1,-1.8,1.7,1.68,458
+S17,CA1,30,Field CA1,CA1,-2.1,1.87,-1.37,458
+S17,CA1,31,Field CA1,CA1,-2.1,1.84,-1.49,458
