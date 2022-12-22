@@ -14,6 +14,7 @@ from statannotations.Annotator import Annotator
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.general.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text, clean_box_plot
+from update_project.general.place_cells import get_place_fields, get_largest_field_loc
 from update_project.statistics.statistics import Stats
 from update_project.base_visualization_class import BaseVisualizationClass
 
@@ -54,7 +55,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # plot model metrics (comparing parameters across brain regions and features)
         for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
             self.plot_group_confusion_matrices(data, name, )
-            self.plot_tuning_curves(data, name, )
+            # self.plot_tuning_curves(data, name, )
             self.plot_all_confusion_matrices(data, name)
             self.plot_parameter_comparison(data, name, thresh_params=True)
 
@@ -65,9 +66,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
         self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
-    def plot_decoding_output_heatmap(self, sfig):
+    def plot_decoding_output_heatmap(self, sfig, update_type='switch'):
         # load up data
-        plot_groups = dict(update_type=['switch'], turn_type=[1, 2], correct=[1], time_label=['t_update'])
+        plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups)
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups, ret_df=True)
 
@@ -99,7 +100,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                          facecolor='white', alpha=0, transform=ax.get_yaxis_transform())
             clipping_masks[arm] = mask
             images[arm] = ax.imshow(prob_map, cmap=self.colors[f'{arm}_cmap'], aspect='auto',
-                                    origin='lower', vmin=0.02, vmax=0.056,
+                                    origin='lower', vmin=0.02, vmax=0.045,
                                     extent=[im_times[0], im_times[-1], track_fraction[0], track_fraction[-1]])
             images[arm].set_clip_path(clipping_masks[arm])
             ticks = None if arm == 'home' else []
@@ -109,7 +110,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             cbar.ax.set_title(label, fontsize=8, ha='center')
             for line in b:
                 ax.axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75,)
-        ax.plot(time_bins, true_feat, color=self.colors['switch'], linestyle='dotted', linewidth=1,
+        ax.plot(time_bins, true_feat, color=self.colors[update_type], linestyle='dotted', linewidth=1,
                 label='actual position')
 
         # plot edge spaces in track
@@ -120,13 +121,13 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         ax.set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
                xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
-        ax.set_title('switch', color=self.colors['switch'])
+        ax.set_title(self.label_maps['update_type'][update_type], color=self.colors[update_type])
         ax.legend(loc='lower right', labelcolor='linecolor')
         sfig.suptitle('Decoded position', fontsize=12)
 
         return sfig
 
-    def plot_goal_coding(self, sfig, comparison='update_type'):
+    def plot_goal_coding(self, sfig, comparison='update_type', groups=[], ylim=None):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
@@ -134,34 +135,53 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                        prob_value='prob_sum')
 
         # plot figure
-        ax = sfig.subplots(nrows=1, ncols=len(label_map.keys()), sharey=True)
-        for update, data in trial_data.groupby('update_type'):
-            trial_mat = data.pivot(index=['choice', 'trial_index'], columns='times', values='prob_over_chance')
+        nrows = 2 if groups else 1
+        ax = sfig.subplots(nrows=nrows, ncols=len(label_map.keys()), sharey=True, squeeze=False)
+        for comp, data in trial_data.groupby(comparison):
+            trial_mat = data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times', values='prob_sum')
             new_mat = trial_mat.query('choice == "switch"').to_numpy()
             initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
             time_bins = trial_mat.columns.to_numpy()
 
-            ax_id = np.argwhere(np.array(list(label_map.keys())) == update)[0][0]
-            ax[ax_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'], label='new')
-            ax[ax_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
-                                   np.nanmean(new_mat, axis=0) - sem(new_mat), color=self.colors['new'], alpha=0.2)
-            ax[ax_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'], label='initial')
-            ax[ax_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat),
-                                   np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=self.colors['initial'],
-                                   alpha=0.2)
-            ax[ax_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
-            ax[ax_id].set_title(label_map[update], color=self.colors[update])
-            # ax[ax_id].set(ylabel='prob. density', xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
-        sfig.suptitle('Goal arm representations', fontsize=12)
+            ax_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
+            if not groups:
+                ax[0][ax_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'])
+                ax[0][ax_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'])
+                ax[0][ax_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
+                                       np.nanmean(new_mat, axis=0) - sem(new_mat), color=self.colors['new'], alpha=0.2)
+                ax[0][ax_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat),
+                                       np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=self.colors['initial'],
+                                       alpha=0.2)
+                ax[0][ax_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                if ylim:
+                    ax[0][ax_id].set(ylim=ylim)
+            else:
+                color_map = {'switch': 'new', 'initial_stay': 'initial'}
+                for row_id, c in enumerate(['initial_stay', 'switch']):
+                    matrix = (data
+                              .query(f'choice == "{c}"')
+                              .groupby([*groups, 'times'])['diff_baseline']
+                              .mean().unstack().to_numpy())
+                    im = ax[row_id][ax_id].imshow(matrix, cmap=self.colors[f'{color_map[c]}_cmap'], vmin=0, vmax=0.2,
+                                                  aspect='auto', origin='lower',
+                                                  extent=[time_bins.min(), time_bins.max(), 0, np.shape(matrix)[0]], )
+                    ax[row_id][ax_id].axvline(0, color='k', linestyle='dashed')
+                    if ax_id == len(label_map.keys())-1:
+                        plt.colorbar(im, ax=ax[row_id][ax_id], pad=0.04, location='right', fraction=0.046,
+                                     label='Δ prob. density from t=0')
+            ax[0][ax_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
+
+        title = f'goal arm representations by {groups}' if groups else 'goal arm representations'
+        sfig.suptitle(title, fontsize=12)
         sfig.supylabel('prob. density', fontsize=10)
         sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
 
         colors = [self.colors[t] for t in ['initial', 'new']]
-        rainbow_text(0.05, 0.85, ['initial', 'new'], colors, ax=ax[0], size=10)
+        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][ax_id], size=6)
 
         return sfig
 
-    def plot_goal_coding_stats(self, sfig, comparison='update_type'):
+    def plot_goal_coding_stats(self, sfig, comparison='update_type', title=''):
         # get data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
@@ -173,24 +193,25 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         time_window = (0, 1.5)
         data_for_stats = (trial_data
                           .query(f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
-                          .groupby(groupby_cols)[['prob_over_chance', 'diff_baseline']]  # group by trial/trial type
+                          .groupby(groupby_cols)[['prob_sum', 'diff_baseline']]  # group by trial/trial type
                           .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                           .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
         data_for_stats.reset_index(inplace=True)
         data_for_stats['choice'] = data_for_stats['choice'].map({'initial_stay': 'initial', 'switch': 'new'})
+        data_for_stats[comparison] = data_for_stats[comparison].map(label_map)
         diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
-                                          values=['prob_over_chance_mean'])
+                                          values=['prob_sum_mean'])
                      .reset_index())
-        diff_data[('initial_vs_new','')] = diff_data[('prob_over_chance_mean', 'initial')] - \
-                                           diff_data[('prob_over_chance_mean', 'new')]
+        diff_data[('initial_vs_new','')] = diff_data[('prob_sum_mean', 'initial')] - \
+                                           diff_data[('prob_sum_mean', 'new')]
         diff_data = diff_data.droplevel(1, axis=1)
-        diff_data['update_type'] = diff_data['update_type'].map(label_map)
 
         # setup stats - group variables, pairs to compare, and levels of hierarchical data
         var = 'diff_baseline_mean'
         group = 'choice'
         group_list = data_for_stats['choice'].unique()
-        combos = list(itertools.combinations(plot_groups[comparison], r=2))
+        combo_list = [label_map[g] for g in plot_groups[comparison]]
+        combos = list(itertools.combinations(combo_list, r=2))
         pairs = [((g, c[0]), (g, c[1], )) for c in combos for g in group_list]
         stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                       approaches=['traditional'], tests=['mann-whitney'])
@@ -199,20 +220,20 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         # plot data TODO - make this mixed effects models
         ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[2, 1]))
-        colors = [self.colors[t] for t in list(label_map.keys())]
+        colors = [self.colors[t] for t in list(label_map.values())]
         sns.boxplot(data=data_for_stats, x=group, y=var, hue=comparison, ax=ax[0], width=0.5, showfliers=False,
                     palette=colors, medianprops={'color': 'white'}, hue_order=list(label_map.values()))
         ax[0] = clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
         ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density from t={time_window[0]} to t={time_window[-1]}')
         ax[0].get_legend().remove()
-        rainbow_text(0.5, 0.9, list(label_map.keys()), colors, ax=ax[0], size=8)
+        rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
 
         # add stats annotations
         stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
                                           f'& variable == "{var}"')
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
         annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
-                          hue_order=list(label_map.keys()))
+                          hue_order=list(label_map.values()))
         annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison)
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
@@ -225,9 +246,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         ax[1] = clean_box_plot(ax[1])
         ax[1].set(xlabel=comparison, ylabel=f'initial - new prob. density')
 
-        combos = list(itertools.combinations(list(label_map.values()), r=2))
+        combos = list(itertools.combinations(combo_list, r=2))
         diff_pairs = [((c[0],), (c[1],)) for c in combos]
-        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=diff_pairs, filename='goal_diff_stats')
+        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=diff_pairs, filename=f'goal_diff_stats_{comparison}')
         stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
                                           f'& variable == "initial_vs_new"')
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
@@ -239,10 +260,22 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
          .set_pvalues(pvalues=pvalues)
          .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
-        sfig.suptitle('Goal representation quantification', fontsize=12)
+        sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
         return sfig
 
     def plot_decoding_validation(self, sfig):
+        # plot confusion matrix
+        ax = sfig.subplots(nrows=1, ncols=1)
+        matrix = np.vstack(sorted_data['confusion_matrix'])
+        limits = [np.min(np.array(sorted_data['bins'])), np.max(np.array(sorted_data['bins']))]
+        im = ax[row_id][col_id].imshow(matrix, cmap=self.colors['control'], origin='lower',  # aspect='auto',
+                                         vmin=0, vmax=sorted_data['vmax'],
+                                         extent=[limits[0], limits[1], limits[0], limits[1]])
+        plt.colorbar(im, ax=ax[ax_id], pad=0.04, location='right', fraction=0.046, label='prob. density')
+
+        for key, value in sorted_data['locations'].items():
+            ax[ax_id].axhline(value, linestyle='dashed', color=[0, 0, 0, 0.5])
+            ax[ax_id].avhline(value, linestyle='dashed', color=[0, 0, 0, 0.5])
 
         return sfig
 
@@ -1078,74 +1111,55 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                              filename=f'compare_{comp}_aligned_data_{var}_window_{win}',
                                              additional_tags=tags, tight_layout=False)
 
-    def plot_tuning_curves(self, data, name):
-        print('Plotting tuning curves...')
+    def plot_tuning_curves(self, sfig, title='hippocampal position tuning curves'):
+        # get data
+        label_map = dict(model='encoding model',
+                         model_delay_only='decoded trials - delay only',
+                         model_update_only='decoded trials - update only')
+        feat = self.aggregator.group_df['feature'].values[0]
+        locations = self.aggregator.group_df.virtual_track.values[0].cue_end_locations.get(feat, dict())
+        sort_index, tuning_curve_scaled = dict(), dict()
+        for model in list(label_map.keys()):
+            model_df = self.aggregator.get_tuning_data(self.aggregator.group_df, model_name=model)
+            tuning_curves = pd.concat(model_df['tuning_curve'].to_list(), axis=1)
 
-        feat = data['feature'].values[0]
-        locations = data.virtual_track.values[0].cue_end_locations.get(feat, dict())
-        tuning_curve_params = [p for p in self.params if p not in ['decoder_bins']]
-        data_const_decoding = data[data['decoder_bin_size'] == data['decoder_bin_size'].values[0]]
-        param_group_data = data_const_decoding.groupby(tuning_curve_params)
-        plot_num, counter = (0, 0)
-        nrows, ncols = (1, 3)
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, squeeze=False)
-        for param_name, param_data in param_group_data:
-            group_tuning_curve_df = self.aggregator.get_tuning_data(param_data)
-            tuning_curve_mat = np.stack(group_tuning_curve_df['tuning_curve'].values)
-            tuning_curve_scaled = tuning_curve_mat / np.nanmax(tuning_curve_mat, axis=1)[:, None]
-            tuning_curve_bins = group_tuning_curve_df['bins'].values[0]
-            sort_index = np.argsort(np.argmax(tuning_curve_scaled, axis=1))
+            place_fields = get_place_fields(tuning_curves=tuning_curves)
+            place_field_peak_ind = place_fields.apply(lambda x: get_largest_field_loc(x), axis=0).reset_index(drop=True)
+            sort_index[model] = place_field_peak_ind.sort_values(na_position='first').index  # to start at 0
 
-            # plotting info
-            param_name = param_name if isinstance(param_name, list) else [param_name]
-            new_line = '\n'
-            tags = f'{"_".join(["".join(n) for n in name])}' \
-                   f'{"_".join([f"{p}_{n}" for p, n in zip(tuning_curve_params, param_name)])}'
-            title = ''.join([f'{p}: {n} {new_line}' for p, n in zip(tuning_curve_params, param_name)])
+            tuning_curve_mat = np.stack(tuning_curves.T.values)
+            tuning_curve_scaled[model] = tuning_curve_mat / np.nanmax(tuning_curve_mat, axis=1)[:, None]
 
-            # plot the data
-            if (counter % (ncols * nrows) == 0) and (counter != 0):
-                fig.suptitle(f'Feature tuning curves - {name}')
-                tags = f'{tags}_plot{plot_num}'
-                self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=tags)
+        tuning_curve_bins = model_df['bins'].values[0]  # should all be the same, use the most recent
+        fraction_of_track = (tuning_curve_bins - np.min(tuning_curve_bins)) / (np.max(tuning_curve_bins) - np.min(tuning_curve_bins))
+        locations_fractions = {k: (v - np.min(tuning_curve_bins)) / (np.max(tuning_curve_bins) - np.min(tuning_curve_bins))
+                               for k, v in locations.items()}
 
-                fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
-                counter = 0
-                plot_num += 1
-            else:
-                row_id = int(np.floor(counter / ncols))
-                col_id = counter - row_id * ncols
-
-                # plot heatmaps
-                y_limits = [0, np.shape(tuning_curve_scaled)[0]]
-                x_limits = [np.round(np.min(tuning_curve_bins), 2), np.round(np.max(tuning_curve_bins), 2)]
-                im = axes[row_id][col_id].imshow(tuning_curve_scaled[sort_index, :], cmap=self.colors['cmap_r'],
-                                                 origin='lower',
-                                                 vmin=0.1,
-                                                 aspect='auto',
-                                                 vmax=0.9, extent=[x_limits[0], x_limits[1], y_limits[0], y_limits[1]])
-
-                # plot annotation lines
-                for key, value in locations.items():
-                    axes[row_id][col_id].plot([value, value], [y_limits[0], y_limits[1]], linestyle='dashed',
-                                              color=[1, 1, 1, 0.5])
+        # plot data
+        ax = sfig.subplots(nrows=2, ncols=3, sharex=True, sharey=True)
+        for ax_ind, model in enumerate(list(label_map.keys())):
+            im = ax[0][ax_ind].imshow(tuning_curve_scaled[model][sort_index['model'], :], cmap=self.colors['cmap_r'],
+                                   origin='lower', vmin=0.1, vmax=0.9, aspect='auto',
+                                   extent=[fraction_of_track[0], fraction_of_track[-1],
+                                           0, np.shape(tuning_curve_scaled[model])[0]])
+            im = ax[1][ax_ind].imshow(tuning_curve_scaled[model][sort_index['model_update_only'], :], cmap=self.colors['cmap_r'],
+                                   origin='lower', vmin=0.1, vmax=0.9, aspect='auto',
+                                   extent=[fraction_of_track[0], fraction_of_track[-1],
+                                           0, np.shape(tuning_curve_scaled[model])[0]])
+            for row_ind in [0, 1]:
+                for key, value in locations_fractions.items():
+                    ax[row_ind][ax_ind].axvline(value, linestyle='dashed', color='k', alpha=0.5)
 
                 # add limits
-                axes[row_id][col_id].set_title(f'{title}', fontsize=10)
-                axes[row_id][col_id].set_xlim(x_limits)
-                axes[row_id][col_id].set_ylim(y_limits)
-                axes[row_id][col_id].set_ylim(y_limits)
-                if row_id == (nrows - 1):
-                    axes[row_id][col_id].set_xlabel(f'{feat}')
-                if col_id == 0:
-                    axes[row_id][col_id].set_ylabel(f'Units')
-                plt.colorbar(im, ax=axes[row_id][col_id], pad=0.04, location='right', fraction=0.046,
-                             label='Normalized firing rate')
-                counter += 1
+                ax[row_ind][ax_ind].set(xlim=(fraction_of_track[0], fraction_of_track[-1]),
+                               ylim=(0, np.shape(tuning_curve_scaled[model])[0]),
+                               title=label_map[model],)
 
-        # save figure
-        fig.suptitle(f'Feature tuning curves - {name}')
-        self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=tags)
+        plt.colorbar(im, ax=ax[row_ind][ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
+
+        sfig.supylabel(f'units sorted by {label_map["model"]} place field peak')
+        sfig.suptitle(title, fontsize=12)
+        return sfig
 
     def plot_phase_modulation_around_update(self, param_data, title, plot_groups=None, tags=''):
         # make plots for aligned data (1 row for heatmap, 1 row for modulation index, 1 col for each align time)

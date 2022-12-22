@@ -51,8 +51,9 @@ class BayesianDecoderAggregator:
                                           num_units=len(sess_dict[self.analyzer_name].spikes),
                                           num_trials=len(sess_dict[self.analyzer_name].train_df),
                                           excluded_session=self._meets_exclusion_criteria(sess_dict[self.analyzer_name]),)
-            metadata_keys = ['bins', 'virtual_track', 'model', 'results_io', 'results_tags', 'convert_to_binary',
-                             'encoder_bin_num', 'decoder_bin_size', 'decoder_test_size']
+            metadata_keys = ['bins', 'virtual_track', 'model', 'model_test', 'model_delay_only', 'model_update_only',
+                             'results_io', 'results_tags', 'convert_to_binary', 'encoder_bin_num', 'decoder_bin_size',
+                             'decoder_test_size']
             metadata_dict = {k: getattr(sess_dict[self.analyzer_name], k) for k in metadata_keys}
             if hasattr(sess_dict[self.analyzer_name].encoder_bin_num, 'item'):
                 metadata_dict['encoder_bin_num'] = sess_dict[self.analyzer_name].encoder_bin_num.item()
@@ -445,10 +446,10 @@ class BayesianDecoderAggregator:
             return None, None
 
     @staticmethod
-    def get_tuning_data(param_data):
+    def get_tuning_data(param_data, model_name='model'):
         tuning_curve_list = []
         for _, sess_data in param_data.iterrows():
-            for key, unit_tuning in sess_data['model'].items():
+            for key, unit_tuning in sess_data[model_name].items():
                 tuning_curve_list.append(dict(animal=sess_data['results_io'].animal,
                                               session=sess_data['results_io'].session_id,
                                               unit=key,
