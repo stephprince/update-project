@@ -4,39 +4,46 @@ import pandas as pd
 import pingouin as pg
 import warnings
 
+from ast import literal_eval
 from statsmodels.regression.mixed_linear_model import MixedLM
 from pathlib import Path
 from scipy.stats import sem, ranksums, kstest
 from tqdm import tqdm
 
-# import rpy2.robjects as ro
-# from rpy2.robjects.packages import importr
-# from rpy2.robjects import pandas2ri
+import rpy2.robjects as ro
+from rpy2.robjects.packages import importr
+from rpy2.robjects import pandas2ri
 
 from update_project.general.results_io import ResultsIO
-#
-# utils = importr('utils')
-# utils.chooseCRANmirror(ind=1)
-# utils.install_packages(ro.StrVector(['lme4', 'lmerTest', 'emmeans', 'report']))
-# lme4 = importr('lme4')
-# lme4= importr('lmerTest')  # TODO - determine if I need this or not
-# emmeans = importr('emmeans')
-# report = importr('report')
+
+utils = importr('utils')
+utils.chooseCRANmirror(ind=1)
+utils.install_packages(ro.StrVector(['lme4', 'lmerTest', 'emmeans', 'report']))
+lme4 = importr('lme4')
+lme4= importr('lmerTest')  # TODO - determine if I need this or not
+emmeans = importr('emmeans')
+report = importr('report')
 
 rng = np.random.default_rng(12345)
 new_line = '\n'
 
+
 class Stats:
     def __init__(self, levels=None, approaches=None, tests=None, alternatives=None, results_io=None, units=None,
-                 nboot=1000):
+                 nboot=1000, results_type=None):
         # setup defaults unless given otherwise
         self.levels = levels or ['animal', 'session_id']  # append levels needed (e.g., trials, units)
-        self.approaches = approaches or ['bootstrap', 'traditional']  # 'summary' as other option
-        self.tests = tests or ['direct_prob', 'mann-whitney']  # 'wilcoxon' as other option
+        self.approaches = approaches or ['bootstrap', 'traditional', 'mixed-effects']  # 'mixed-effects', 'summary' as other option
+        self.tests = tests or ['direct_prob', 'mann-whitney', 'emmeans', 'anova']  # 'wilcoxon' as other option
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
         self.nboot = nboot  # number of iterations to perform for bootstrapping default should be 1000
         self.units = units or 'trials'  # lowest hierarchical level of individual samples to use for description
-        self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
+        self.results_type = results_type or 'preliminary'
+        if self.results_type == 'manuscript':
+            folder_name = Path(__file__).parent.parent.parent / 'results' / 'manuscript_figures'
+            self.results_io = ResultsIO(creator_file=__file__, folder_name=folder_name)
+        else:
+            self.results_io = results_io or ResultsIO(creator_file=__file__, folder_name=Path(__file__).stem)
 
     def run(self, df, dependent_vars=None, group_vars='group', pairs=None, filename=''):
         # function requires data to be a dataframe in the following format
@@ -64,6 +71,16 @@ class Stats:
 
         self._export_stats(filename)
 
+    def get_summary(self, df, dependent_vars=None, group_vars='group', filename=''):
+        self.dependent_vars = dependent_vars
+        self.group_vars = group_vars
+        self._setup_data(approach='traditional', data=df)
+
+        self.descript_df = self._get_descriptive_stats(approach='traditional', test='na', alternative='na')
+        self.stats_df = pd.DataFrame()
+
+        self._export_stats(filename, summary_only=True)
+
     def _setup_data(self, approach, data):
         if approach == 'bootstrap':
             self.df_processed = (data
@@ -76,7 +93,8 @@ class Stats:
         elif approach == 'traditional':
             self.df_processed = data.copy(deep=True)
         elif approach == 'mixed_effects':
-            self.df_processed = self._get_mixed_effects_model(data)
+            self.df_processed = data.copy(deep=True)
+            self.model = self._get_mixed_effects_model(data)
         else:
             warnings.warn(f'Statistical approach {approach} is not supported')
             self.df_processed = []
@@ -85,35 +103,62 @@ class Stats:
 
     def _perform_test(self, approach, test, alternative, pairs=None):
         pair_outputs = []
-        for p in pairs:
-            query = [' & '.join([f'{g_item} == "{p_item}"' if isinstance(p_item, str)
-                                 else f'{g_item} == {p_item}' for p_item, g_item in zip(p_var, self.group_vars)])
-                     for p_var in p]
-            samples = [self.df_processed.query(q) for q in query]
 
-            for var in self.dependent_vars:
-                if test == 'direct_prob':
-                    comparisons = {0: f'{p[1]} >= {p[0]}', 1: f'{p[0]} >= {p[1]}'}
-                    prob_vals = (self.get_direct_prob(samples[0][var].to_numpy(), samples[1][var].to_numpy()),
-                                 self.get_direct_prob(samples[1][var].to_numpy(), samples[0][var].to_numpy()))
-                    test_output = dict(pair=p, variable=var, test=test, approach=approach, prob_test_vals=[prob_vals],
-                                       p_val=np.min(prob_vals) * 2, alternative=comparisons[np.argmin(prob_vals)])
-                elif test == 'mann-whitney':
-                    output = pg.mwu(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
-                    test_output = dict(pair=p, variable=var, test=test, approach=approach,
-                                       prob_test_vals=output['U-val'].to_numpy()[0],
-                                       p_val=output["p-val"].to_numpy()[0],
-                                       alternative=output['alternative'].to_numpy()[0])
-                elif test == 'wilcoxon':
-                    output = pg.wilcoxon(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
-                    test_output = dict(pair=p, variable=var, test=test, approach=approach,
-                                       prob_test_vals=output['W-val'].to_numpy()[0],
-                                       p_val=output["p-val"].to_numpy()[0],
-                                       alternative=output['alternative'].to_numpy()[0])
-                elif test == 'anova':
+        # run tests that look across pairs
+        for var in self.dependent_vars:
+            if test == 'emmeans':
+                emm = emmeans.emmeans(self.model, 'predictor', contr='pairwise', adjust='tukey')
+                emm_df = self.r_to_pandas_df(ro.r['summary'](emm.rx2('contrasts')))
+                emm_df['pairs'] = [[literal_eval(c) for c in row.split(' - ')] for row in emm_df['contrast'].to_list()]
+                for _, row in emm_df.iterrows():
+                    matching_pair = [p for p in pairs if (p[0] in row['pairs'] and p[1] in row['pairs'])]
+                    if matching_pair:
+                        test_val = row.get('z.ratio') or row.get('t.ratio')
+                        test_output = dict(pair=matching_pair, variable=var, test=test, approach=approach,
+                                           prob_test_vals=test_val, p_val=row["p.value"],
+                                           alternative='the effect of the predictor')
+                        pair_outputs.append(test_output)
+                        # TODO - could also export the whole emm predictor
+            elif test == 'anova':
+                if approach == 'mixed_effects':
+                    anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model)))
+                    test_output = dict(pair='all', variable=var, test=test, approach=approach,
+                                       prob_test_vals=anova_df['F value'].to_numpy()[0],
+                                       p_val=anova_df["Pr(>F)"].to_numpy()[0],
+                                       alternative='type III anova with Satterthwaite method')
+                    pair_outputs.append(test_output)
+                else:
                     output = pg.mixed_anova()  # TODO - determine if I need mixed or not
 
-                pair_outputs.append(test_output)
+        # run tests that work on pairs individually
+        if test in ['direct_prob', 'mann-whitney', 'wilcoxon']:
+            for p in pairs:
+                query = [' & '.join([f'{g_item} == "{p_item}"' if isinstance(p_item, str)
+                                     else f'{g_item} == {p_item}' for p_item, g_item in zip(p_var, self.group_vars)])
+                         for p_var in p]
+                samples = [self.df_processed.query(q) for q in query]
+
+                for var in self.dependent_vars:
+                    if test == 'direct_prob':
+                        comparisons = {0: f'{p[1]} >= {p[0]}', 1: f'{p[0]} >= {p[1]}'}
+                        prob_vals = (self.get_direct_prob(samples[0][var].to_numpy(), samples[1][var].to_numpy()),
+                                     self.get_direct_prob(samples[1][var].to_numpy(), samples[0][var].to_numpy()))
+                        test_output = dict(pair=p, variable=var, test=test, approach=approach, prob_test_vals=[prob_vals],
+                                           p_val=np.min(prob_vals) * 2, alternative=comparisons[np.argmin(prob_vals)])
+                    elif test == 'mann-whitney':
+                        output = pg.mwu(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
+                        test_output = dict(pair=p, variable=var, test=test, approach=approach,
+                                           prob_test_vals=output['U-val'].to_numpy()[0],
+                                           p_val=output["p-val"].to_numpy()[0],
+                                           alternative=output['alternative'].to_numpy()[0])
+                    elif test == 'wilcoxon':
+                        output = pg.wilcoxon(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
+                        test_output = dict(pair=p, variable=var, test=test, approach=approach,
+                                           prob_test_vals=output['W-val'].to_numpy()[0],
+                                           p_val=output["p-val"].to_numpy()[0],
+                                           alternative=output['alternative'].to_numpy()[0])
+
+                    pair_outputs.append(test_output)
 
         return pd.DataFrame(pair_outputs)
 
@@ -128,27 +173,42 @@ class Stats:
                               .pivot(columns='variable_1', index=[*self.group_vars, 'variable_0'],
                                      values='metric')
                               .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
-                              .reset_index())
+                              .reset_index()
+                              .assign(sem=lambda x: x['std'] / np.sqrt(x['count'])))
         descriptive_stats.insert(0, 'approach', approach)
         descriptive_stats.insert(1, 'test', test)
         descriptive_stats.insert(2, 'alternative', alternative)
 
         return descriptive_stats
 
-    def _export_stats(self, filename):
-        self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', format='csv')
-        self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', format='csv')
-        # self.results_io.export_statistics(self._get_stats_text(), f'{filename}_text', format='txt')
+    def _export_stats(self, filename, summary_only=False):
+        self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', results_type=self.results_type,
+                                          format='csv')
+        self.results_io.export_statistics(self._get_stats_text(), f'{filename}_text', results_type=self.results_type,
+                                          format='txt')
+
+        if not summary_only:
+            self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', results_type=self.results_type,
+                                              format='csv')
 
     def _get_stats_text(self):
-        descript_text = self.descript_df.apply(lambda x: self.series_to_text(x), axis=1)
+        descript_text = self.descript_df.apply(lambda x: self.descript_to_text(x), axis=1)
+        descript_text = ''.join(descript_text)
 
-        return descript_text
+        stats_text = self.stats_df.apply(lambda x: self.stats_to_text(x), axis=1)
+        stats_text = ''.join(stats_text)
 
-    def series_to_text(self, x):
-        text = f'{", ".join([x[v] for v in self.group_vars])}: {x["mean"]:.2f} ± {x["std"]:.2f}, ' \
+        return ''.join([descript_text, stats_text])
+
+    def descript_to_text(self, x):
+        text = f'{", ".join([x[v] for v in self.group_vars])}: {x["mean"]:.2f} ± {x["sem"]:.2f}, ' \
                f'n = {x["count"]:.0f} {self.units}, ' \
                f'percentiles = {", ".join([f"{x:.2f}" for x in x.loc["min":"max"].to_list()])} {new_line}'
+        return text
+
+    @staticmethod
+    def stats_to_text(x):
+        text = f'p = {x["p_val"]:.4f}, {x["variable"]} for {x["pair"][0][0]} vs. {x["pair"][0][1]}, {x["test"]} {new_line} '
         return text
 
     def _get_mixed_effects_model(self, data):
@@ -157,32 +217,38 @@ class Stats:
 
             formula = f'{var} ~ predictor + (1|animal) + (1|animal:session_id)'  # equivalent to var ~ predictor + 1|animal/session_id
             model = lme4.lmer(formula, data=self.pandas_to_r_df(data), REML=False)
-            print(ro.r['summary'](model))
-            print(ro.r['anova'](model))
-            print(emmeans.emmeans(model, 'predictor', contr='pairwise', adjust='tukey'))
+            # TODO - add checks for assumptions of mixed effects models
+
+            # extra outputs that might be good to know
             # model2 = ro.r['lm'](f'{var} ~ predictor', data=self.pandas_to_r_df(data))
             # print(ro.r['anova'](model, model2))  # just for curiosity to compare with/without random effects
-            #print(report.report(model))
+            # print(report.report(model))
+            # print(ro.r['summary'](model))  (could access variables within using rx2)
 
-            # TODO - add checks for assumptions of mixed effects models
-            # TODO - add plots for visualization of data
-            # TODO - add stats output in dataframe format
+            # THE PURE PYTHON WAY TO DO IT - not using current
             # not super clear but I'm pretty sure it's the same formula as 'var ~ predictor + (1|animal/session_id)' like above
-            model3 = (MixedLM
-                      .from_formula(f'{var} ~ C(predictor)', vc_formula={'session_id': '0+C(session_id)'}, re_formula='1',
-                                    groups='animal', data=data)
-                      .fit(method=['lbfgs'], reml=False))
-            print(model3.summary())
-            re_df = pd.DataFrame.from_dict(model3.random_effects, orient='index')
-            re_df['intercept'] = re_df['animal'] + model3.fe_params.loc['Intercept']
-            re_df['slopes'] = re_df.iloc[:, 1:] + model3.fe_params.loc['Intercept']
+            # model3 = (MixedLM
+            #           .from_formula(f'{var} ~ C(predictor)', vc_formula={'session_id': '0+C(session_id)'}, re_formula='1',
+            #                         groups='animal', data=data)
+            #           .fit(method=['lbfgs'], reml=False))
+            # print(model3.summary())
+            # re_df = pd.DataFrame.from_dict(model3.random_effects, orient='index')
+            # re_df['intercept'] = re_df['animal'] + model3.fe_params.loc['Intercept']
+            # re_df['slopes'] = re_df.iloc[:, 1:] + model3.fe_params.loc['Intercept']
 
-        return output_data
+        return model
 
     @staticmethod
     def pandas_to_r_df(data):
         with ro.conversion.localconverter(ro.default_converter + pandas2ri.converter):
             r_df = ro.conversion.py2rpy(data)
+
+        return r_df
+
+    @staticmethod
+    def r_to_pandas_df(data):
+        with ro.conversion.localconverter(ro.default_converter + pandas2ri.converter):
+            r_df = ro.conversion.rpy2py(data)
 
         return r_df
 

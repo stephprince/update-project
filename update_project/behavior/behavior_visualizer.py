@@ -10,7 +10,7 @@ from scipy.stats import sem
 
 from update_project.general.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, rainbow_text, clean_box_plot, add_task_phase_lines
-from update_project.statistics.statistics import get_fig_stats
+from update_project.statistics.statistics import get_fig_stats, Stats
 from update_project.base_visualization_class import BaseVisualizationClass
 
 rng = np.random.default_rng(12345)
@@ -65,9 +65,13 @@ class BehaviorVisualizer(BaseVisualizationClass):
         sns.boxplot(data=df_by_bin, x='trial type', y='proportion correct', ax=ax, width=0.5,
                     palette=self.colors['trials'], medianprops={'color': 'white'}, showfliers=False)
         clean_box_plot(ax)
-
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance', xlabel=None, ylim=(0, 1))
+
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], units='trial windows', results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
+        stats.get_summary(df_by_bin, dependent_vars=['proportion correct'], group_vars=['trial type'],
+                          filename=f'prop_correct', )
 
         return sfig
 
@@ -302,6 +306,13 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         for a in ax:
             clean_box_plot(a, labelcolors=[self.colors['nan']] * len(durations['event'].unique()))
+
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
+        stats.get_summary(durations.query('event == "total trial"'), dependent_vars=['duration'],
+                          group_vars=['update_type'], filename=f'total_trial_durations')
+        stats.get_summary(durations.query('event not in ["total trial"]'), dependent_vars=['duration'],
+                          group_vars=['update_type', 'event'], filename=f'event_durations')
 
         return sfig
 

@@ -13,7 +13,8 @@ from statannotations.Annotator import Annotator
 
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text, clean_box_plot
+from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text, \
+    clean_box_plot, add_task_phase_lines
 from update_project.general.place_cells import get_place_fields, get_largest_field_loc
 from update_project.statistics.statistics import Stats
 from update_project.base_visualization_class import BaseVisualizationClass
@@ -127,18 +128,18 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_goal_coding(self, sfig, comparison='update_type', groups=[], ylim=None):
+    def plot_goal_coding(self, sfig, comparison='update_type', groups=[], prob_value='prob_sum', ylim=None):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
-                                                                       prob_value='prob_sum')
+                                                                       prob_value=prob_value)
 
         # plot figure
         nrows = 2 if groups else 1
         ax = sfig.subplots(nrows=nrows, ncols=len(label_map.keys()), sharey=True, squeeze=False)
         for comp, data in trial_data.groupby(comparison):
-            trial_mat = data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times', values='prob_sum')
+            trial_mat = data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times', values=prob_value)
             new_mat = trial_mat.query('choice == "switch"').to_numpy()
             initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
             time_bins = trial_mat.columns.to_numpy()
@@ -177,33 +178,33 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
 
         colors = [self.colors[t] for t in ['initial', 'new']]
-        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][ax_id], size=6)
+        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][ax_id], size=8)
 
         return sfig
 
-    def plot_goal_coding_stats(self, sfig, comparison='update_type', title=''):
+    def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags=''):
         # get data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
-                                                                       prob_value='prob_sum')
+                                                                       prob_value=prob_value)
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
         time_window = (0, 1.5)
         data_for_stats = (trial_data
                           .query(f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
-                          .groupby(groupby_cols)[['prob_sum', 'diff_baseline']]  # group by trial/trial type
+                          .groupby(groupby_cols)[[prob_value, 'diff_baseline']]  # group by trial/trial type
                           .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                           .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
         data_for_stats.reset_index(inplace=True)
         data_for_stats['choice'] = data_for_stats['choice'].map({'initial_stay': 'initial', 'switch': 'new'})
         data_for_stats[comparison] = data_for_stats[comparison].map(label_map)
         diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
-                                          values=['prob_sum_mean'])
+                                          values=[f'{prob_value}_mean'])
                      .reset_index())
-        diff_data[('initial_vs_new','')] = diff_data[('prob_sum_mean', 'initial')] - \
-                                           diff_data[('prob_sum_mean', 'new')]
+        diff_data[('initial_vs_new','')] = diff_data[(f'{prob_value}_mean', 'initial')] - \
+                                           diff_data[(f'{prob_value}_mean', 'new')]
         diff_data = diff_data.droplevel(1, axis=1)
 
         # setup stats - group variables, pairs to compare, and levels of hierarchical data
@@ -214,9 +215,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         combos = list(itertools.combinations(combo_list, r=2))
         pairs = [((g, c[0]), (g, c[1], )) for c in combos for g in group_list]
         stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
-                      approaches=['traditional'], tests=['mann-whitney'])
+                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
         stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],
-                  pairs=pairs, filename=f'goal_coding_stats_{comparison}')
+                  pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
 
         # plot data TODO - make this mixed effects models
         ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[2, 1]))
@@ -224,13 +225,14 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sns.boxplot(data=data_for_stats, x=group, y=var, hue=comparison, ax=ax[0], width=0.5, showfliers=False,
                     palette=colors, medianprops={'color': 'white'}, hue_order=list(label_map.values()))
         ax[0] = clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
-        ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density from t={time_window[0]} to t={time_window[-1]}')
+        ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density{self.new_line}after update cue onset')  #from t={time_window[0]} to t={time_window[-1]}
         ax[0].get_legend().remove()
         rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
 
         # add stats annotations
-        stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
                                           f'& variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
         annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
                           hue_order=list(label_map.values()))
@@ -248,9 +250,11 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         combos = list(itertools.combinations(combo_list, r=2))
         diff_pairs = [((c[0],), (c[1],)) for c in combos]
-        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=diff_pairs, filename=f'goal_diff_stats_{comparison}')
-        stats_data = stats.stats_df.query(f'approach == "traditional" & test == "mann-whitney"'
+        stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=diff_pairs,
+                  filename=f'goal_diff_stats_{comparison}_{tags}')
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
                                           f'& variable == "initial_vs_new"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
         annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
                           order=list(label_map.values()))
@@ -1147,17 +1151,20 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                    extent=[fraction_of_track[0], fraction_of_track[-1],
                                            0, np.shape(tuning_curve_scaled[model])[0]])
             for row_ind in [0, 1]:
+                ax[row_ind][ax_ind] = add_task_phase_lines(ax[row_ind][ax_ind], cue_locations=locations_fractions,
+                                                           text_brackets=True)
                 for key, value in locations_fractions.items():
-                    ax[row_ind][ax_ind].axvline(value, linestyle='dashed', color='k', alpha=0.5)
+                    ax[row_ind][ax_ind].axvline(value, linestyle='dashed', color='w', alpha=0.5, linewidth=0.5)
+
 
                 # add limits
                 ax[row_ind][ax_ind].set(xlim=(fraction_of_track[0], fraction_of_track[-1]),
-                               ylim=(0, np.shape(tuning_curve_scaled[model])[0]),
-                               title=label_map[model],)
+                                        ylim=(0, np.shape(tuning_curve_scaled[model])[0]))
+            ax[0][ax_ind].set_title(label_map[model], fontsize=10)
 
         plt.colorbar(im, ax=ax[row_ind][ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
 
-        sfig.supylabel(f'units sorted by {label_map["model"]} place field peak')
+        sfig.supylabel(f'units sorted by {self.new_line} {label_map["model"]}', fontsize=10)
         sfig.suptitle(title, fontsize=12)
         return sfig
 

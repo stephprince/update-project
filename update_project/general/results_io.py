@@ -111,7 +111,8 @@ class ResultsIO:
         if format == 'csv':
             stats_data.to_csv(fname, index=False)
         elif format == 'txt':
-            stats_data.to_csv(fname, header=None, index=False, sep=' ', mode='a')
+            with open(fname, 'w') as f:
+                f.write(stats_data)
 
     def data_exists(self, data_files):
         files_exist = []

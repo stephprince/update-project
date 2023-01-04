@@ -10,7 +10,8 @@ from pathlib import Path
 from scipy.stats import sem
 
 from update_project.general.results_io import ResultsIO
-from update_project.general.plots import rainbow_text, clean_box_plot, add_task_phase_lines, colorline
+from update_project.general.plots import clean_box_plot, add_task_phase_lines, colorline
+from update_project.statistics.statistics import Stats
 from update_project.base_visualization_class import BaseVisualizationClass
 
 rng = np.random.default_rng(12345)
@@ -50,7 +51,7 @@ class ChoiceVisualizer(BaseVisualizationClass):
         if self.grid_search:
             self.plot_grid_search_results()
 
-    def plot_choice_commitment(self, sfig, num_trials=20):
+    def plot_choice_commitment(self, sfig, num_trials=15):
         # get data
         predict_df = self._get_group_prediction().reset_index(drop=True)
         predict_df = predict_df.rename_axis('trial').reset_index()
@@ -88,7 +89,7 @@ class ChoiceVisualizer(BaseVisualizationClass):
             linestyle = 'solid' if g_name == 'right' else 'dashed'
             for t in trials.T:
                 ax[0] = colorline(pos_bins, t, cmap=self.colors['choice_cmap'], linestyle=linestyle, alpha=0.5, ax=ax[0])
-        ax[0] = add_task_phase_lines(ax[0], cue_locations=cue_fractions, text_brackets=True)
+        ax[0] = add_task_phase_lines(ax[0], cue_locations=cue_fractions, text_height=0.975, text_brackets=True)
         ax[0].set(title=f'Example trials', xlabel='fraction of track', ylabel='p(right choice)', ylim=(0, 1.1))
 
         custom_lines = [Line2D([0], [0], color=self.colors['choice'][-1], linestyle='solid', linewidth=1),
@@ -102,6 +103,10 @@ class ChoiceVisualizer(BaseVisualizationClass):
         ax[1].axhline(-1, linestyle='dashed', color='k', label='chance', alpha=0.5, zorder=0)
         ax[1].axhline(0, linestyle='dashed', color='k', label='perfect', alpha=0.5, zorder=0)
         clean_box_plot(ax[1])
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io, units='session averages',
+                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
+        stats.get_summary(cue_performance, dependent_vars=['log_likelihood'],
+                          group_vars=['cue'], filename=f'choice_commitment')
 
         sfig.suptitle('Choice commitment estimation', fontsize=12)
 
