@@ -146,6 +146,7 @@ class BehaviorAnalyzer:
         self.proportion_correct_by_phase = proportion_correct_by_phase
 
     def _get_session_type(self):
+        session_type=np.nan
         # get total count and phase count
         session_phases=self.trials['phase']
         total_trials = session_phases.count()
