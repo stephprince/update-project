@@ -13,6 +13,7 @@ from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
+from update_project.general.preprocessing import get_commitment_data
 from update_project.base_analysis_class import BaseAnalysisClass
 
 
@@ -59,7 +60,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                                                   'train_df', 'test_df', 'test_delay_only_df', 'test_update_only_df',
                                                                   'model', 'model_test', 'model_delay_only', 'model_update_only',
                                                                   'bins', 'decoded_values', 'decoded_probs',
-                                                                  'theta', 'velocity'],
+                                                                  'theta', 'velocity', 'commitment'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
@@ -73,6 +74,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         self.units = nwbfile.units.to_dataframe()
         self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
+        self.commitment = get_commitment_data(nwbfile, self.results_io)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.limits = {feat: self.virtual_track.get_limits(feat) for feat in self.feature_names}
 
@@ -194,7 +196,12 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
             new_starts.append(new_left)
             new_stops.append(new_right)
 
-        times = nap.IntervalSet(start=np.hstack(new_starts), end=np.hstack(new_stops), time_units='s')
+        if np.size(new_starts):
+            start = np.hstack(new_starts)
+            end = np.hstack(new_stops)
+        else:
+            start, end = [], []
+        times = nap.IntervalSet(start=start, end=end, time_units='s')
 
         return times
 
@@ -259,6 +266,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
             train_df = encoder_trials
             test_df = decoder_trials
             test_delay_only_df = decoder_trials_delay_only
+            test_update_only_df = decoder_trials_update_only
         else:
             train_data, test_data = train_test_split(encoder_trials, test_size=self.decoder_test_size,
                                                      random_state=random_state)
@@ -301,7 +309,10 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
         self.features_test_delay_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_delay_only)
-        self.features_test_update_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_update_only)
+        if np.size(self.decoder_times_update_only):
+            self.features_test_update_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_update_only)
+        else:
+            self.features_test_update_only = pd.DataFrame()
 
         # select additional data for post-processing
         self.theta = nap.TsdFrame(self.theta, time_units='s', time_support=self.decoder_times)
@@ -310,6 +321,13 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         return self
 
     def _encode(self):
+        # if there are no units/spikes to use for encoding, create empty dataframe as default
+        self.model = pd.DataFrame()
+        self.model_test = pd.DataFrame()
+        self.model_delay_only = pd.DataFrame()
+        self.model_update_only = pd.DataFrame()
+        self.bins = []
+
         if self.spikes:  # if there were units and spikes to use for encoding
             if self.dim_num == 1:
                 feat_input = self.features_train[self.feature_names[0]]
@@ -323,19 +341,14 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                                      feature=self.features_test_delay_only[self.feature_names[0]],
                                                      nb_bins=self.encoder_bin_num, ep=self.decoder_times_delay_only,
                                                      minmax=self.limits[self.feature_names[0]])
-                self.model_update_only = self.encoder(group=self.spikes,
-                                                      feature=self.features_test_update_only[self.feature_names[0]],
-                                                      nb_bins=self.encoder_bin_num, ep=self.decoder_times_update_only,
-                                                      minmax=self.limits[self.feature_names[0]])
+                if np.size(self.features_test_update_only):
+                    self.model_update_only = self.encoder(group=self.spikes,
+                                                          feature=self.features_test_update_only[self.feature_names[0]],
+                                                          nb_bins=self.encoder_bin_num, ep=self.decoder_times_update_only,
+                                                          minmax=self.limits[self.feature_names[0]])
             elif self.dim_num == 2:
                 self.model, self.bins = self.encoder(group=self.spikes, feature=self.features_train,
                                                      nb_bins=self.encoder_bin_num, ep=self.encoder_times)
-        else:  # if there were no units/spikes to use for encoding, create empty dataframe
-            self.model = pd.DataFrame()
-            self.model_test = pd.DataFrame()
-            self.model_delay_only = pd.DataFrame()
-            self.model_update_only = pd.DataFrame()
-            self.bins = []
 
         return self
 
