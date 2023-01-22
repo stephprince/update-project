@@ -62,7 +62,8 @@ def clean_box_plot(ax, labelcolors=None):
 
     return ax
 
-def add_task_phase_lines(ax, cue_locations=dict(), text_brackets=False):
+
+def add_task_phase_lines(ax, cue_locations=dict(), text_height=0.95, text_brackets=False):
     name_remapping = {'initial cue': 'sample', 'delay cue': 'delay', 'update cue': 'update',
                       'delay2 cue': 'delay'}
     cue_details = dict()
@@ -76,11 +77,11 @@ def add_task_phase_lines(ax, cue_locations=dict(), text_brackets=False):
 
     if text_brackets:
         for cue_name, cue_loc in cue_details.items():
-            ax.text(cue_details[cue_name]['middle'], 0.95, cue_details[cue_name]['label'], ha='center',
+            ax.text(cue_details[cue_name]['middle'], text_height, cue_details[cue_name]['label'], ha='center',
                            va='bottom', transform=ax.get_xaxis_transform(), fontsize=7)
-            ax.annotate('', xy=(cue_details[cue_name]['start'], 0.925),
+            ax.annotate('', xy=(cue_details[cue_name]['start'], text_height - 0.025),
                                xycoords=ax.get_xaxis_transform(),
-                               xytext=(cue_details[cue_name]['end'], 0.925),
+                               xytext=(cue_details[cue_name]['end'], text_height - 0.025),
                                textcoords=ax.get_xaxis_transform(),
                                arrowprops=dict(arrowstyle='|-|, widthA=0.15, widthB=0.15', shrinkA=1, shrinkB=1, lw=1),
                                ha='left', rotation=30)
@@ -123,6 +124,7 @@ def get_color_theme():
     for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all', 'delay only', 'correct']:
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#000000', as_cmap=True)
+        color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#c0c0c0,#303030', 4)  # increasing grey scales
     for key in ['switch_trials', 'switch']:
         color_theme_dict[key] = '#785cf7'  # purple - 270 in degrees, 95 saturation, 50 light
     for key in ['stay_trials', 'stay']:
@@ -131,10 +133,12 @@ def get_color_theme():
         color_theme_dict[key] = '#2459bd'  # blue - 258 degrees, 85 saturation, 40 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#2459bd',
                                                             as_cmap=True)  # start at dark blue (30 light)
+        color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#b7c4fa,#2459bd', 4)  # (30 to 70 light)
     for key in ['new', 'switch_update']:
         color_theme_dict[key] = '#b01e70'  # pink - 345 degrees, 90 saturation, 40 light (was 30, testing out)
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#b01e70',
                                                             as_cmap=True)  # start at dark pink (30 light)
+        color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#fab2cf,#b01e70', 4)  # (40 to 70 light)
     for key in ['error', 'incorrect']:
         color_theme_dict[key] = '#bc1026'  # 10 degrees, 95 saturation, 40 light
     for key in ['choice', 'choice_commitment']:
@@ -150,6 +154,7 @@ def get_color_theme():
     color_theme_dict['general'] = sns.color_palette("husl", 10)
     color_theme_dict['trials'] = [color_theme_dict['non_update'], color_theme_dict['switch_trials'],
                                   color_theme_dict['stay_trials']]
+    color_theme_dict['delays'] = sns.color_palette('blend:#c0c0c0,#303030', 5)  # increasing grey scales
 
     return color_theme_dict
 
