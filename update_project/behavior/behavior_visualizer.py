@@ -31,6 +31,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         # get session visualization info
         for sess_dict in self.data:
             sess_dict.update(proportion_correct=sess_dict['analyzer'].proportion_correct)
+            sess_dict.update(proportion_correct_by_delay=sess_dict['analyzer'].proportion_correct_by_delay)
             sess_dict.update(trajectories=sess_dict['analyzer'].trajectories)
             sess_dict.update(aligned_data=sess_dict['analyzer'].aligned_data)
             sess_dict.update(event_durations=sess_dict['analyzer'].event_durations)
@@ -101,6 +102,31 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance per animal', xlabel=None, ylim=(0, 1))
+
+        return sfig
+
+    def plot_performance_by_delay(self, sfig):
+        session_df = (self.group_df[['animal', 'session_id', 'proportion_correct_by_delay']]
+                      .explode('proportion_correct_by_delay')
+                      .drop('proportion_correct_by_delay', axis=1)  # only exploding so that same number of rows of final df
+                      .reset_index(drop=True))
+        performance_temp_df = pd.concat(self.group_df['proportion_correct_by_delay'].to_list()).reset_index(drop=True)
+
+        df_by_update_type = pd.concat([session_df, performance_temp_df], axis=1)
+        df_by_bin = pd.DataFrame(df_by_update_type
+                                 .query('update_type == 1')
+                                 .rename(columns={'correct': 'proportion correct', 'delay_location': 'delay phase'})
+                                 .reset_index(drop=True)
+                                 .to_dict())  # convert to dict and back bc violin plot has object format err otherwise
+
+        ax = sfig.subplots(nrows=2, ncols=1)
+        sns.boxplot(data=df_by_bin, x='delay phase', y='proportion correct', ax=ax[0], width=0.5,
+                    palette=self.colors['delays'], medianprops={'color': 'white'}, showfliers=False)
+        clean_box_plot(ax[0], labelcolors=self.colors['delays'])
+        rainbow_text(0.85, 0.85, df_by_bin['delay phase'].unique(), self.colors['delays'], ax=ax[0], size=10)
+
+        ax[0].axhline(0.5, linestyle='dashed', color=self.colors['nan'])
+        ax[0].set(title='Task performance by delay', xlabel=None, ylim=(0, 1))
 
         return sfig
 
@@ -274,17 +300,17 @@ class BehaviorVisualizer(BaseVisualizationClass):
         # get data
         group_durations = pd.concat(self.group_df['event_durations'].to_list(), axis=0)
         durations = (group_durations
-                     .assign(sample_to_choice=lambda x: np.nansum([x['delay1'], x['delay2'], x['update']], axis=0))
+                     .assign(original_to_choice=lambda x: np.nansum([x['delay1'], x['delay2'], x['update']], axis=0))
                      .assign(delay1=lambda x: [np.nan if u == 1 else d for d, u in zip(x['delay1'], x['update_type'])])
                      .melt(var_name='event', value_name='duration', id_vars='update_type',
-                           value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'sample_to_choice', 'total_trial'])
+                           value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'original_to_choice', 'total_trial'])
                      .dropna(subset='duration', axis=0)
                      .assign(update_type=lambda x: x['update_type'].map({1: 'delay only', 2: 'switch', 3: 'stay'}))
-                     .assign(event=lambda x: x['event'].map({'initial_cue': 'sample',
+                     .assign(event=lambda x: x['event'].map({'initial_cue': 'original',
                                                              'delay1': '1st delay',
                                                              'update': 'update',
                                                              'delay2': '2nd delay',
-                                                             'sample_to_choice': 'sample to choice',
+                                                             'original_to_choice': 'original to choice',
                                                              'total_trial': 'total trial'})))
 
         ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[1, 4]))
@@ -298,7 +324,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         # breakdown by task phase
         sns.boxplot(data=durations.query('event not in ["total trial"]'), x='event', y='duration', hue='update_type',
                     ax=ax[1], width=0.5, palette=self.colors['trials'], medianprops={'color': 'white'},
-                    showfliers=False, order=['sample', 'sample to choice', '1st delay', 'update', '2nd delay'])
+                    showfliers=False, order=['original', 'original to choice', '1st delay', 'update', '2nd delay'])
         ax[1].set(title='Event lengths', ylabel='duration (s)')
         ax[1].get_legend().remove()
         colors = [self.colors[t] for t in durations['update_type'].unique()]

@@ -29,12 +29,13 @@ class BehaviorAnalyzer(BaseAnalysisClass):
 
         # setup data
         self.trials = self._setup_trials(nwbfile)
+        self.trials_including_warmup = self._setup_trials(nwbfile, maze_ids=[3, 4])
         self.data = self._setup_data(nwbfile)
 
         # setup I/O
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem)
         self.data_files = dict(behavior_output=dict(vars=['proportion_correct', 'aligned_data', 'trajectories',
-                                                          'event_durations'],
+                                                          'event_durations', 'proportion_correct_by_delay'],
                                                     format='pkl'))
 
     def run_analysis(self, overwrite=False):
@@ -42,6 +43,7 @@ class BehaviorAnalyzer(BaseAnalysisClass):
 
         if overwrite:
             self._get_proportion_correct()
+            self._get_proportion_correct_by_delay()
             self._get_trajectories()
             self._align_data()
             self._get_event_durations()
@@ -53,9 +55,10 @@ class BehaviorAnalyzer(BaseAnalysisClass):
                 warnings.warn('Data with those input parameters does not exist, setting overwrite to True')
                 self.run_analysis(overwrite=True)
 
-    def _setup_trials(self, nwbfile):
+    def _setup_trials(self, nwbfile, maze_ids=None):
+        maze_ids = maze_ids or self.maze_ids  # use default if none provided
         all_trials = get_trials_dataframe(nwbfile, with_pseudoupdate=True)
-        trials = all_trials[all_trials['maze_id'].isin(self.maze_ids)]
+        trials = all_trials[all_trials['maze_id'].isin(maze_ids)]
 
         return trials
 
@@ -90,6 +93,17 @@ class BehaviorAnalyzer(BaseAnalysisClass):
                                            update_type=self.virtual_track.mappings['update_type'][str(name)]))
 
         self.proportion_correct = proportion_correct
+
+    def _get_proportion_correct_by_delay(self):
+        delay_location_bins = pd.IntervalIndex.from_tuples(self.virtual_track.delay_locations.values())
+        delay_type_bins = pd.cut(self.trials_including_warmup['delay_location'], delay_location_bins)
+        delay_locations_invert = {i: l for i, l in zip(delay_location_bins,
+                                                       self.virtual_track.delay_locations.keys(),)}
+        delay_type_bins = delay_type_bins.map(delay_locations_invert)
+        self.proportion_correct_by_delay = (self.trials_including_warmup
+                                            .groupby(['update_type', delay_type_bins])['correct']
+                                            .mean()
+                                            .reset_index())
 
     def _get_trajectories(self):
         trajectory_df = pd.DataFrame(index=self.data['position'].timestamps, data=self.data['position'].data[:, 1],
