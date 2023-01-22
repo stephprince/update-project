@@ -11,14 +11,16 @@ from scipy.stats import sem, ranksums, kstest
 from tqdm import tqdm
 
 import rpy2.robjects as ro
-from rpy2.robjects.packages import importr
+from rpy2.robjects.packages import importr, isinstalled
 from rpy2.robjects import pandas2ri
 
 from update_project.general.results_io import ResultsIO
 
 utils = importr('utils')
 utils.chooseCRANmirror(ind=1)
-utils.install_packages(ro.StrVector(['lme4', 'lmerTest', 'emmeans', 'report']))
+package_names = ['lme4', 'lmerTest', 'emmeans', 'report']
+packages_to_install = [x for x in package_names if not isinstalled(x)]
+utils.install_packages(ro.StrVector(packages_to_install))
 lme4 = importr('lme4')
 lme4= importr('lmerTest')  # TODO - determine if I need this or not
 emmeans = importr('emmeans')
