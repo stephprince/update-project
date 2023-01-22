@@ -5,12 +5,13 @@ from track_linearization import make_track_graph, get_linearized_position
 
 class VirtualTrack:
     def __init__(self, coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries, home_boundaries,
-                 mappings=None, linearization=False):
+                 mappings=None, delay_locations=None, linearization=False):
         self.coords = coords
         self.nodes = nodes
         self.edges = edges
         self.cue_start_locations = cue_start_locations
         self.cue_end_locations = cue_end_locations
+        self.delay_locations = delay_locations
         self.choice_boundaries = choice_boundaries
         self.home_boundaries = home_boundaries
         self.mappings = mappings
@@ -100,9 +101,21 @@ class UpdateTrack(VirtualTrack):
                            view_angle=(2 * np.pi / 9, -2 * np.pi/9),
                            dynamic_choice=(-0.5, 0.5),
                            cue_bias=(-0.4, 0.4))
+    delay_locations = dict(delay1=(214, 216),  # latest delay
+                           delay2=(179, 181),  # later delay
+                           delay3=(144, 146),  # middle delay
+                           delay4=(119, 121))  # earlier delay
 
-    def __init__(self, coords=coords, nodes=nodes, edges=edges, cue_start_locations=cue_start_locations,
-                 cue_end_locations=cue_end_locations, choice_boundaries=choice_boundaries,
-                 home_boundaries=home_boundaries, mappings=mappings, linearization=False):
+    def __init__(self,
+                 coords=coords,
+                 nodes=nodes,
+                 edges=edges,
+                 cue_start_locations=cue_start_locations,
+                 cue_end_locations=cue_end_locations,
+                 choice_boundaries=choice_boundaries,
+                 home_boundaries=home_boundaries,
+                 mappings=mappings,
+                 delay_locations=delay_locations,
+                 linearization=False):
         super().__init__(coords, nodes, edges, cue_start_locations, cue_end_locations, choice_boundaries,
-                         home_boundaries, mappings, linearization)
+                         home_boundaries, mappings, delay_locations, linearization)
