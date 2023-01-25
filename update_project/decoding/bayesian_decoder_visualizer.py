@@ -14,7 +14,7 @@ from statannotations.Annotator import Annotator
 from update_project.decoding.bayesian_decoder_aggregator import BayesianDecoderAggregator
 from update_project.general.results_io import ResultsIO
 from update_project.general.plots import plot_distributions, plot_scatter_with_distributions, rainbow_text, \
-    clean_box_plot, add_task_phase_lines
+    clean_box_plot, clean_violin_plot, add_task_phase_lines
 from update_project.general.place_cells import get_place_fields, get_largest_field_loc
 from update_project.statistics.statistics import Stats
 from update_project.base_visualization_class import BaseVisualizationClass
@@ -36,43 +36,60 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         # make plots for different parameters, groups, features
         groups = [g if g != 'feature' else 'feature_name' for g in [*group_names, *self.params]]
+        groups = [g for g in groups if g in self.aggregator.group_aligned_df.columns]
         for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
             tags = "_".join([str(n) for n in g_name])
             kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
             # self.plot_theta_data(data, kwargs)
             # self.plot_group_aligned_stats(data, **kwargs)
-            self.plot_group_aligned_comparisons(data, **kwargs)
+            # self.plot_group_aligned_comparisons(data, **kwargs)
             # self.plot_performance_comparisons(data, tags=tags)
+
+            # fig = plt.figure()
+            # fig = self.plot_goal_coding_prediction(fig, tags=tags)
+            # self.results_io.save_fig(fig=fig, filename=f'goal_coding_prediction', tight_layout=False,
+            #                          additional_tags=tags)
+            #
+            fig = plt.figure()
+            self.plot_goal_coding_commitment_single_trials(fig)
+            self.results_io.save_fig(fig=fig, filename='choice_commitment_scatter', tight_layout=False,
+                                     additional_tags=tags)
+
+            fig = plt.figure()
+            self.plot_goal_coding_by_commitment(fig)
+            self.results_io.save_fig(fig=fig, filename=f'choice_commitment', tight_layout=False, additional_tags=tags)
 
             # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
             for plot_types in list(itertools.product(*self.plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                 title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                 kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                self.plot_group_aligned_data(data, **kwargs)
+                # self.plot_group_aligned_data(data, **kwargs)
                 # self.plot_scatter_dists_around_update(data, **kwargs)
                 # self.plot_trial_by_trial_around_update(data, **kwargs)
 
         # plot model metrics (comparing parameters across brain regions and features)
-        for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
-            self.plot_group_confusion_matrices(data, name, )
+        # for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
+            # self.plot_group_confusion_matrices(data, name, )
             # self.plot_tuning_curves(data, name, )
-            self.plot_all_confusion_matrices(data, name)
-            self.plot_parameter_comparison(data, name, thresh_params=True)
+            # self.plot_all_confusion_matrices(data, name)
+            # self.plot_parameter_comparison(data, name, thresh_params=True)
 
         #  make plots with both brain regions
-        self.plot_multiregional_data()
-        self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
-        self.plot_all_groups_error(main_group=group_names, sub_group='animal')
-        self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
-        self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
+        # self.plot_multiregional_data()
+        # self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
+        # self.plot_all_groups_error(main_group=group_names, sub_group='animal')
+        # self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
+        # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
-    def plot_decoding_output_heatmap(self, sfig, update_type='switch'):
+    def plot_decoding_output_heatmap(self, sfig, update_type='switch', prob_value='prob_sum', feat='position'):
         # load up data
         plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
-        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups)
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value)
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups, ret_df=True)
 
+        clim = (0.02, 0.045) if feat == 'position' else (0.02, 0.04)
         prob_map = np.nanmean(np.stack(aligned_data['probability']), axis=0)
         true_feat = np.nanmean(np.stack(aligned_data['feature']), axis=0)
         time_bins = np.linspace(aligned_data['times'].apply(np.nanmin).min(),
@@ -101,7 +118,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                          facecolor='white', alpha=0, transform=ax.get_yaxis_transform())
             clipping_masks[arm] = mask
             images[arm] = ax.imshow(prob_map, cmap=self.colors[f'{arm}_cmap'], aspect='auto',
-                                    origin='lower', vmin=0.02, vmax=0.045,
+                                    origin='lower', vmin=clim[0], vmax=clim[1],
                                     extent=[im_times[0], im_times[-1], track_fraction[0], track_fraction[-1]])
             images[arm].set_clip_path(clipping_masks[arm])
             ticks = None if arm == 'home' else []
@@ -128,49 +145,76 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_goal_coding(self, sfig, comparison='update_type', groups=[], prob_value='prob_sum', ylim=None):
+    def plot_goal_coding(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
+                         ylim=None, with_velocity=False):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value=prob_value)
+        sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
 
         # plot figure
-        nrows = 2 if groups else 1
-        ax = sfig.subplots(nrows=nrows, ncols=len(label_map.keys()), sharey=True, squeeze=False)
+        nrows = 1  # default value if no other info provided
+        height_ratios = [1]
+        if heatmap:
+            nrows = nrows + 1
+        elif groups and not heatmap:
+            nrows = len(trial_data[groups].unique())
+        elif with_velocity:
+            nrows = nrows + 1
+            height_ratios = [2, 1]
+        ax = sfig.subplots(nrows=nrows, ncols=len(label_map.keys()), sharey='row', squeeze=False, height_ratios=height_ratios)
         for comp, data in trial_data.groupby(comparison):
-            trial_mat = data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times', values=prob_value)
-            new_mat = trial_mat.query('choice == "switch"').to_numpy()
-            initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
-            time_bins = trial_mat.columns.to_numpy()
+            col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
+            if not heatmap:
+                for s_name, s_data in data.groupby(sub_groups):
+                    if with_velocity:
+                        row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0] * 2
+                    else:
+                        row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0]
+                    trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                             values=prob_value)
+                    new_mat = trial_mat.query('choice == "switch"').to_numpy()
+                    initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                    time_bins = trial_mat.columns.to_numpy()
 
-            ax_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
-            if not groups:
-                ax[0][ax_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'])
-                ax[0][ax_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'])
-                ax[0][ax_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
-                                       np.nanmean(new_mat, axis=0) - sem(new_mat), color=self.colors['new'], alpha=0.2)
-                ax[0][ax_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat),
-                                       np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=self.colors['initial'],
-                                       alpha=0.2)
-                ax[0][ax_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
-                if ylim:
-                    ax[0][ax_id].set(ylim=ylim)
+                    ax[row_id][col_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'])
+                    ax[row_id][col_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'])
+                    ax[row_id][col_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
+                                           np.nanmean(new_mat, axis=0) - sem(new_mat), color=self.colors['new'], alpha=0.2)
+                    ax[row_id][col_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat),
+                                           np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=self.colors['initial'],
+                                           alpha=0.2)
+                    ax[row_id][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                    if ylim:
+                        ax[row_id][col_id].set(ylim=ylim)
+
+                    if with_velocity:
+                        veloc_data = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                                 values='rotational_velocity')
+                        veloc_mat = veloc_data.query('choice == "switch"').to_numpy()  # velocity data same for both
+                        ax[row_id + 1][col_id].plot(time_bins, np.mean(veloc_mat, axis=0), color=self.colors['home'])
+                        ax[row_id + 1][col_id].fill_between(time_bins, np.nanmean(veloc_mat, axis=0) + sem(veloc_mat),
+                                                np.nanmean(veloc_mat, axis=0) - sem(veloc_mat), color=self.colors['new'],
+                                                alpha=0.2)
+                        ax[row_id + 1][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
             else:
+                time_bins = data['times'].unique()
                 color_map = {'switch': 'new', 'initial_stay': 'initial'}
                 for row_id, c in enumerate(['initial_stay', 'switch']):
                     matrix = (data
                               .query(f'choice == "{c}"')
-                              .groupby([*groups, 'times'])['diff_baseline']
+                              .groupby([groups, 'times'])['diff_baseline']
                               .mean().unstack().to_numpy())
-                    im = ax[row_id][ax_id].imshow(matrix, cmap=self.colors[f'{color_map[c]}_cmap'], vmin=0, vmax=0.2,
+                    im = ax[row_id][col_id].imshow(matrix, cmap=self.colors[f'{color_map[c]}_cmap'], vmin=0, vmax=0.2,
                                                   aspect='auto', origin='lower',
                                                   extent=[time_bins.min(), time_bins.max(), 0, np.shape(matrix)[0]], )
-                    ax[row_id][ax_id].axvline(0, color='k', linestyle='dashed')
-                    if ax_id == len(label_map.keys())-1:
-                        plt.colorbar(im, ax=ax[row_id][ax_id], pad=0.04, location='right', fraction=0.046,
+                    ax[row_id][col_id].axvline(0, color='k', linestyle='dashed')
+                    if col_id == len(label_map.keys())-1:
+                        plt.colorbar(im, ax=ax[row_id][col_id], pad=0.04, location='right', fraction=0.046,
                                      label='Δ prob. density from t=0')
-            ax[0][ax_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
+            ax[0][col_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
 
         title = f'goal arm representations by {groups}' if groups else 'goal arm representations'
         sfig.suptitle(title, fontsize=12)
@@ -178,11 +222,14 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
 
         colors = [self.colors[t] for t in ['initial', 'new']]
-        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][ax_id], size=8)
+        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
 
         return sfig
 
-    def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags=''):
+    def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
+                               time_window=(0, 1.5), use_zscores=True):
+        decoding_measures = 'zscore_prob' if use_zscores else prob_value
+
         # get data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
@@ -191,24 +238,23 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                        prob_value=prob_value)
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
-        time_window = (0, 1.5)
         data_for_stats = (trial_data
                           .query(f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
-                          .groupby(groupby_cols)[[prob_value, 'diff_baseline']]  # group by trial/trial type
+                          .groupby(groupby_cols)[[decoding_measures, 'diff_baseline']]  # group by trial/trial type
                           .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                           .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
         data_for_stats.reset_index(inplace=True)
         data_for_stats['choice'] = data_for_stats['choice'].map({'initial_stay': 'initial', 'switch': 'new'})
         data_for_stats[comparison] = data_for_stats[comparison].map(label_map)
         diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
-                                          values=[f'{prob_value}_mean'])
+                                          values=[f'{decoding_measures}_mean'])
                      .reset_index())
-        diff_data[('initial_vs_new','')] = diff_data[(f'{prob_value}_mean', 'initial')] - \
-                                           diff_data[(f'{prob_value}_mean', 'new')]
+        diff_data[('initial_vs_new','')] = diff_data[(f'{decoding_measures}_mean', 'initial')] - \
+                                           diff_data[(f'{decoding_measures}_mean', 'new')]
         diff_data = diff_data.droplevel(1, axis=1)
 
         # setup stats - group variables, pairs to compare, and levels of hierarchical data
-        var = 'diff_baseline_mean'
+        var = f'{decoding_measures}_mean'
         group = 'choice'
         group_list = data_for_stats['choice'].unique()
         combo_list = [label_map[g] for g in plot_groups[comparison]]
@@ -220,33 +266,51 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                   pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
 
         # plot data TODO - make this mixed effects models
-        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[2, 1]))
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
         colors = [self.colors[t] for t in list(label_map.values())]
-        sns.boxplot(data=data_for_stats, x=group, y=var, hue=comparison, ax=ax[0], width=0.5, showfliers=False,
+        sns.boxplot(data=data_for_stats, y=group, x=var, hue=comparison, ax=ax[0], width=0.5, showfliers=False,
                     palette=colors, medianprops={'color': 'white'}, hue_order=list(label_map.values()))
-        ax[0] = clean_box_plot(ax[0], labelcolors=[self.colors['initial'], self.colors['new']])
-        ax[0].set(xlabel='goal location', ylabel=f'Δ prob. density{self.new_line}after update cue onset')  #from t={time_window[0]} to t={time_window[-1]}
-        ax[0].get_legend().remove()
-        rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
+        ax[0] = clean_box_plot(ax[0])
+        # for row_ind, g in enumerate(group_list):
+        #     ax[row_ind][0] = sns.violinplot(data=data_for_stats.query(f'{group} == "{g}"'), y=comparison, x=var,
+        #                            ax=ax[row_ind][0], cut=0, inner='quartile', bw=0.15, hue=True,
+        #                            palette=colors, medianprops={'color': 'white'}, hue_order=[True, False], split=True,
+        #                            order=list(label_map.values()), edgewidth=1.25)
+        #     clean_violin_plot(ax[row_ind][0], colors,)
+        #     ax[row_ind][0] = sns.boxplot(data=data_for_stats.query(f'{group} == "{g}"'), y=comparison, x=var,
+        #                                  ax=ax[row_ind][0],
+        #                                  width=0.1, showfliers=False,
+        #                                  palette=colors, boxprops={'zorder': 3, 'facecolor': 'none'},
+        #                                  order=list(label_map.values()))
+        #     ax[row_ind][0].set(xlabel=f'{g} goal location', ylabel=f'prob. density after update cue onset (z-score)')  #from t={time_window[0]} to t={time_window[-1]}
+        #     ax[row_ind][0].get_legend().remove()
+        #     rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[row_ind][0], size=8)
 
         # add stats annotations
         stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
                                           f'& variable == "{var}"')
         stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
-        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
-                          hue_order=list(label_map.values()))
-        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison)
+        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, y=group, x=var, hue=comparison, orient='h', hue_order=list(label_map.values()))
+        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats,  y=group, x=var, hue=comparison,
+                       hue_order=list(label_map.values()), orient='h')
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
          .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
-        # plot the difference between initial and new probabilities
-        sns.boxplot(data=diff_data, x=comparison, y='initial_vs_new', ax=ax[1], width=0.5, showfliers=False,
+        # # plot the difference between initial and new probabilities
+        sns.boxplot(data=diff_data, y=comparison, x='initial_vs_new',ax=ax[1], width=0.5, showfliers=False,
                     palette=colors, medianprops={'color': 'white'}, order=list(label_map.values()))
         ax[1] = clean_box_plot(ax[1])
-        ax[1].set(xlabel=comparison, ylabel=f'initial - new prob. density')
+
+        ax[1] = sns.histplot(data=diff_data, hue=comparison, y='initial_vs_new', ax=ax[1], kde=True, common_norm=False,
+                             element='step', fill=False, kde_kws={'bw_adjust':0.75, 'cut':0}, palette=colors,
+                             hue_order=list(label_map.values()), stat='proportion', alpha=0.1)
+        medians = diff_data.groupby(comparison)['initial_vs_new'].median()
+        for u in list(label_map.values()):
+            ax[1].axhline(medians[u], color=self.colors[u])
+        ax[1].set(ylabel=f'initial - new prob. density (z-scored')
 
         combos = list(itertools.combinations(combo_list, r=2))
         diff_pairs = [((c[0],), (c[1],)) for c in combos]
@@ -256,9 +320,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                           f'& variable == "initial_vs_new"')
         stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
-        annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
-                          order=list(label_map.values()))
-        annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new')
+        annot = Annotator(ax[1], pairs=combos, data=diff_data, y=comparison, x='initial_vs_new', orient='h', order=list(label_map.values()))
+        annot.new_plot(ax[1], pairs=combos, data=diff_data, y=comparison, x='initial_vs_new', order=list(label_map.values()),
+                       orient='h')
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
@@ -267,19 +331,219 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
         return sfig
 
-    def plot_decoding_validation(self, sfig):
-        # plot confusion matrix
-        ax = sfig.subplots(nrows=1, ncols=1)
-        matrix = np.vstack(sorted_data['confusion_matrix'])
-        limits = [np.min(np.array(sorted_data['bins'])), np.max(np.array(sorted_data['bins']))]
-        im = ax[row_id][col_id].imshow(matrix, cmap=self.colors['control'], origin='lower',  # aspect='auto',
-                                         vmin=0, vmax=sorted_data['vmax'],
-                                         extent=[limits[0], limits[1], limits[0], limits[1]])
-        plt.colorbar(im, ax=ax[ax_id], pad=0.04, location='right', fraction=0.046, label='prob. density')
+    def plot_goal_coding_commitment_single_trials(self, sfig, comparison='update_type', prob_value='prob_sum',
+                                                  use_zscores=True):
+        decoding_measures = 'zscore_prob' if use_zscores else prob_value
 
-        for key, value in sorted_data['locations'].items():
-            ax[ax_id].axhline(value, linestyle='dashed', color=[0, 0, 0, 0.5])
-            ax[ax_id].avhline(value, linestyle='dashed', color=[0, 0, 0, 0.5])
+        # load up data
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        label_map = self.label_maps[comparison]
+        choice_data = self.aggregator.calc_choice_commitment_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                  prob_value=prob_value, quantiles=4)
+
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                    prob_value=prob_value, n_time_bins=11,
+                                                                    time_window=(-2.5, 2.5))
+        merge_keys = ['session_id', 'trial_id', 'times', 'choice']
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
+                        'choice']
+        agg_dict = {k: (k, np.mean) for k in ['zscore_prob', prob_value, 'diff_baseline', 'choice_commitment_at_0',
+                                               'view_angle_at_0']}
+        agg_dict.update({k: (k, lambda x: x.unique()[0]) for k in ['choice_commitment_quantile', 'view_angle_quantile']})
+        choice_data = choice_data.merge(trial_data[[*merge_keys, 'zscore_prob']], how='left', left_on=merge_keys,
+                                        right_on=merge_keys, validate='one_to_one')
+        trial_data = (choice_data
+                       .query(f'times_binned > 0 & times_binned < 1.5')  # select window
+                       .groupby(groupby_cols)[[a[0] for a in agg_dict.values()]]
+                       .agg(**agg_dict)  # get mean, peak, or peak latency for each trial (np.argmax)
+                       .reset_index()  #TODO - look into nan values
+                       .dropna(axis=0, subset=['choice_commitment_at_0', 'view_angle_at_0'])
+                       .assign(choice=lambda x: x['choice'].map(dict(initial_stay='initial', switch='new'))))
+
+        ax = sfig.subplots(nrows=4, ncols=len(label_map.keys()), sharey='row', squeeze=False)
+        metrics = ['view_angle', 'choice_commitment']
+        for i, m in enumerate(metrics):
+            for comp, data in trial_data.groupby([comparison, 'choice']):
+                col_id = np.argwhere(np.array(list(label_map.keys())) == comp[0])[0][0]
+                row_id = np.argwhere(np.array(['initial', 'new']) == comp[1])[0][0] + (i * 2)
+
+                sess_averages = data.groupby(['animal', f'{m}_quantile'])[decoding_measures].mean().reset_index()
+
+                for n, sess in sess_averages.groupby(['animal']):
+                    ax[row_id][col_id] = sns.pointplot(sess, x=f'{m}_quantile', y=decoding_measures, order=['q3', 'q2', 'q1', 'q0'],
+                                         color=self.colors['home'], ax=ax[row_id][col_id], join=True,)
+                [c.set_alpha(0.25) for c in ax[row_id][col_id].collections]
+                [l.set_alpha(0.25) for l in ax[row_id][col_id].lines]
+                ax[row_id][col_id] = sns.pointplot(sess_averages, x=f'{m}_quantile', y=decoding_measures, order=['q3', 'q2', 'q1', 'q0'],
+                                                    palette=self.colors[f'{comp[1]}_quartiles'], errorbar='se', ax=ax[row_id][col_id],)
+                # sns.boxplot(data, x=f'{m}_quantile', y=decoding_measures, order=['q4', 'q3', 'q2', 'q1'], showfliers=False,
+                #             width=0.5, medianprops={'color': 'white'}, palette=self.colors[f'{comp[1]}_quartiles'], ax=ax[row_id][col_id])
+                # clean_box_plot(ax[row_id][col_id])
+                # ax[row_id][col_id] = sns.regplot(data, x=f'{m}_at_0', y=decoding_measures,
+                #                                  scatter=True, x_ci='sd', ax=ax[row_id][col_id], color=self.colors[comp[1]])
+                # cmap = self.colors[f'{comp[1]}_cmap_light_to_dark']
+                # ax[row_id][col_id].scatter(data[f'{m}_at_0'], data['diff_baseline'], c=data[f'{m}_at_0'], cmap=cmap,
+                #                            alpha=0.2, s=5)
+                # ax[row_id][col_id] = sns.stripplot(sess_averages, x=f'{m}_quantile', y=decoding_measures, order=['q4', 'q3', 'q2', 'q1'],
+                #               palette=self.colors[f'{comp[1]}_quartiles'],  ax=ax[row_id][col_id], alpha=0.25)
+
+                stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                              approaches=['traditional'], tests=['spearman'],
+                              results_type='manuscript')
+                stats.run(data, dependent_vars=[decoding_measures], group_vars=[f'{m}_at_0'], pairs=None,
+                          filename=f'commitment_stats_{m}')
+
+                stats_data = stats.stats_df.query(f'approach == "traditional" & test == "spearman"'
+                                                  f'& variable == "{decoding_measures}"')
+                pvalues = np.round(stats_data['p_val'].to_numpy(), 4)
+                correlations = np.round(stats_data['prob_test_vals'].to_numpy(), 4)
+                rainbow_text(0.05, 0.85, [f'p = {p}, rho = {r}' for p, r in zip(pvalues, correlations)],
+                             [self.colors['home']], ax=ax[row_id][col_id], size=8)
+                ax[row_id][col_id].set(xlabel=m, ylabel='probability density after update (z-scored)')
+                ax[row_id][col_id].set_title(f'{label_map[comp[0]]} - {comp[1]} -{m}',
+                                             color=self.colors[label_map[comp[0]]])
+
+            sfig.suptitle('goal arm representations by behavioral state', fontsize=12)
+            colors = [self.colors[t] for t in ['initial', 'new']]
+            rainbow_text(0.85, 0.85, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+
+        return sfig
+
+    def plot_goal_coding_by_commitment(self, sfig, comparison='update_type', prob_value='prob_sum', ):
+        # load up data
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        label_map = self.label_maps[comparison]
+        choice_data = self.aggregator.calc_choice_commitment_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                  prob_value=prob_value)
+        initial_colors = self.colors['initial_quartiles']
+        new_colors = self.colors['new_quartiles']
+        behavior_colors = self.colors['home_quartiles']
+
+        # plot figure of goal coding over time
+        ax = sfig.subplots(nrows=6, ncols=len(label_map.keys()), sharey='row', squeeze=False)
+        metrics = ['view_angle', 'choice_commitment']
+        for i, m in enumerate(metrics):
+            for comp, data in choice_data.groupby(comparison):
+                col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
+                sub_groups = f'{m}_quantile'
+                for s_name, s_data in data.groupby(sub_groups):
+                    color_id = np.argwhere(np.array(['q4', 'q3', 'q2', 'q1']) == s_name)[0][0]
+                    trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                             values=prob_value)
+                    new_mat = trial_mat.query('choice == "switch"').to_numpy()
+                    initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                    time_bins = trial_mat.columns.to_numpy()
+
+                    behavior_df = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
+                                                columns='times', values=m)
+                    behavior_mat = behavior_df.query('choice == "switch"').to_numpy()  # behavior values hsould be same for both
+
+                    ax[0 + i * 3][col_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=initial_colors[color_id])
+                    ax[0 + i * 3][col_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat),
+                                           np.nanmean(initial_mat, axis=0) - sem(initial_mat), color=initial_colors[color_id],
+                                           alpha=0.3)
+
+                    ax[1 + i * 3][col_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=new_colors[color_id])
+                    ax[1 + i * 3][col_id].fill_between(time_bins, np.nanmean(new_mat, axis=0) + sem(new_mat),
+                                           np.nanmean(new_mat, axis=0) - sem(new_mat), color=new_colors[color_id], alpha=0.3)
+
+                    ax[2 + i * 3][col_id].plot(time_bins, np.nanmean(behavior_mat, axis=0),
+                                               color=behavior_colors[color_id])
+                    ax[2 + i * 3][col_id].fill_between(time_bins, np.nanmean(behavior_mat, axis=0) + sem(behavior_mat),
+                                                       np.nanmean(behavior_mat, axis=0) - sem(behavior_mat),
+                                                       color=behavior_colors[color_id],
+                                                       alpha=0.3)
+
+                ax[0 + i * 3][0].set(ylabel='prob density')
+                ax[1 + i * 3][0].set(ylabel='prob density')
+                ax[2 + i * 3][0].set(ylabel=m)
+                ax[0 + i * 3][col_id].set_title(f'{label_map[comp]} {m}', color=self.colors[label_map[comp]])
+
+        for a in ax.flatten():
+            a.axvline(0, color='k', linestyle='dashed', alpha=0.5)
+        title = f'goal arm representations by behavioral state'
+        sfig.suptitle(title, fontsize=12)
+        sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
+
+        colors = [self.colors[t] for t in ['initial', 'new']]
+        rainbow_text(0.85, 0.85, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+
+        return sfig
+
+    @staticmethod
+    def nan_sem(x):
+        return sem(x, nan_policy='omit')
+
+    def plot_decoding_validation(self, sfig, comparison='update_type'):
+        ax = sfig.subplots(nrows=1, ncols=4, sharey='row', sharex='row')
+        label_map = self.label_maps[comparison]
+        feat_map = dict(y_position='position', dynamic_choice='choice', choice='choice')
+        feat = self.aggregator.group_df['feature'].to_numpy()[0]
+        feat_bins = self.aggregator.group_df['bins'].to_numpy()[0]
+        bins = (feat_bins[1:] + feat_bins[:-1]) / 2
+
+        # get confusion matrix and error
+        summary_df = pd.concat(self.aggregator.group_df['summary_df'].to_list())
+        summary_df['feature_bins'] = pd.cut(summary_df['actual_feature'], feat_bins)
+
+        # error_by_position = (summary_df
+        #                      .groupby(['update_type', 'feature_bins', 'correct', 'session'])['decoding_error']
+        #                      .mean()  # get mean decoding error for position/trial type for each session
+        #                      .reset_index()
+        #                      .groupby(['update_type', 'feature_bins', 'correct'])  # get across sessions
+        #                      .agg(mean=('decoding_error', np.mean), sem=('decoding_error', self.nan_sem))
+        #                      .reset_index())
+        #
+        # error_mean = (error_by_position
+        #               .pivot(columns='feature_bins', index=['update_type', 'correct'], values='mean')
+        #               .rename(lambda x: x.mid, axis=1)
+        #               .apply(lambda x: (x - np.min(bins)) / (np.max(bins) - np.min(bins))))
+        # error_sem = (error_by_position
+        #               .pivot(columns='feature_bins', index=['update_type', 'correct'], values='sem')
+        #               .rename(lambda x: x.mid, axis=1)
+        #               .apply(lambda x: (x - np.min(bins)) / (np.max(bins) - np.min(bins))))
+
+        confusion_matrix = (summary_df
+                            .groupby(['update_type', 'correct'])
+                            .apply(lambda x: self.aggregator._get_confusion_matrix(x, feat_bins)))
+
+        error_df = (summary_df
+                    .query('correct == 1')
+                    .assign(error_fraction=lambda x: (x.decoding_error - np.min(bins)) / (np.max(bins) - np.min(bins))))
+
+        locations_fractions = {k: (v - np.min(bins)) / (np.max(bins) - np.min(bins))
+                               for k, v in self.virtual_track.cue_end_locations.get(feat, dict()).items()}
+        locations_fractions_start = {k: (v - np.min(bins)) / (np.max(bins) - np.min(bins))
+                               for k, v in self.virtual_track.cue_start_locations.get(feat, dict()).items()}
+
+        for col_id, label in enumerate(label_map.values()):
+            # plot decoding error across positions in the track
+            index_id = (label, 1.0)
+            # ax[0][col_id].fill_between(fraction_of_track, error_mean.loc[index_id] - error_sem.loc[index_id],
+            #                            error_mean.loc[index_id] + error_sem.loc[index_id],
+            #                            color=self.colors[label], alpha=0.25)
+            # ax[0][col_id].plot(fraction_of_track, error_mean.loc[index_id], color=self.colors[label],
+            #                    linestyle='solid')
+            # ax[0][col_id].set(ylabel='decoding error', xlabel='fraction of track', title=label)
+
+            # plot confusion matrix for each trial type
+            im = ax[col_id].imshow(confusion_matrix.loc[index_id], cmap=self.colors['control_cmap'],
+                                      origin='lower', vmin=.015, vmax=0.1, extent=[0, 1, 0, 1])
+            ax[col_id].set(ylabel=f'decoded {feat_map[feat]}', xlabel=f'true {feat_map[feat]}')
+            ax[col_id] = add_task_phase_lines(ax[col_id], cue_locations=locations_fractions_start,
+                                              text_brackets=True)
+            # add dashed lines
+            for key, value in locations_fractions.items():
+                ax[col_id].axvline(value, linestyle='dashed', linewidth=0.5, color='k', alpha=0.5)
+                ax[col_id].axhline(value, linestyle='dashed', linewidth=0.5, color='k', alpha=0.5)
+                ax[col_id].axvline(value, linestyle='dashed', linewidth=0.5, color='k', alpha=0.5)
+        plt.colorbar(im, ax=ax[col_id], pad=0.04, location='right', fraction=0.046, label='prob. density')
+
+        ax[col_id+1] = sns.ecdfplot(data=error_df, x='error_fraction', hue='session', ax=ax[col_id+1],
+                                    palette=[self.colors['control']] * len(error_df['session'].unique()), alpha=0.25,
+                                    legend=False)
+        ax[col_id+1].set(xlabel='decoding error (fraction of track)', ylabel='cumulative fraction')
+        ax[col_id+1].set_aspect(1. / ax[col_id+1].get_data_ratio(), adjustable='box')
 
         return sfig
 
@@ -1138,34 +1402,29 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         fraction_of_track = (tuning_curve_bins - np.min(tuning_curve_bins)) / (np.max(tuning_curve_bins) - np.min(tuning_curve_bins))
         locations_fractions = {k: (v - np.min(tuning_curve_bins)) / (np.max(tuning_curve_bins) - np.min(tuning_curve_bins))
                                for k, v in locations.items()}
+        locations_fractions_start = {k: (v - np.min(tuning_curve_bins)) / (np.max(tuning_curve_bins) - np.min(tuning_curve_bins))
+                                     for k, v in self.virtual_track.cue_start_locations.get(feat, dict()).items()}
 
         # plot data
-        ax = sfig.subplots(nrows=2, ncols=3, sharex=True, sharey=True)
+        ax = sfig.subplots(nrows=1, ncols=3, sharex=True, sharey=True)
         for ax_ind, model in enumerate(list(label_map.keys())):
-            im = ax[0][ax_ind].imshow(tuning_curve_scaled[model][sort_index['model'], :], cmap=self.colors['cmap_r'],
+            im = ax[ax_ind].imshow(tuning_curve_scaled[model][sort_index['model'], :], cmap=self.colors['cmap_r'],
                                    origin='lower', vmin=0.1, vmax=0.9, aspect='auto',
                                    extent=[fraction_of_track[0], fraction_of_track[-1],
                                            0, np.shape(tuning_curve_scaled[model])[0]])
-            im = ax[1][ax_ind].imshow(tuning_curve_scaled[model][sort_index['model_update_only'], :], cmap=self.colors['cmap_r'],
-                                   origin='lower', vmin=0.1, vmax=0.9, aspect='auto',
-                                   extent=[fraction_of_track[0], fraction_of_track[-1],
-                                           0, np.shape(tuning_curve_scaled[model])[0]])
-            for row_ind in [0, 1]:
-                ax[row_ind][ax_ind] = add_task_phase_lines(ax[row_ind][ax_ind], cue_locations=locations_fractions,
+            ax[ax_ind] = add_task_phase_lines(ax[ax_ind], cue_locations=locations_fractions_start,
                                                            text_brackets=True)
-                for key, value in locations_fractions.items():
-                    ax[row_ind][ax_ind].axvline(value, linestyle='dashed', color='w', alpha=0.5, linewidth=0.5)
-
-
-                # add limits
-                ax[row_ind][ax_ind].set(xlim=(fraction_of_track[0], fraction_of_track[-1]),
+            for key, value in locations_fractions.items():
+                ax[ax_ind].axvline(value, linestyle='dashed', color='w', alpha=0.5, linewidth=0.5)
+                ax[ax_ind].set(xlim=(fraction_of_track[0], fraction_of_track[-1]),
                                         ylim=(0, np.shape(tuning_curve_scaled[model])[0]))
-            ax[0][ax_ind].set_title(label_map[model], fontsize=10)
+            ax[ax_ind].set_title(label_map[model], fontsize=10)
 
-        plt.colorbar(im, ax=ax[row_ind][ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
+        plt.colorbar(im, ax=ax[ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
 
         sfig.supylabel(f'units sorted by {self.new_line} {label_map["model"]}', fontsize=10)
         sfig.suptitle(title, fontsize=12)
+
         return sfig
 
     def plot_phase_modulation_around_update(self, param_data, title, plot_groups=None, tags=''):
@@ -1480,3 +1739,48 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             times = f'up_to_{time_included}s_{trial_block}trials'
             self.results_io.save_fig(fig=fig, filename=f'performance_comparisons', additional_tags=f'{tags}_{times}',
                                      tight_layout=False)
+
+    def plot_goal_coding_prediction(self, sfig, comparison='all_update', prob_value='zscore_prob', tags=''):
+        # load up data
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        label_map = self.label_maps
+        colors = [self.colors[t] for t in ['non_update', 'stay', 'switch']]
+
+        # plot figure
+        ax = sfig.subplots(nrows=4, ncols=2, sharex=True, squeeze=False)
+        predicted_value = ['correct', 'choice_made']
+        for ind, pred in enumerate(predicted_value):
+            path = self.results_io.get_data_filename(filename=f'prediction_{prob_value}_{pred}_{tags}', format='csv')
+            if path.is_file():
+                predict_df = pd.read_csv(path)
+            else:
+                predict_df = self.aggregator.predict_trial_outcomes(self.aggregator.group_aligned_df, plot_groups,
+                                                                    prob_value, comparison=pred)
+                predict_df.to_csv(path, index=False)
+            groupers = ['pre_or_post', 'input', 'correct'] if pred == 'choice_made' else ['pre_or_post', 'input', 'region']
+            for comp, data in predict_df.groupby(groupers):
+                col_id = np.argwhere(predict_df['pre_or_post'].unique() == comp[0])[0][0] + int(ind * 2)
+                row_add = int(comp[2] * 2) if pred == 'choice_made' else 0
+                row_id = np.argwhere(predict_df['input'].unique() == comp[1])[0][0] + row_add
+
+                sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
+                             palette=[self.colors['control']] * 3, ax=ax[row_id][col_id], legend=False, binrange=(0.45, 0.75),
+                             binwidth=0.015, element='bars', linewidth=0.5, fill=True, stat='density', alpha=0.025)
+                sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type', hue_order=['non_update', 'switch', 'stay', ],
+                             palette=self.colors['trials'], ax=ax[row_id][col_id], binrange=(0.45, 0.75),
+                             binwidth=0.015, element='step', linewidth=1.5, fill=False, stat='density')
+                p_values = []
+                for u in ['non_update', 'stay', 'switch']:
+                    actual_score = data.query(f'update_type == "{u}" & target == "actual"')['score'].to_numpy()
+                    ax[row_id][col_id].axvline(actual_score, color=self.colors[u], linewidth=2)
+                    shuffled_scores = data.query(f'update_type == "{u}" & target == "shuffled"')['score'].to_numpy()
+                    p_values.append(sum(shuffled_scores >= actual_score) / len(shuffled_scores))
+                rainbow_text(0.05, 0.85, p_values, colors, ax=ax[row_id][col_id], size=8)
+
+                ax[row_id][col_id].set(title=f'{comp[1]} trials - {comp[0]} cue - {pred} - {groupers[2]}: {comp[2]}')
+                ax[row_id][col_id].set(xlim=(0.45, 0.75))
+
+        # rainbow_text(0.05, 0.85, ['delay only', 'stay', 'switch'], colors, ax=ax[0][0], size=8)
+        sfig.suptitle(f'prediction of {comparison} trial types with goal codes', fontsize=12)
+
+        return sfig
