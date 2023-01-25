@@ -7,7 +7,7 @@ import warnings
 from matplotlib.transforms import Affine2D, offset_copy
 import mpl_toolkits.axisartist.floating_axes as floating_axes
 from mpl_toolkits.axisartist.grid_finder import FixedLocator, MaxNLocator
-from matplotlib.collections import LineCollection
+from matplotlib.collections import LineCollection, PolyCollection
 
 
 def clean_plot(fig, axes, tight_layout):
@@ -43,7 +43,7 @@ def clean_plot(fig, axes, tight_layout):
     fig.align_labels()
 
 
-def clean_box_plot(ax, labelcolors=None):
+def clean_box_plot(ax, labelcolors=None, fill=True):
     box_patches = [patch for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
     colors = [patch.get_facecolor() for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
     colors = colors * int(len(box_patches) / len(colors))
@@ -59,6 +59,25 @@ def clean_box_plot(ax, labelcolors=None):
 
     for ticklabel, color in zip(ax.get_xticklabels(), colors):
         ticklabel.set_color(color)
+
+    if not fill:
+        [patch.set_facecolor(None) for patch in ax.patches if type(patch) == mpl.patches.PathPatch]
+
+    return ax
+
+
+def clean_violin_plot(ax, colors, line_start=0):
+    for ind, violin in enumerate(ax.findobj(PolyCollection)):
+        violin.set(facecolor=(*mpl.colors.to_rgb(colors[ind]), 0.5))
+        violin.set(edgecolor=(*mpl.colors.to_rgb(colors[ind]), 1))
+
+    for ind, l in enumerate(ax.lines[line_start:]):
+        color_ind = int(np.floor(ind / len(colors)))
+        if color_ind < len(colors):
+            if (ind - 1) % len(colors) == 0:
+                l.set(linestyle='-', linewidth=1, color=colors[color_ind], alpha=0.8)
+            else:
+                l.set(linestyle='--', linewidth=0.5, color=colors[color_ind])
 
     return ax
 
@@ -125,6 +144,7 @@ def get_color_theme():
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#000000', as_cmap=True)
         color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#c0c0c0,#303030', 4)  # increasing grey scales
+        color_theme_dict[f'{key}_cmap_light_to_dark'] = sns.color_palette('blend:#c0c0c0,#303030', as_cmap=True)  # (40 to 70 light)
     for key in ['switch_trials', 'switch']:
         color_theme_dict[key] = '#785cf7'  # purple - 270 in degrees, 95 saturation, 50 light
     for key in ['stay_trials', 'stay']:
@@ -134,11 +154,13 @@ def get_color_theme():
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#2459bd',
                                                             as_cmap=True)  # start at dark blue (30 light)
         color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#b7c4fa,#2459bd', 4)  # (30 to 70 light)
+        color_theme_dict[f'{key}_cmap_light_to_dark'] = sns.color_palette("blend:#b7c4fa,#2459bd", as_cmap=True)  # (40 to 70 light)
     for key in ['new', 'switch_update']:
         color_theme_dict[key] = '#b01e70'  # pink - 345 degrees, 90 saturation, 40 light (was 30, testing out)
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#b01e70',
                                                             as_cmap=True)  # start at dark pink (30 light)
         color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#fab2cf,#b01e70', 4)  # (40 to 70 light)
+        color_theme_dict[f'{key}_cmap_light_to_dark'] = sns.color_palette('blend:#fab2cf,#b01e70', as_cmap=True)  # (40 to 70 light)
     for key in ['error', 'incorrect']:
         color_theme_dict[key] = '#bc1026'  # 10 degrees, 95 saturation, 40 light
     for key in ['choice', 'choice_commitment']:
