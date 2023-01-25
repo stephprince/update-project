@@ -7,7 +7,7 @@ import warnings
 from ast import literal_eval
 from statsmodels.regression.mixed_linear_model import MixedLM
 from pathlib import Path
-from scipy.stats import sem, ranksums, kstest
+from scipy.stats import sem, ranksums, kstest, spearmanr
 from tqdm import tqdm
 
 import rpy2.robjects as ro
@@ -36,7 +36,7 @@ class Stats:
         # setup defaults unless given otherwise
         self.levels = levels or ['animal', 'session_id']  # append levels needed (e.g., trials, units)
         self.approaches = approaches or ['bootstrap', 'traditional', 'mixed-effects']  # 'mixed-effects', 'summary' as other option
-        self.tests = tests or ['direct_prob', 'mann-whitney', 'emmeans', 'anova']  # 'wilcoxon' as other option
+        self.tests = tests or ['direct_prob', 'mann-whitney', 'emmeans', 'anova', 'spearmanr']  # 'wilcoxon' as other option
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
         self.nboot = nboot  # number of iterations to perform for bootstrapping default should be 1000
         self.units = units or 'trials'  # lowest hierarchical level of individual samples to use for description
@@ -124,13 +124,21 @@ class Stats:
             elif test == 'anova':
                 if approach == 'mixed_effects':
                     anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model)))
-                    test_output = dict(pair='all', variable=var, test=test, approach=approach,
+                    test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
                                        prob_test_vals=anova_df['F value'].to_numpy()[0],
                                        p_val=anova_df["Pr(>F)"].to_numpy()[0],
                                        alternative='type III anova with Satterthwaite method')
                     pair_outputs.append(test_output)
                 else:
-                    output = pg.mixed_anova()  # TODO - determine if I need mixed or not
+                    print('not currently supported')
+                    # output = pg.mixed_anova()  # TODO - determine if I need mixed or not
+            elif test == 'spearman':
+                test_val, pval = spearmanr(self.df_processed[self.group_vars[0]], self.df_processed[var],
+                                           alternative=alternative)
+                test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
+                                   prob_test_vals=test_val, p_val=pval,
+                                   alternative=alternative)
+                pair_outputs.append(test_output)
 
         # run tests that work on pairs individually
         if test in ['direct_prob', 'mann-whitney', 'wilcoxon']:
@@ -180,6 +188,10 @@ class Stats:
         descriptive_stats.insert(0, 'approach', approach)
         descriptive_stats.insert(1, 'test', test)
         descriptive_stats.insert(2, 'alternative', alternative)
+
+        if test == 'spearman':
+            descriptive_stats[self.group_vars[0]] = self.group_vars[0]
+            descriptive_stats = descriptive_stats.iloc[0:2, :]
 
         return descriptive_stats
 

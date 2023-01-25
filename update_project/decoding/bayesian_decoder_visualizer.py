@@ -475,7 +475,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         return sem(x, nan_policy='omit')
 
     def plot_decoding_validation(self, sfig, comparison='update_type'):
-        ax = sfig.subplots(nrows=1, ncols=4, sharey='row', sharex='row')
+        ax = sfig.subplots(nrows=1, ncols=4, sharex='row')
         label_map = self.label_maps[comparison]
         feat_map = dict(y_position='position', dynamic_choice='choice', choice='choice')
         feat = self.aggregator.group_df['feature'].to_numpy()[0]
@@ -485,24 +485,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # get confusion matrix and error
         summary_df = pd.concat(self.aggregator.group_df['summary_df'].to_list())
         summary_df['feature_bins'] = pd.cut(summary_df['actual_feature'], feat_bins)
-
-        # error_by_position = (summary_df
-        #                      .groupby(['update_type', 'feature_bins', 'correct', 'session'])['decoding_error']
-        #                      .mean()  # get mean decoding error for position/trial type for each session
-        #                      .reset_index()
-        #                      .groupby(['update_type', 'feature_bins', 'correct'])  # get across sessions
-        #                      .agg(mean=('decoding_error', np.mean), sem=('decoding_error', self.nan_sem))
-        #                      .reset_index())
-        #
-        # error_mean = (error_by_position
-        #               .pivot(columns='feature_bins', index=['update_type', 'correct'], values='mean')
-        #               .rename(lambda x: x.mid, axis=1)
-        #               .apply(lambda x: (x - np.min(bins)) / (np.max(bins) - np.min(bins))))
-        # error_sem = (error_by_position
-        #               .pivot(columns='feature_bins', index=['update_type', 'correct'], values='sem')
-        #               .rename(lambda x: x.mid, axis=1)
-        #               .apply(lambda x: (x - np.min(bins)) / (np.max(bins) - np.min(bins))))
-
         confusion_matrix = (summary_df
                             .groupby(['update_type', 'correct'])
                             .apply(lambda x: self.aggregator._get_confusion_matrix(x, feat_bins)))
@@ -517,19 +499,12 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                for k, v in self.virtual_track.cue_start_locations.get(feat, dict()).items()}
 
         for col_id, label in enumerate(label_map.values()):
-            # plot decoding error across positions in the track
-            index_id = (label, 1.0)
-            # ax[0][col_id].fill_between(fraction_of_track, error_mean.loc[index_id] - error_sem.loc[index_id],
-            #                            error_mean.loc[index_id] + error_sem.loc[index_id],
-            #                            color=self.colors[label], alpha=0.25)
-            # ax[0][col_id].plot(fraction_of_track, error_mean.loc[index_id], color=self.colors[label],
-            #                    linestyle='solid')
-            # ax[0][col_id].set(ylabel='decoding error', xlabel='fraction of track', title=label)
-
             # plot confusion matrix for each trial type
+            index_id = (label, 1.0)
             im = ax[col_id].imshow(confusion_matrix.loc[index_id], cmap=self.colors['control_cmap'],
                                       origin='lower', vmin=.015, vmax=0.1, extent=[0, 1, 0, 1])
             ax[col_id].set(ylabel=f'decoded {feat_map[feat]}', xlabel=f'true {feat_map[feat]}')
+            ax[col_id].set(title=label, color=self.colors[label])
             ax[col_id] = add_task_phase_lines(ax[col_id], cue_locations=locations_fractions_start,
                                               text_brackets=True)
             # add dashed lines
