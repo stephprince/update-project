@@ -40,7 +40,8 @@ class BayesianDecoderAggregator:
         for sess_dict in data:
             # get aggregate data and add to session dictionary
             bins = \
-            [[-1, 0, 1] if sess_dict[self.analyzer_name].convert_to_binary else sess_dict[self.analyzer_name].bins][0]
+                [[-1, 0, 1] if sess_dict[self.analyzer_name].convert_to_binary else sess_dict[self.analyzer_name].bins][
+                    0]
             summary_df = self._summarize(sess_dict[self.analyzer_name])
             session_error = self._get_session_error(sess_dict[self.analyzer_name], summary_df)
             if hasattr(sess_dict[self.analyzer_name].units_types, 'any'):
@@ -119,7 +120,8 @@ class BayesianDecoderAggregator:
                         lambda x: self._flip_y_position(x, bounds) if x.name in ['feature', 'decoding'] else x)
                     trials_to_flip = trials_to_flip.apply(
                         lambda x: self._flip_y_position(x, bounds, feat_bins) if x.name in ['probability'] else x)
-                    trials_to_flip = trials_to_flip.apply(lambda x: x * -1 if x.name in ['rotational_velocity', 'view_angle', 'choice_commitment'] else x)
+                    trials_to_flip = trials_to_flip.apply(
+                        lambda x: x * -1 if x.name in ['rotational_velocity', 'view_angle', 'choice_commitment'] else x)
                     feat_df.loc[feat_df['turn_type'] == self.turn_to_flip, :] = trials_to_flip
                 else:
                     cols_to_flip = ['feature', 'decoding', 'rotational_velocity', 'view_angle', 'choice_commitment']
@@ -161,7 +163,9 @@ class BayesianDecoderAggregator:
         else:
             return group_data
 
-    def calc_choice_commitment_data(self, param_data, plot_groups, prob_value='prob_over_chance'):
+    def calc_choice_commitment_data(self, param_data, plot_groups, prob_value='prob_sum', time_window=(-2.5, 2.5),
+                                    n_time_bins=11, quantiles=4):
+        # combine choice commitment with aligned df
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
         combined_df = pd.merge(quant_df, group_aligned_data[['choice_commitment', 'view_angle']], left_index=True,
@@ -186,12 +190,20 @@ class BayesianDecoderAggregator:
             combined_df['trial_index'] = combined_df.index
             combined_df = (combined_df
                            .explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline', 'choice_commitment',
-                                         'view_angle'])
+                                     'view_angle'])
                            .reset_index(drop=True))
+            combined_df['times_binned'] = pd.cut(combined_df['times'], np.linspace(*time_window, n_time_bins)).apply(
+                lambda x: x.mid)
             combined_df = pd.DataFrame(combined_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
-            combined_df['choice_commitment_quantile'] = pd.qcut(combined_df['choice_commitment_at_0'], q=4, labels=['q1', 'q2', 'q3', 'q4'])
-            combined_df['view_angle_quantile'] = pd.qcut(combined_df['view_angle_at_0'], q=4, labels=['q4', 'q3', 'q2', 'q1'])
+            combined_df['choice_commitment_quantile'] = pd.qcut(combined_df['choice_commitment_at_0'], q=quantiles,
+                                                                labels=[f'q{i}' for i in range(quantiles)])
+            combined_df['choice_commitment_pos_or_neg'] = pd.cut(combined_df['choice_commitment_at_0'], (-1, 0, 1),
+                                                                labels=['positive', 'negative'])
+            combined_df['view_angle_quantile'] = pd.qcut(combined_df['view_angle_at_0'], q=quantiles,
+                                                         labels=[f'q{i}' for i in range(quantiles)][::-1])  # reversed
+            combined_df['view_angle_pos_or_neg'] = pd.cut(combined_df['view_angle_at_0'], (-1, 0, 1),
+                                                         labels=['negative', 'positive'])  # reversed
 
             return combined_df
         else:
@@ -380,7 +392,8 @@ class BayesianDecoderAggregator:
                            .reset_index(drop=True)
                            .set_index('trial_index'))
                 output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'update_type',
-                                                   'correct', 'feature_name', 'time_label', 'times', ]],
+                                                   'correct', 'turn_type', 'feature_name', 'time_label', 'times',
+                                                   'rotational_velocity']],
                                      list_df, left_index=True, right_index=True)
                 output_df['choice'] = output_df['choice'].map(dict(left='initial_stay', right='switch'))
                 return output_df
@@ -469,6 +482,13 @@ class BayesianDecoderAggregator:
 
     def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3,
                                        time_window=(0, 2.5)):
+        # get data for z-scoring (all trial types but only times around update)
+        group_aligned_data = self.select_group_aligned_data(param_data, dict(time_label=['t_update']), ret_df=True)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
+        zscore_mean = np.mean(np.stack(quant_df[prob_value]))
+        zscore_std = np.std(np.stack(quant_df[prob_value]))
+
+        # get data for quantification
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
 
@@ -480,16 +500,14 @@ class BayesianDecoderAggregator:
                 align_time = align_time - 1  # get index immediately preceding 0 if not the first one
             prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
-
-            # get z-scored values
-            zscore_mean = np.mean(quant_df[prob_value])  #TODO - do separately for switch/stay data
-            zscore_std = np.std(quant_df[prob_value])  #TODO - do separately for switch/stay data
-            prob_sum_mat = np.vstack(quant_df[prob_value])
-            quant_df['zscore_prob'] = (prob_sum_mat - zscore_mean) / zscore_std
+            quant_df['zscore_prob'] = list((prob_sum_mat - zscore_mean) / zscore_std)
 
             # get diff from left vs. right bounds
             quant_df['trial_index'] = quant_df.index
-            quant_df = quant_df.explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline']).reset_index()
+            quant_df = (quant_df
+                        .explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline', 'zscore_prob',
+                                  'rotational_velocity'])
+                        .reset_index())
             quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(*time_window, n_time_bins)).apply(
                 lambda x: x.mid)
             quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
@@ -497,8 +515,10 @@ class BayesianDecoderAggregator:
             choice_df = quant_df.pivot(
                 index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
                 columns=['choice'],
-                values=[prob_value, 'diff_baseline']).reset_index()  # had times here before
+                values=[prob_value, 'diff_baseline', 'zscore_prob']).reset_index()  # had times here before
             choice_df['diff_switch_stay'] = choice_df[(prob_value, 'switch')] - choice_df[(prob_value, 'initial_stay')]
+            choice_df['zscore_diff_switch_stay'] = choice_df[('zscore_prob', 'switch')] - \
+                                                   choice_df[('zscore_prob', 'initial_stay')]
             choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
 
             return quant_df, choice_df
@@ -827,9 +847,10 @@ class BayesianDecoderAggregator:
         return data_for_stats, dict(sig=stars_to_plot, ns=blanks_to_plot)
 
     def calc_prediction_data(self, group_aligned_df, plot_groups, prob_value, comparison):
-        trial_data, _ = self.calc_trial_by_trial_quant_data(group_aligned_df, plot_groups, prob_value)
+        trial_data, _ = self.calc_trial_by_trial_quant_data(group_aligned_df, plot_groups)
         trial_data['pre_or_post'] = pd.cut(trial_data['times'], [-1.5, 0, 1.5], labels=['pre', 'post'])
-        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'turn_type',
+                        'feature_name',
                         'pre_or_post', 'choice', ]
         data_for_predict = (trial_data
                             .groupby(groupby_cols)[[prob_value, 'diff_baseline']]  # group by trial type
@@ -843,32 +864,55 @@ class BayesianDecoderAggregator:
                             .reset_index()
                             )
 
-        choice_made = []
-        for c, t in zip(data_for_predict['correct'], data_for_predict['update_type']):
-            if (t == 'switch' and c == 1) or (
-                    t != 'switch' and c == 0):  # correct switch trials and incorrect stay/delay trials
-                choice_made.append('new')
-            else:
-                choice_made.append('initial')
-
         data_for_predict['initial'] = data_for_predict[(f'{prob_value}_mean', 'initial')]
         data_for_predict['new'] = data_for_predict[(f'{prob_value}_mean', 'new')]
         data_for_predict[('initial_vs_new', '')] = data_for_predict['initial'] - data_for_predict['new']
-        data_for_predict[(('choice_made', ''))] = choice_made
         data_for_predict = (data_for_predict
                             .droplevel(1, axis=1)
-                            .drop('prob_sum_mean', axis=1))
+                            .drop(f'{prob_value}_mean', axis=1))
+
+        # convert data to original left/right terms and choices made for prediction purposes
+        # drew this out for confirmation that it's correct. Initial/new sides have no dependence on the animals
+        # decision or update type. Chosen sides depend on whether choice was correct and what update type
+        left, right, left_vs_right, choice_made = [], [], [], []
+        for i, row in data_for_predict.iterrows():
+            if row['turn_type'] == 1:
+                right.append(row['new'])
+                left.append(row['initial'])
+                left_vs_right.append(row['initial_vs_new'])
+                if (row['update_type'] == 'switch' and row['correct'] == 1) or (
+                        row['update_type'] != 'switch' and row['correct'] == 0):
+                    choice_made.append('right')
+                else:
+                    choice_made.append('left')
+            elif row['turn_type'] == 2:
+                right.append(row['initial'])
+                left.append(row['new'])
+                left_vs_right.append(-1 * row['initial_vs_new'])
+                if (row['update_type'] == 'switch' and row['correct'] == 1) or (
+                        row['update_type'] != 'switch' and row['correct'] == 0):
+                    choice_made.append('left')
+                else:
+                    choice_made.append('right')
+
+        data_for_predict['left'] = left
+        data_for_predict['right'] = right
+        data_for_predict['left_vs_right'] = left_vs_right
+        data_for_predict['choice_made'] = choice_made
 
         return data_for_predict
 
     def predict_trial_outcomes(self, group_aligned_df, plot_groups, prob_value, comparison='correct'):
         # get input and target variable
-        input_target_groups = dict(choice_made=dict(prediction_groups=['region', 'pre_or_post', 'update_type', 'correct'],
-                                                    target_variable='choice_made'),
-                                   correct=dict(prediction_groups=['region', 'pre_or_post', 'update_type'],
-                                                target_variable='correct'),)
-        input_variables = ['initial', 'new', 'initial_vs_new']
+        input_target_groups = dict(
+            choice_made=dict(prediction_groups=['region', 'pre_or_post', 'update_type', 'correct'],
+                             input_variables=['left', 'right', 'left_vs_right'],
+                             target_variable='choice_made'),
+            correct=dict(prediction_groups=['region', 'pre_or_post', 'update_type'],
+                         input_variables=['initial', 'new', 'initial_vs_new'],
+                         target_variable='correct'), )
         prediction_groups = input_target_groups[comparison]['prediction_groups']
+        input_variables = input_target_groups[comparison]['input_variables']
         target_variable = input_target_groups[comparison]['target_variable']
         enc = OrdinalEncoder()
 
@@ -880,7 +924,8 @@ class BayesianDecoderAggregator:
             unbalanced_data = dict()
             for var in input_variables:
                 unbalanced_data[var] = data[var].to_numpy()
-            unbalanced_data[target_variable] = (enc.fit_transform(data[target_variable].to_numpy().reshape(-1, 1))).squeeze()
+            unbalanced_data[target_variable] = (
+                enc.fit_transform(data[target_variable].to_numpy().reshape(-1, 1))).squeeze()
 
             # resample incorrect trials to balance classes
             unique_counts, counts = np.unique(unbalanced_data[target_variable], return_counts=True)
@@ -896,28 +941,31 @@ class BayesianDecoderAggregator:
                                                           random_state=123, n_samples=np.shape(target_oversampled)[0])
             inputs_balanced = np.vstack((inputs_oversampled, inputs_resampled))
             target_balanced = np.hstack((target_oversampled, target_resampled))
-            target_shuffled = resample(target_balanced, random_state=123)
 
             # fit svm for each input
-            inputs = dict(prob=inputs_balanced[:, :1], initial_vs_new=inputs_balanced[:, 2])
-            targets = dict(actual=target_balanced, shuffled=target_shuffled)
+            inputs = dict(probability=inputs_balanced[:, :1], probability_difference=inputs_balanced[:, 2])
             distributions = dict(C=loguniform(1e0, 1e3), gamma=loguniform(1e-4, 1e0))
-            for i, t in itertools.product(list(inputs.keys()), list(targets.keys())):
-                # use randomized search to get best hyperparameters
-                model = svm.SVC(kernel='rbf')  # will have to tune the hyperparameters
-                clf = RandomizedSearchCV(model, distributions, n_iter=10, cv=LeaveOneOut(), verbose=3, n_jobs=12)
-                input_data = inputs[i] if np.ndim(inputs[i]) > 1 else inputs[i].reshape(-1, 1)
-                search = clf.fit(input_data, targets[t])
-                model_params = search.best_params_
+            for i, t in itertools.product(list(inputs.keys()), ['actual', 'shuffled']):
+                n_iter = 100 if t == 'shuffled' else 1  # for shuffled data get distribution of values
+                for iter in range(n_iter):
+                    # resample shuffled data each iteration if needed, otherwise use real data
+                    target = resample(target_balanced) if t == 'shuffled' else target_balanced
 
-                # assess model performance with leave-one-out cross validation
-                model = svm.SVC(kernel='rbf', **model_params)
-                model_score = np.nanmean(cross_val_score(model, input_data, targets[t], cv=LeaveOneOut(),
-                                                         scoring='accuracy',  n_jobs=12))
+                    # use randomized search to get best hyperparameters
+                    model = svm.SVC(kernel='rbf')  # will have to tune the hyperparameters
+                    clf = RandomizedSearchCV(model, distributions, n_iter=10, cv=LeaveOneOut(), verbose=3, n_jobs=12)
+                    input_data = inputs[i] if np.ndim(inputs[i]) > 1 else inputs[i].reshape(-1, 1)
+                    search = clf.fit(input_data, target)
+                    model_params = search.best_params_
 
-                predict_dict = {k: v for k, v in zip(prediction_groups, name)}
-                predict_dict.update(dict(input=i, target=t, score=model_score, **model_params))
-                prediction_outputs.append(pd.DataFrame.from_dict(predict_dict))
+                    # assess model performance with leave-one-out cross validation
+                    model = svm.SVC(kernel='rbf', **model_params)
+                    model_score = np.nanmean(cross_val_score(model, input_data, target, cv=LeaveOneOut(),
+                                                             scoring='accuracy', n_jobs=12))
+
+                    predict_dict = {k: v for k, v in zip(prediction_groups, name)}
+                    predict_dict.update(dict(input=i, target=t, iter=iter, score=model_score, **model_params))
+                    prediction_outputs.append(pd.DataFrame.from_dict(predict_dict))
 
         prediction_data = pd.concat(prediction_outputs)
 
