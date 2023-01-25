@@ -30,18 +30,20 @@ class UpdateTaskFigureGenerator:
 
     def plot_main_figures(self):
         # self.plot_figure_1()  # figure 1 - experimental paradigm
-        # self.plot_figure_2()  # figure 2 - HPC position coding during decision updating
-        # self.plot_figure_3()  # figure 3 - PFC choice coding during decision updating
-        self.plot_figure_4()  # figure 4 - HPC + PFC contributions to accurate decision updating
+        self.plot_figure_2()  # figure 2 - HPC position coding during decision updating
+        # self.plot_figure_3()  # figure 3 - HPC theta sequences
+        # self.plot_figure_4()  # figure 4 - PFC choice coding during decision updating
+        # self.plot_figure_5()  # figure 5 - HPC + PFC contributions to accurate decision updating
+        # self.plot_figure_6()  # figure 6 - HPC + PFC responses by choice commitment
 
     def plot_supplemental_figures(self):
         # self.plot_supp_figure_1()  # supp figure 1 - behavioral supplement
-        # self.plot_supp_figure_2()  # supp figure 2 - HPC position coding supplement
+        self.plot_supp_figure_2()  # supp figure 2 - HPC position coding supplement
         self.plot_supp_figure_3()  # supp figure 3 - HPC position coding supplement - session/animal breakdown
         self.plot_supp_figure_4()  # supp figure 4 - PFC position coding supplement
         self.plot_supp_figure_5()  # supp figure 5 - PFC choice coding supplement
         self.plot_supp_figure_6()  # supp figure 6 - HPC + PFC supplement
-        self.plot_supp_figure_7()  # supp figure 6 - HPC + PFC supplement
+        self.plot_supp_figure_7()  # supp figure 7 - HPC + PFC supplement
 
     def run_analysis_pipeline(self, analysis_to_run, analysis_kwargs=dict(), overwrite=False):
         print(f'Running {analysis_to_run} analysis interface')
@@ -109,38 +111,57 @@ class UpdateTaskFigureGenerator:
 
     def plot_figure_3(self):
         visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-                                                analysis_kwargs=dict(features=['choice'],
-                                                                     params=dict(region=['PFC'])),
+                                                analysis_kwargs=dict(features=['y_position'],
+                                                                     params=dict(region=['CA1'],
+                                                                                 decoder_bin_size=[0.025])),
                                                 overwrite=self.overwrite)
-        choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Choice', overwrite=False)  # do not overwrite choice data
 
         # figure structure
-        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6))
-        sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1.25])
-        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2)
-        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2)
-        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2)
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 5))
+        sfigs = fig.subfigures(nrows=2, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
 
-        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
-        sfigs_row0[1] = choice_visualizer.plot_choice_commitment(sfigs_row0[1])  # TODO - check which trial types included
-        sfigs_row1[0] = self.plot_placeholder(sfigs[1][0], text='Recording setup + choice schematic')
-        sfigs_row1[1] = visualizer.plot_decoding_output_heatmap(sfigs_row1[1])
-        sfigs[2] = visualizer.plot_goal_coding(sfigs[2])
-        sfigs_row3[0] = visualizer.plot_goal_coding_stats(sfigs_row3[0], tags='PFC_choice')
+        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='example theta raw signal + filtered')
+        sfigs_row0[1] = visualizer.plot_theta_phase_modulation(sfigs_row0[1])
+        sfigs[1] = visualizer.plot_theta_phase_stats(sfigs[1])
 
         # figure saving
         self.add_panel_labels(sfigs)
         self.results_io.save_fig(fig=fig, filename=f'figure_3', tight_layout=False, results_type='manuscript')
 
     def plot_figure_4(self):
-        # pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-        #                                             analysis_kwargs=dict(features=['choice'],
-        #                                                                  params=dict(region=['PFC'])),
-        #                                             overwrite=self.overwrite)
-        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-                                                    analysis_kwargs=dict(features=['y_position'],
-                                                                         params=dict(region=['CA1'])),
+        visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                analysis_kwargs=dict(features=['choice'],
+                                                                     params=dict(region=['PFC'])),
+                                                overwrite=self.overwrite)
+        choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Choice', overwrite=False)  # don't overwrite
+
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=4, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1.25, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2)
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2)
+
+        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
+        sfigs_row0[1] = choice_visualizer.plot_choice_commitment(sfigs_row0[1])  # TODO - check which trial types included
+        sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Recording setup + choice schematic')
+        sfigs_row1[1] = visualizer.plot_decoding_output_heatmap(sfigs_row1[1], feat=choice)
+        sfigs[2] = visualizer.plot_goal_coding(sfigs[2], with_velocity=True)
+        sfigs[3] = visualizer.plot_goal_coding_stats(sfigs[3], tags='PFC_choice')
+
+        # figure saving
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'figure_4', tight_layout=False, results_type='manuscript')
+
+    def plot_figure_5(self):
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['choice'],
+                                                                         params=dict(region=['PFC'])),
                                                     overwrite=self.overwrite)
+        # hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                             analysis_kwargs=dict(features=['y_position'],
+        #                                                                  params=dict(region=['CA1'])),
+        #                                             overwrite=self.overwrite)
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 6))
@@ -154,25 +175,49 @@ class UpdateTaskFigureGenerator:
         #                                                     tags='HPC_position_accuracy')
         # sfigs[2][1] = pfc_visualizer.plot_goal_coding_stats(sfigs[2][1], comparison='correct', title='prefrontal',
         #                                                     tags='PFC_choice_accuracy')
-        sfigs[3][0] = hpc_visualizer.plot_goal_coding_prediction(sfigs[3][0], comparison='all_update')
-        # sfigs[3][1] = pfc_visualizer.plot_goal_coding_prediction(sfigs[3][1], comparison='all_update')
+        #sfigs[3][0] = hpc_visualizer.plot_goal_coding_prediction(sfigs[3][0], comparison='all_update')
+        sfigs[3][1] = pfc_visualizer.plot_goal_coding_prediction(sfigs[3][1], comparison='all_update')
 
         # figure saving
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'figure_4', tight_layout=False, results_type='manuscript')
+        self.results_io.save_fig(fig=fig, filename=f'figure_5', tight_layout=False, results_type='manuscript')
+
+    def plot_figure_6(self):
+        # pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                             analysis_kwargs=dict(features=['choice'],
+        #                                                                  params=dict(region=['PFC'])),
+        #                                             overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6))
+        sfigs = fig.subfigures(nrows=4, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1.5, 1])
+
+        # sfigs[0] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs[0])
+        sfigs[1] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs[1])
+        sfigs[2] = hpc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs[2])
+
+        # figure saving
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'figure_6', tight_layout=False, results_type='manuscript')
 
     def plot_supp_figure_1(self):
         visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
-        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[1.5, 1], height_ratios=[1, 3])
+        sfigs = fig.subfigures(nrows=2, ncols=1, height_ratios=[1, 3])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1.5])
 
         # plot data
-        sfigs[0][0] = visualizer.plot_event_durations(sfigs[0][0])  # average trajectories aligned to update
-        sfigs[0][1] = visualizer.plot_performance_by_animals(sfigs[0][1])  # behavioral performance distributions
-        sfigs[1][0] = visualizer.plot_performance_by_delay(sfigs[1][0])  # example trajectories of each trial type
-        sfigs[1][1] = visualizer.plot_trajectories_all_metrics(sfigs[1][1])  # example trajectories of each trial type
+        sfigs_row0[0] = visualizer.plot_event_durations(sfigs_row0[0])  # average trajectories aligned to update
+        sfigs_row0[1] = visualizer.plot_performance_by_animals(sfigs_row0[1])  # behavioral performance distributions
+        sfigs_row1[0] = visualizer.plot_performance_by_delay(sfigs_row1[0])  # example trajectories of each trial type
+        sfigs_row1[1] = visualizer.plot_trajectories_all_metrics(sfigs_row1[1])  # example trajectories of each trial type
 
         # figure saving
         self.add_panel_labels(sfigs)
@@ -186,7 +231,7 @@ class UpdateTaskFigureGenerator:
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1.5, 1.5, 1])
+        sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1.5, 1, 1.5])
         sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2)
 
         # plot data
@@ -206,18 +251,21 @@ class UpdateTaskFigureGenerator:
                                                                analysis_kwargs=dict(features=['y_position'],
                                                                                     params=dict(region=['CA1'],
                                                                                                 encoder_trial_types=encoder_trials_all,
-                                                                                                decoder_test_size=0.5)),
+                                                                                                decoder_test_size=0.8)),
                                                                overwrite=self.overwrite)
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[1, 1], height_ratios=[1, 1])
+        sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         # plot data
-        sfigs[0][0] = hpc_visualizer_encode_all.plot_decoding_output_heatmap(sfigs[1][0])
-        sfigs[0][1] = hpc_visualizer_encode_all.plot_goal_coding(sfigs[1][1])
-        sfigs[1][0] = hpc_visualizer_encode_all.plot_goal_coding_stats(sfigs[2][0], tags='CA1_position',
-                                                                       time_window=(0,1))
+        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='schematic of using all trials for decoder')
+        sfigs_row0[1] = hpc_visualizer_encode_all.plot_decoding_output_heatmap(sfigs_row0[1])
+        sfigs[1] = hpc_visualizer_encode_all.plot_goal_coding(sfigs[1])
+        sfigs_row2[0] = hpc_visualizer_encode_all.plot_goal_coding_stats(sfigs_row2[0], tags='CA1_position',
+                                                                       time_window=(0, 1.5))
 
         # figure saving
         self.add_panel_labels(sfigs)
@@ -316,7 +364,7 @@ class UpdateTaskFigureGenerator:
         # plot data
         sfigs[0] = pfc_visualizer.plot_goal_coding(sfigs[0], groups='session_id', heatmap=True)  # results by session
         sfigs[1] = pfc_visualizer.plot_goal_coding(sfigs[1], groups='animal', heatmap=True)  # results by animal
-        sfigs[2] = pfc_visualizer.plot_goal_coding(sfigs[2], groups='animal')  # results by animal non-heatmap
+        sfigs[2] = pfc_visualizer.plot_goal_coding(sfigs[2], groups='animal', with_velocity=True)  # results by animal non-heatmap
 
         # figure saving
         self.add_panel_labels(sfigs)
