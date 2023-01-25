@@ -31,7 +31,10 @@ class BaseVisualizationClass(ABC):
                                                                  turn_type=[1, 2], correct=[1],
                                                                  time_label=['t_update']),
                                                 correct=dict(update_type=['switch'], turn_type=[1, 2], correct=[1, 0],
-                                                             time_label=['t_update']))
+                                                             time_label=['t_update']),
+                                                all_update=dict(update_type=['switch', 'stay', 'non_update'],
+                                                                turn_type=[1, 2], correct=[1, 0],
+                                                                time_label=['t_update']))
         self.label_maps = dict(update_type=dict(switch='switch', stay='stay', non_update='delay only'),
                                correct={1: 'correct', 0: 'incorrect'})
 
