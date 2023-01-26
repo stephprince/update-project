@@ -50,14 +50,14 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             # self.results_io.save_fig(fig=fig, filename=f'goal_coding_prediction', tight_layout=False,
             #                          additional_tags=tags)
             #
-            fig = plt.figure()
-            self.plot_goal_coding_commitment_single_trials(fig)
-            self.results_io.save_fig(fig=fig, filename='choice_commitment_scatter', tight_layout=False,
-                                     additional_tags=tags)
-
-            fig = plt.figure()
-            self.plot_goal_coding_by_commitment(fig)
-            self.results_io.save_fig(fig=fig, filename=f'choice_commitment', tight_layout=False, additional_tags=tags)
+            # fig = plt.figure()
+            # self.plot_goal_coding_commitment_single_trials(fig)
+            # self.results_io.save_fig(fig=fig, filename='choice_commitment_scatter', tight_layout=False,
+            #                          additional_tags=tags)
+            #
+            # fig = plt.figure()
+            # self.plot_goal_coding_by_commitment(fig)
+            # self.results_io.save_fig(fig=fig, filename=f'choice_commitment', tight_layout=False, additional_tags=tags)
 
             # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
             for plot_types in list(itertools.product(*self.plot_groups.values())):
@@ -159,8 +159,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         height_ratios = [1]
         if heatmap:
             nrows = nrows + 1
+            height_ratios = [1] * nrows
         elif groups and not heatmap:
             nrows = len(trial_data[groups].unique())
+            height_ratios = [1] * nrows
         elif with_velocity:
             nrows = nrows + 1
             height_ratios = [2, 1]
@@ -169,11 +171,17 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
             if not heatmap:
                 for s_name, s_data in data.groupby(sub_groups):
-                    if with_velocity:
-                        row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0] * 2
+                    i = 2 if with_velocity else 1
+                    row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0] * i
+                    data_to_plot = s_data
+                    if sub_groups != 'session_id':   # don't group by session if it already was grouped by that
+                        trial_mat = (s_data
+                                     .groupby(['choice', 'session_id', 'times'])[prob_value]
+                                     .mean()
+                                     .reset_index()
+                                     .pivot(index=['choice', 'session_id'], columns='times', values=prob_value))
                     else:
-                        row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0]
-                    trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                        trial_mat = data_to_plot.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
                                              values=prob_value)
                     new_mat = trial_mat.query('choice == "switch"').to_numpy()
                     initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
@@ -191,7 +199,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         ax[row_id][col_id].set(ylim=ylim)
 
                     if with_velocity:
-                        veloc_data = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                        veloc_data = data_to_plot.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
                                                  values='rotational_velocity')
                         veloc_mat = veloc_data.query('choice == "switch"').to_numpy()  # velocity data same for both
                         ax[row_id + 1][col_id].plot(time_bins, np.mean(veloc_mat, axis=0), color=self.colors['home'])
@@ -268,48 +276,37 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # plot data TODO - make this mixed effects models
         ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
         colors = [self.colors[t] for t in list(label_map.values())]
-        sns.boxplot(data=data_for_stats, y=group, x=var, hue=comparison, ax=ax[0], width=0.5, showfliers=False,
-                    palette=colors, medianprops={'color': 'white'}, hue_order=list(label_map.values()))
-        ax[0] = clean_box_plot(ax[0])
-        # for row_ind, g in enumerate(group_list):
-        #     ax[row_ind][0] = sns.violinplot(data=data_for_stats.query(f'{group} == "{g}"'), y=comparison, x=var,
-        #                            ax=ax[row_ind][0], cut=0, inner='quartile', bw=0.15, hue=True,
-        #                            palette=colors, medianprops={'color': 'white'}, hue_order=[True, False], split=True,
-        #                            order=list(label_map.values()), edgewidth=1.25)
-        #     clean_violin_plot(ax[row_ind][0], colors,)
-        #     ax[row_ind][0] = sns.boxplot(data=data_for_stats.query(f'{group} == "{g}"'), y=comparison, x=var,
-        #                                  ax=ax[row_ind][0],
-        #                                  width=0.1, showfliers=False,
-        #                                  palette=colors, boxprops={'zorder': 3, 'facecolor': 'none'},
-        #                                  order=list(label_map.values()))
-        #     ax[row_ind][0].set(xlabel=f'{g} goal location', ylabel=f'prob. density after update cue onset (z-score)')  #from t={time_window[0]} to t={time_window[-1]}
-        #     ax[row_ind][0].get_legend().remove()
-        #     rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[row_ind][0], size=8)
+        light_colors = [self.colors[f'{t}_light'] for t in list(label_map.values())]
+
+        sess_averages = data_for_stats.groupby(['session_id', group, comparison])[var].mean().reset_index()
+        ax[0] = sns.stripplot(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0], zorder=1, jitter=True,
+                              palette=colors,  hue_order=list(label_map.values()), alpha=0.4, dodge=True, legend=False,)
+        ax[0] = sns.pointplot(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0], errwidth=5,
+                      palette=colors, hue_order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3),
+                      scale=1.5, errorbar=('ci', 95),)
+        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update cue onset (z-score)')
+        ax[0].get_legend().remove()
+        rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
 
         # add stats annotations
         stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
                                           f'& variable == "{var}"')
         stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
-        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, y=group, x=var, hue=comparison, orient='h', hue_order=list(label_map.values()))
-        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats,  y=group, x=var, hue=comparison,
-                       hue_order=list(label_map.values()), orient='h')
+        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison, hue_order=list(label_map.values()))
+        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats,  x=group, y=var, hue=comparison,
+                       hue_order=list(label_map.values()),)
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
          .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
-        # # plot the difference between initial and new probabilities
-        sns.boxplot(data=diff_data, y=comparison, x='initial_vs_new',ax=ax[1], width=0.5, showfliers=False,
-                    palette=colors, medianprops={'color': 'white'}, order=list(label_map.values()))
-        ax[1] = clean_box_plot(ax[1])
-
-        ax[1] = sns.histplot(data=diff_data, hue=comparison, y='initial_vs_new', ax=ax[1], kde=True, common_norm=False,
-                             element='step', fill=False, kde_kws={'bw_adjust':0.75, 'cut':0}, palette=colors,
-                             hue_order=list(label_map.values()), stat='proportion', alpha=0.1)
-        medians = diff_data.groupby(comparison)['initial_vs_new'].median()
-        for u in list(label_map.values()):
-            ax[1].axhline(medians[u], color=self.colors[u])
+        sess_averages = diff_data.groupby(['session_id', comparison])['initial_vs_new'].mean().reset_index()
+        ax[1] = sns.stripplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], zorder=1, legend=False,
+                              palette=colors, order=list(label_map.values()), alpha=0.4)
+        ax[1] = sns.pointplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], errwidth=4,
+                              palette=colors, order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3),
+                              scale=1.5, errorbar=('ci', 95), )
         ax[1].set(ylabel=f'initial - new prob. density (z-scored')
 
         combos = list(itertools.combinations(combo_list, r=2))
@@ -320,9 +317,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                           f'& variable == "initial_vs_new"')
         stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
-        annot = Annotator(ax[1], pairs=combos, data=diff_data, y=comparison, x='initial_vs_new', orient='h', order=list(label_map.values()))
-        annot.new_plot(ax[1], pairs=combos, data=diff_data, y=comparison, x='initial_vs_new', order=list(label_map.values()),
-                       orient='h')
+        annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new', order=list(label_map.values()))
+        annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new', order=list(label_map.values()),
+                       )
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
@@ -331,7 +328,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
         return sfig
 
-    def plot_goal_coding_commitment_single_trials(self, sfig, comparison='update_type', prob_value='prob_sum',
+    def plot_goal_coding_by_commitment_single_trials(self, sfig, comparison='update_type', prob_value='prob_sum',
                                                   use_zscores=True):
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
 
@@ -349,7 +346,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         'choice']
         agg_dict = {k: (k, np.mean) for k in ['zscore_prob', prob_value, 'diff_baseline', 'choice_commitment_at_0',
                                                'view_angle_at_0']}
-        agg_dict.update({k: (k, lambda x: x.unique()[0]) for k in ['choice_commitment_quantile', 'view_angle_quantile']})
+        agg_dict.update({k: (k, lambda x: x.unique()[0]) for k in ['choice_commitment_quantile', 'view_angle_quantile',
+                                                                   'choice_commitment_pos_or_neg', 'view_angle_pos_or_neg']})
         choice_data = choice_data.merge(trial_data[[*merge_keys, 'zscore_prob']], how='left', left_on=merge_keys,
                                         right_on=merge_keys, validate='one_to_one')
         trial_data = (choice_data
@@ -360,32 +358,24 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                        .dropna(axis=0, subset=['choice_commitment_at_0', 'view_angle_at_0'])
                        .assign(choice=lambda x: x['choice'].map(dict(initial_stay='initial', switch='new'))))
 
-        ax = sfig.subplots(nrows=4, ncols=len(label_map.keys()), sharey='row', squeeze=False)
-        metrics = ['view_angle', 'choice_commitment']
+        ax = sfig.subplots(nrows=2, ncols=len(label_map.keys()), sharey='row', squeeze=False)
+        metrics = ['choice_commitment']
+        grouping = 'pos_or_neg'  #quantile is other option
+        order1 = ['q3', 'q2', 'q1', 'q0']
         for i, m in enumerate(metrics):
             for comp, data in trial_data.groupby([comparison, 'choice']):
                 col_id = np.argwhere(np.array(list(label_map.keys())) == comp[0])[0][0]
                 row_id = np.argwhere(np.array(['initial', 'new']) == comp[1])[0][0] + (i * 2)
 
-                sess_averages = data.groupby(['animal', f'{m}_quantile'])[decoding_measures].mean().reset_index()
+                sess_averages = data.groupby(['animal', 'session_id', f'{m}_{grouping}'])[decoding_measures].mean().reset_index()
 
                 for n, sess in sess_averages.groupby(['animal']):
-                    ax[row_id][col_id] = sns.pointplot(sess, x=f'{m}_quantile', y=decoding_measures, order=['q3', 'q2', 'q1', 'q0'],
-                                         color=self.colors['home'], ax=ax[row_id][col_id], join=True,)
+                    ax[row_id][col_id] = sns.pointplot(sess, x=f'{m}_{grouping}', y=decoding_measures, order=['negative', 'positive'],
+                                         color=self.colors['home'], errorbar=None, ax=ax[row_id][col_id], join=True,)
                 [c.set_alpha(0.25) for c in ax[row_id][col_id].collections]
                 [l.set_alpha(0.25) for l in ax[row_id][col_id].lines]
-                ax[row_id][col_id] = sns.pointplot(sess_averages, x=f'{m}_quantile', y=decoding_measures, order=['q3', 'q2', 'q1', 'q0'],
-                                                    palette=self.colors[f'{comp[1]}_quartiles'], errorbar='se', ax=ax[row_id][col_id],)
-                # sns.boxplot(data, x=f'{m}_quantile', y=decoding_measures, order=['q4', 'q3', 'q2', 'q1'], showfliers=False,
-                #             width=0.5, medianprops={'color': 'white'}, palette=self.colors[f'{comp[1]}_quartiles'], ax=ax[row_id][col_id])
-                # clean_box_plot(ax[row_id][col_id])
-                # ax[row_id][col_id] = sns.regplot(data, x=f'{m}_at_0', y=decoding_measures,
-                #                                  scatter=True, x_ci='sd', ax=ax[row_id][col_id], color=self.colors[comp[1]])
-                # cmap = self.colors[f'{comp[1]}_cmap_light_to_dark']
-                # ax[row_id][col_id].scatter(data[f'{m}_at_0'], data['diff_baseline'], c=data[f'{m}_at_0'], cmap=cmap,
-                #                            alpha=0.2, s=5)
-                # ax[row_id][col_id] = sns.stripplot(sess_averages, x=f'{m}_quantile', y=decoding_measures, order=['q4', 'q3', 'q2', 'q1'],
-                #               palette=self.colors[f'{comp[1]}_quartiles'],  ax=ax[row_id][col_id], alpha=0.25)
+                ax[row_id][col_id] = sns.pointplot(sess_averages, x=f'{m}_{grouping}', y=decoding_measures, order=['negative', 'positive'],
+                                                    palette=self.colors[f'{comp[1]}_quartiles'], ax=ax[row_id][col_id],)
 
                 stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                               approaches=['traditional'], tests=['spearman'],
@@ -504,7 +494,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             im = ax[col_id].imshow(confusion_matrix.loc[index_id], cmap=self.colors['control_cmap'],
                                       origin='lower', vmin=.015, vmax=0.1, extent=[0, 1, 0, 1])
             ax[col_id].set(ylabel=f'decoded {feat_map[feat]}', xlabel=f'true {feat_map[feat]}')
-            ax[col_id].set(title=label, color=self.colors[label])
+            ax[col_id].set_title(label, color=self.colors[label])
             ax[col_id] = add_task_phase_lines(ax[col_id], cue_locations=locations_fractions_start,
                                               text_brackets=True)
             # add dashed lines
