@@ -115,18 +115,20 @@ class Stats:
                 for _, row in emm_df.iterrows():
                     matching_pair = [p for p in pairs if (p[0] in row['pairs'] and p[1] in row['pairs'])]
                     if matching_pair:
-                        test_val = row.get('z.ratio') or row.get('t.ratio')
+                        test_statistic_name = [r for r in ['z.ratio', 't.ratio'] if r in row.index][0]
                         test_output = dict(pair=matching_pair, variable=var, test=test, approach=approach,
-                                           prob_test_vals=test_val, p_val=row["p.value"],
-                                           alternative='the effect of the predictor')
+                                           test_statistic=row.get(test_statistic_name),
+                                           test_statistic_name=test_statistic_name,
+                                           df=row.get('df'), p_val=row["p.value"],
+                                           alternative='two-sided')
                         pair_outputs.append(test_output)
-                        # TODO - could also export the whole emm predictor
             elif test == 'anova':
                 if approach == 'mixed_effects':
                     anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model)))
                     test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
-                                       prob_test_vals=anova_df['F value'].to_numpy()[0],
-                                       p_val=anova_df["Pr(>F)"].to_numpy()[0],
+                                       test_statistic=anova_df['F value'].to_numpy()[0],
+                                       test_statistic_name='F value',
+                                       df=anova_df['DenDF'], p_val=anova_df["Pr(>F)"].to_numpy()[0],
                                        alternative='type III anova with Satterthwaite method')
                     pair_outputs.append(test_output)
                 else:
@@ -134,11 +136,15 @@ class Stats:
                     # output = pg.mixed_anova()  # TODO - determine if I need mixed or not
             elif test == 'spearman':
                 test_val, pval = spearmanr(self.df_processed[self.group_vars[0]], self.df_processed[var],
-                                           alternative=alternative)
+                                           alternative=alternative, nan_policy='omit')
                 test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
-                                   prob_test_vals=test_val, p_val=pval,
+                                   test_statistic=test_val, test_statistic_name='rho',  # not exactly right? but using
+                                   df=(len(self.df_processed[var]) - 2), p_val=pval,
                                    alternative=alternative)
                 pair_outputs.append(test_output)
+            elif test == 'summary':
+                if approach == 'mixed_effects':
+                     summary = (ro.r['summary'](self.model))  # (could access variables within using rx2)
 
         # run tests that work on pairs individually
         if test in ['direct_prob', 'mann-whitney', 'wilcoxon']:
@@ -153,18 +159,28 @@ class Stats:
                         comparisons = {0: f'{p[1]} >= {p[0]}', 1: f'{p[0]} >= {p[1]}'}
                         prob_vals = (self.get_direct_prob(samples[0][var].to_numpy(), samples[1][var].to_numpy()),
                                      self.get_direct_prob(samples[1][var].to_numpy(), samples[0][var].to_numpy()))
-                        test_output = dict(pair=p, variable=var, test=test, approach=approach, prob_test_vals=[prob_vals],
+                        test_output = dict(pair=p, variable=var, test=test, approach=approach, test_statistic=[prob_vals],
+                                           test_statistic_name='joint_probability', df=np.nan,
                                            p_val=np.min(prob_vals) * 2, alternative=comparisons[np.argmin(prob_vals)])
                     elif test == 'mann-whitney':
                         output = pg.mwu(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
                         test_output = dict(pair=p, variable=var, test=test, approach=approach,
-                                           prob_test_vals=output['U-val'].to_numpy()[0],
+                                           test_statistic=output['U-val'].to_numpy()[0],
+                                           test_statistic_name='U-val', df=np.nan,
                                            p_val=output["p-val"].to_numpy()[0],
                                            alternative=output['alternative'].to_numpy()[0])
                     elif test == 'wilcoxon':
                         output = pg.wilcoxon(samples[0][var].to_numpy(), samples[1][var].to_numpy(), alternative=alternative)
                         test_output = dict(pair=p, variable=var, test=test, approach=approach,
-                                           prob_test_vals=output['W-val'].to_numpy()[0],
+                                           test_statistic=output['W-val'].to_numpy()[0],
+                                           test_statistic_name='W-val', df=np.nan,
+                                           p_val=output["p-val"].to_numpy()[0],
+                                           alternative=output['alternative'].to_numpy()[0])
+                    elif test == 'wilcoxon_one_sample':
+                        output = pg.wilcoxon(samples[0][var].to_numpy(), alternative=alternative)
+                        test_output = dict(pair=p, variable=var, test=test, approach=approach,
+                                           test_statistic=output['W-val'].to_numpy()[0],
+                                           test_statistic_name='W-val', df=np.nan,
                                            p_val=output["p-val"].to_numpy()[0],
                                            alternative=output['alternative'].to_numpy()[0])
 
@@ -222,7 +238,12 @@ class Stats:
 
     @staticmethod
     def stats_to_text(x):
-        text = f'p = {x["p_val"]:.4f}, {x["variable"]} for {x["pair"][0][0]} vs. {x["pair"][0][1]}, {x["test"]} {new_line} '
+        if x['df'] is not np.nan:
+            text = f'{x["test_statistic_name"]}({x["df"]}) = {x["test_statistic"]}, p = {x["p_val"]:.4f}, ' \
+                   f'{x["variable"]} for {x["pair"][0][0]} vs. {x["pair"][0][1]}, {x["test"]} {new_line} '
+        else:
+            text = f'{x["test_statistic_name"]} = {x["test_statistic"]}, p = {x["p_val"]:.4f}, ' \
+                   f'{x["variable"]} for {x["pair"][0][0]} vs. {x["pair"][0][1]}, {x["test"]} {new_line} '
         return text
 
     def _get_mixed_effects_model(self, data):
@@ -238,17 +259,6 @@ class Stats:
             # print(ro.r['anova'](model, model2))  # just for curiosity to compare with/without random effects
             # print(report.report(model))
             # print(ro.r['summary'](model))  (could access variables within using rx2)
-
-            # THE PURE PYTHON WAY TO DO IT - not using current
-            # not super clear but I'm pretty sure it's the same formula as 'var ~ predictor + (1|animal/session_id)' like above
-            # model3 = (MixedLM
-            #           .from_formula(f'{var} ~ C(predictor)', vc_formula={'session_id': '0+C(session_id)'}, re_formula='1',
-            #                         groups='animal', data=data)
-            #           .fit(method=['lbfgs'], reml=False))
-            # print(model3.summary())
-            # re_df = pd.DataFrame.from_dict(model3.random_effects, orient='index')
-            # re_df['intercept'] = re_df['animal'] + model3.fe_params.loc['Intercept']
-            # re_df['slopes'] = re_df.iloc[:, 1:] + model3.fe_params.loc['Intercept']
 
         return model
 
