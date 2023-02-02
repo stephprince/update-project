@@ -14,6 +14,7 @@ from sklearn.utils import resample
 from sklearn.utils.fixes import loguniform
 from scipy.stats import sem, pearsonr, uniform
 from scipy import signal
+from tqdm import tqdm
 
 from update_project.general.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
@@ -362,7 +363,7 @@ class BayesianDecoderAggregator:
                 start_bin, stop_bin = self.get_bound_bins(bins, bound_values)
 
                 threshold = 0.1  # total probability density to call a left/right choice
-                integrated_prob = np.nansum(prob_map[:, start_bin:stop_bin, :],
+                integrated_prob = np.sum(prob_map[:, start_bin:stop_bin, :],
                                             axis=1)  # (trials, feature bins, window)
                 num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
                 prob_over_chance = integrated_prob * len(bins) / num_bins[
@@ -485,8 +486,8 @@ class BayesianDecoderAggregator:
         # get data for z-scoring (all trial types but only times around update)
         group_aligned_data = self.select_group_aligned_data(param_data, dict(time_label=['t_update']), ret_df=True)
         quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
-        zscore_mean = np.mean(np.stack(quant_df[prob_value]))
-        zscore_std = np.std(np.stack(quant_df[prob_value]))
+        zscore_mean = np.nanmean(np.stack(quant_df[prob_value]))
+        zscore_std = np.nanstd(np.stack(quant_df[prob_value]))
 
         # get data for quantification
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
@@ -902,13 +903,16 @@ class BayesianDecoderAggregator:
 
         return data_for_predict
 
-    def predict_trial_outcomes(self, group_aligned_df, plot_groups, prob_value, comparison='correct'):
+    def predict_trial_outcomes(self, group_aligned_df, plot_groups, prob_value, comparison='correct', iterations=100,
+                               switch_only=True, results_io=None, tags=''):
+        results_io = results_io if results_io else self.results_io  # default if none provided
+
         # get input and target variable
         input_target_groups = dict(
-            choice_made=dict(prediction_groups=['region', 'pre_or_post', 'update_type', 'correct'],
+            choice_made=dict(prediction_groups=['region', 'update_type', 'pre_or_post', 'correct'],
                              input_variables=['left', 'right', 'left_vs_right'],
                              target_variable='choice_made'),
-            correct=dict(prediction_groups=['region', 'pre_or_post', 'update_type'],
+            correct=dict(prediction_groups=['region', 'update_type', 'pre_or_post'],
                          input_variables=['initial', 'new', 'initial_vs_new'],
                          target_variable='correct'), )
         prediction_groups = input_target_groups[comparison]['prediction_groups']
@@ -917,6 +921,8 @@ class BayesianDecoderAggregator:
         enc = OrdinalEncoder()
 
         data_for_prediction = self.calc_prediction_data(group_aligned_df, plot_groups, prob_value, comparison)
+        if switch_only:
+            data_for_prediction = data_for_prediction.query('update_type == "switch"')
 
         # preprocess the data - balance classes and scale
         prediction_outputs = []
@@ -943,29 +949,41 @@ class BayesianDecoderAggregator:
             target_balanced = np.hstack((target_oversampled, target_resampled))
 
             # fit svm for each input
-            inputs = dict(probability=inputs_balanced[:, :1], probability_difference=inputs_balanced[:, 2])
+            inputs = dict(probability_difference=inputs_balanced[:, 2])  # probability=inputs_balanced[:, :1],
             distributions = dict(C=loguniform(1e0, 1e3), gamma=loguniform(1e-4, 1e0))
             for i, t in itertools.product(list(inputs.keys()), ['actual', 'shuffled']):
-                n_iter = 100 if t == 'shuffled' else 1  # for shuffled data get distribution of values
-                for iter in range(n_iter):
-                    # resample shuffled data each iteration if needed, otherwise use real data
-                    target = resample(target_balanced) if t == 'shuffled' else target_balanced
+                n_iter = iterations if t == 'shuffled' else 1  # for shuffled data get distribution of values
+                for iter in tqdm(range(n_iter), desc='randomized hyperparameter search'):
+                    filename = f'prediction_{"_".join(name[1:])}_{prob_value}_{comparison}_{tags}_{t}_iter{iter}'
+                    path = results_io.get_data_filename(filename=filename, format='csv')
+                    if path.is_file():
+                        print(f'Loading {t} iteration: {iter}')
+                        predict_df = pd.read_csv(path)
+                    else:
+                        print(f'Running {t} iteration: {iter}')
+                        # resample shuffled data each iteration if needed, otherwise use real data
+                        target = resample(target_balanced) if t == 'shuffled' else target_balanced
 
-                    # use randomized search to get best hyperparameters
-                    model = svm.SVC(kernel='rbf')  # will have to tune the hyperparameters
-                    clf = RandomizedSearchCV(model, distributions, n_iter=10, cv=LeaveOneOut(), verbose=3, n_jobs=12)
-                    input_data = inputs[i] if np.ndim(inputs[i]) > 1 else inputs[i].reshape(-1, 1)
-                    search = clf.fit(input_data, target)
-                    model_params = search.best_params_
+                        # use randomized search to get best hyperparameters
+                        model = svm.SVC(kernel='rbf')  # will have to tune the hyperparameters
+                        clf = RandomizedSearchCV(model, distributions, n_iter=10, cv=LeaveOneOut(), n_jobs=14)
+                        input_data = inputs[i] if np.ndim(inputs[i]) > 1 else inputs[i].reshape(-1, 1)
+                        search = clf.fit(input_data, target)
+                        model_params = search.best_params_
 
-                    # assess model performance with leave-one-out cross validation
-                    model = svm.SVC(kernel='rbf', **model_params)
-                    model_score = np.nanmean(cross_val_score(model, input_data, target, cv=LeaveOneOut(),
-                                                             scoring='accuracy', n_jobs=12))
+                        # assess model performance with leave-one-out cross validation
+                        model = svm.SVC(kernel='rbf', **model_params)
+                        model_score = np.nanmean(cross_val_score(model, input_data, target, cv=LeaveOneOut(),
+                                                                 scoring='accuracy', n_jobs=12))
 
-                    predict_dict = {k: v for k, v in zip(prediction_groups, name)}
-                    predict_dict.update(dict(input=i, target=t, iter=iter, score=model_score, **model_params))
-                    prediction_outputs.append(pd.DataFrame.from_dict(predict_dict))
+                        predict_dict = {k: v for k, v in zip(prediction_groups, name)}
+                        predict_dict.update(dict(input=i, target=t, iter=iter, score=model_score, **model_params))
+
+                        # save data if needed and compile for appending
+                        predict_df = pd.DataFrame.from_dict(predict_dict)
+                        predict_df.to_csv(path, index=False)
+
+                    prediction_outputs.append(predict_df)
 
         prediction_data = pd.concat(prediction_outputs)
 
