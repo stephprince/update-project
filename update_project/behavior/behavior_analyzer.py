@@ -154,13 +154,12 @@ class BehaviorAnalyzer:
 
         # set percentage of session needed parameter
         session_percent=0.25
-        update_percent=0.1
         trials_needed=session_percent*total_trials
 
         #find session type
         trial_types=self.virtual_track.trial_types[0:7]
         trial_types.reverse()
-        if phase_count['switch_update']+phase_count['stay_update']>=(update_percent*total_trials):
+        if phase_count['switch_update']+phase_count['stay_update']>0:
             session_type='update'
         else:
             for a in trial_types:
