@@ -147,7 +147,7 @@ class BehaviorVisualizer:
         plot_data['session_type'] = pd.Categorical(plot_data['session_type'],
                                                    categories=['linear', 'ymaze_short', 'ymaze_long', 'delay1',
                                                                'delay2',
-                                                               'delay3', 'delay4', 'update'], ordered=True)
+                                                               'delay3', 'update'], ordered=True)
         nrows = 1
         ncols = 1
 
