@@ -54,10 +54,21 @@ def griddata_time_intervals(data, start_locs, stop_locs, nbins, time_offset=[0],
         else:
             x1 = time_bins  # use user-specified time bins
 
-        # ok to grab position bins from max/min bc these come from the dataframe columns
-        y1 = np.linspace(min(proby[:, 1]), max(proby[:, 1]), len(data.columns))  # position bins
-        grid_x, grid_y = np.meshgrid(x1, y1)
-        grid_prob_y = griddata(proby[:, 0:2], proby[:, 2], (grid_x, grid_y), method=method, fill_value=np.nan)
+        # # ok to grab position bins from max/min bc these come from the dataframe columns
+        # y1 = np.linspace(min(proby[:, 1]), max(proby[:, 1]), len(data.columns))  # position bins
+        # grid_x, grid_y = np.meshgrid(x1, y1)
+        # grid_prob_y = griddata(proby[:, 0:2], proby[:, 2], (grid_x, grid_y), method=method, fill_value=np.nan)
+        #
+        raw_data = data.iloc[start:stop].to_numpy().T
+        bin_inds = np.digitize(data.iloc[start:stop].index, x1 + offset, right=True)
+        if bin_inds[-1] == len(x1):  # if bins run up until past limit don't include
+            bin_inds = bin_inds[:-1]
+            raw_data = raw_data[:, :-1]
+
+        grid_prob_y = np.empty((np.shape(raw_data)[0], len(x1)))
+        grid_prob_y[:] = np.nan
+        grid_prob_y[:, bin_inds] = raw_data
+
         grid_prob.append(grid_prob_y)
 
     return grid_prob
