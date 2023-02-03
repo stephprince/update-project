@@ -14,7 +14,7 @@ from update_project.general.units import bin_spikes
 from update_project.general.lfp import get_theta
 from update_project.general.acquisition import get_velocity
 
-plt.style.use(Path().absolute().parent / 'prince-paper.mplstyle')
+plt.style.use(Path(__file__).absolute().parent.parent / 'general' / 'prince-paper.mplstyle')
 
 
 def get_phase_reference():
@@ -63,7 +63,7 @@ def get_phase_reference():
         velocity = get_velocity(nwbfile)
         velocity_resampled = velocity.iloc[::downsample_factor]
         movement = velocity_resampled > speed_threshold
-        theta_spiking_df = theta_df.join(spike_df)[movement]
+        theta_spiking_df = theta_df.join(spike_df)[movement['combined']]
         binned_spikes, spike_df = [], []  # clear out memory
 
         # histogram spiking activity by theta phase
@@ -73,7 +73,7 @@ def get_phase_reference():
         theta_hist_df = theta_hist_df.rename_axis('phase_interval').reset_index()
 
         # find phase of maximal CA1 firing and make adjustment so that phase is 0 degrees
-        phase_adj = theta_hist_df['total_spikes'].idxmax()
+        phase_adj = theta_hist_df['total_spikes_pyr'].idxmax()
         theta_hist_df['phase_adj'] = phase_adj
         phase_vect = theta_hist_df['phase'].to_numpy()/np.pi
         phase_labels = ['raw', 'post_adjustment']
@@ -82,7 +82,7 @@ def get_phase_reference():
                               int=dict(col_name='total_spikes_int', col_ind=int_cols, color='b', cmap='Blues'))
 
         # save the data for each session
-        fname = results_io.get_data_filename(filename='theta-phase_ref_adjustment', results_type='session', format='pkl')
+        fname = results_io.get_data_filename(filename='theta_phase_ref_adjustment', results_type='session', format='pkl')
         with open(fname, 'wb') as f:
             [pickle.dump(theta_hist_df, f)]
 
@@ -117,7 +117,7 @@ def get_phase_reference():
 
         fig.suptitle(f'{results_io.session_id} - theta phase spiking modulation in CA1')
         fig.tight_layout()
-        results_io.save_fig(fig=fig, axes=axes, filename=f'theta-phase-modulation', results_type='session')
+        results_io.save_fig(fig=fig, axes=axes, filename=f'theta_phase_modulation', results_type='session')
 
 
 if __name__ == '__main__':
