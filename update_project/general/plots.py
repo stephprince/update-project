@@ -143,6 +143,7 @@ def get_color_theme():
     for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all', 'delay only', 'correct']:
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_light'] = '#c0c0c0'  # black - 0 in degrees, 0 saturation, 20 light
+        color_theme_dict[f'{key}_medium'] = '#898989'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette('blend:#ffffff,#000000', as_cmap=True)
         color_theme_dict[f'{key}_cmap_r'] = sns.color_palette('blend:#000000,#ffffff', as_cmap=True)
         color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#c0c0c0,#303030', 4)  # increasing grey scales
@@ -168,7 +169,7 @@ def get_color_theme():
         color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#fab2cf,#b01e70', 4)  # (40 to 80 light)
         color_theme_dict[f'{key}_cmap_light_to_dark'] = sns.color_palette('blend:#fab2cf,#b01e70', as_cmap=True)  # (40 to 80 light)
     for key in ['error', 'incorrect']:
-        color_theme_dict[key] = '#bc1026'  # 10 degrees, 95 saturation, 40 light
+        color_theme_dict[key] = '#dba527'  # 57 degrees, 95 sat, 71 light  #'#bc1026'  # 10 degrees, 95 saturation, 40 light
     for key in ['choice', 'choice_commitment']:
         color_theme_dict[key] = sns.light_palette("#9119cf", 5)  # 285 degrees, 95 saturation, 40 light
         color_theme_dict[f'{key}_cmap'] = sns.color_palette("blend:#d7c0e4,#6e119f", as_cmap=True)  # start at dark purple (30 light)
