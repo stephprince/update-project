@@ -368,6 +368,8 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         # run decoding
         if self.model.any().any():
             self.decoded_values, self.decoded_probs = self.decoder(**kwargs)
+            edge_spaces = np.squeeze(np.argwhere(np.sum(self.model, axis=1).to_numpy() == 0))
+            self.decoded_probs.iloc[:, edge_spaces] = np.nan
         else:
             self.decoded_values = pd.DataFrame()
             self.decoded_probs = pd.DataFrame()

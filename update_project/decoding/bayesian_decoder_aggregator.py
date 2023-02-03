@@ -210,7 +210,8 @@ class BayesianDecoderAggregator:
         else:
             return None
 
-    def calc_theta_phase_data(self, param_data, filter_dict, time_bins=3, ret_by_trial=False):
+    def calc_theta_phase_data(self, param_data, filter_dict, n_time_bins=3, ret_by_trial=False,
+                              time_window=(-1.5, 1.5)):
         # get aligned df and apply filters
         mask = pd.concat([param_data[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
         data_subset = param_data[mask].rename_axis('trial').reset_index()
@@ -227,14 +228,14 @@ class BayesianDecoderAggregator:
         choice_bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
         home_bounds = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
         bounds = dict(**choice_bounds, home=home_bounds)
-        bound_mapping = dict(left='initial_stay', right='switch', home='home')
+        bound_mapping = dict(left='initial', right='new', home='home')
         for b_name, b_value in bounds.items():
             theta_phase_df[bound_mapping[b_name]] = theta_phase_df['probability'].apply(
                 lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
 
         # get histogram, ratio, and mean probability values for different theta phases
         theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), quarter=np.linspace(-np.pi, np.pi, 5))
-        time_bins = np.linspace(-self.window, self.window, time_bins)
+        time_bins = np.linspace(time_window[0], time_window[-1], n_time_bins)
         data_to_average = [*list(bound_mapping.values()), 'theta_amplitude']
         theta_phase_list = []
         theta_phase_by_trial_list = []
@@ -248,11 +249,14 @@ class BayesianDecoderAggregator:
                     lambda x: np.mean(x) + sem(x.astype(float)))
                 err_lower = theta_phase_df[data_to_average].groupby([time_df_bins, theta_df_bins]).apply(
                     lambda x: np.mean(x) - sem(x.astype(float)))
+                prob_df = (theta_phase_df
+                           .groupby([time_df_bins, theta_df_bins])['probability']
+                           .apply(lambda x: np.nanmean(np.vstack(x), axis=0)))
                 t_df = err_lower.join(err_upper, lsuffix='_err_lower', rsuffix='_err_upper')
-                t_df = mean.join(t_df).reset_index()
+                t_df = mean.join(t_df)
+                t_df = t_df.join(prob_df).reset_index()
                 t_df['phase_mid'] = t_df['theta_phase'].astype('interval').apply(lambda x: x.mid)
                 t_df['time_mid'] = t_df['times'].astype('interval').apply(lambda x: x.mid)
-
                 for g_name, g_value in t_df.groupby('times'):
                     if g_value['time_mid'].values[0] < 0:
                         times_label = 'pre'
@@ -272,6 +276,11 @@ class BayesianDecoderAggregator:
                                  .agg(np.nanmean)
                                  .dropna()
                                  .reset_index())
+                t_by_trial_df['probability'] = (theta_phase_df
+                                 .groupby(groupby_cols)['probability']
+                                 .apply(lambda x: np.nanmean(np.vstack(x), axis=0))
+                                 .dropna()
+                                 .reset_index()['probability'])
                 t_by_trial_df['theta_amplitude'] = (theta_phase_df
                                                     .groupby(groupby_cols)['theta_amplitude']
                                                     .apply(np.nanmean).dropna().reset_index())['theta_amplitude']
@@ -329,10 +338,10 @@ class BayesianDecoderAggregator:
     def _integrate_prob_density(self, prob_density, prob_density_bins, bounds, axis=0):
         start_bin, stop_bin = self.get_bound_bins(prob_density_bins, bounds)
         integrated_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
-        num_bins = len(prob_density[start_bin:stop_bin])
-        prob_over_chance = integrated_prob * len(prob_density_bins) / num_bins
+        # num_bins = len(prob_density[start_bin:stop_bin])
+        # prob_over_chance = integrated_prob * len(prob_density_bins) / num_bins
 
-        return prob_over_chance
+        return integrated_prob
 
     @staticmethod
     def get_bound_bins(bins, bound_values):
@@ -988,6 +997,34 @@ class BayesianDecoderAggregator:
         prediction_data = pd.concat(prediction_outputs)
 
         return prediction_data
+
+    def calc_significant_bins(self, aligned_data, plot_groups, prob_value):
+        trial_data, _ = self.calc_trial_by_trial_quant_data(aligned_data, plot_groups, prob_value=prob_value)
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
+                        'choice']
+        time_window_pre = (-1.5, 0)
+        baseline_value = (trial_data
+                          .query(f'times_binned > {time_window_pre[0]} & times_binned < {time_window_pre[-1]}')
+                          .groupby(groupby_cols)[prob_value]  # group by trial/trial type
+                          .mean()  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .reset_index())
+                          # .assign(choice=lambda x: x['choice'].map({'initial_stay': 'initial', 'switch': 'new'}))
+        # TODO - calculate diff from baseline for each day (might be better to do it like normal diff_baseline)
+        # could also just use diff baseline value and run one-sample test on that for each bin?
+
+        # setup stats - group variables, pairs to compare, and levels of hierarchical data
+        var = f'{decoding_measures}_mean'
+        group = 'choice'
+        group_list = data_for_stats['choice'].unique()
+        combo_list = [label_map[g] for g in plot_groups[comparison]]
+        combos = list(itertools.combinations(combo_list, r=2))
+        pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
+        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],
+                  pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+
+        return significant_bins
 
     def _load_data(self):
         for name, file_info in self.data_files.items():
