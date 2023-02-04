@@ -82,6 +82,7 @@ class BehaviorAnalyzer(BaseAnalysisClass):
             data = group_data.reset_index(drop=True)  # TODO - determine if I want to have min bin length to use data
             rolling = data['correct'].rolling(self.trial_window, min_periods=self.trial_window).mean()
             binned = data['correct'].groupby(data['correct'].index // self.trial_window).mean()
+            full_session = data['correct'].mean()
             if len(data['correct']) % self.trial_window:  # if any leftover trials getting included in last bin
                 binned = binned[:-1]
 
@@ -91,7 +92,9 @@ class BehaviorAnalyzer(BaseAnalysisClass):
             proportion_correct.append(dict(prop_correct=binned.values,
                                            type='binned',
                                            update_type=self.virtual_track.mappings['update_type'][str(name)]))
-
+            proportion_correct.append(dict(prop_correct=full_session,
+                                           type='full_session',
+                                           update_type=self.virtual_track.mappings['update_type'][str(name)]))
         self.proportion_correct = proportion_correct
 
     def _get_proportion_correct_by_delay(self):
