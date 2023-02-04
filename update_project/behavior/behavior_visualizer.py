@@ -44,7 +44,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         self.plot_trajectories()
         self.plot_aligned_data()
 
-    def plot_performance(self, sfig):
+    def plot_performance(self, sfig, tags=''):
         """plot performance for manuscript figure"""
         temp_df = (self.group_df[['animal', 'session_id', 'proportion_correct']]
                    .explode('proportion_correct')
@@ -54,7 +54,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                        pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
-                                 .query('type == "rolling"')
+                                 .query('type == "rolling"')  # rolling
                                  .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
                                                                                   'switch_update': 'switch',
                                                                                   'stay_update': 'stay'}))
@@ -69,10 +69,18 @@ class BehaviorVisualizer(BaseVisualizationClass):
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance', xlabel=None, ylim=(0, 1))
 
-        stats = Stats(levels=['animal', 'session_id', 'trial_id'], units='trial windows', results_io=self.results_io,
-                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
-        stats.get_summary(df_by_bin, dependent_vars=['proportion correct'], group_vars=['trial type'],
-                          filename=f'prop_correct', )
+        sess_averages = (df_by_update_type
+                         .explode('prop_correct')
+                         .query('type == "full_session"')
+                         .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
+                                                                          'switch_update': 'switch',
+                                                                          'stay_update': 'stay'}))
+                         .rename(columns={'prop_correct': 'proportion correct'}))  # test if significant from 50%
+        sess_averages['proportion correct'] = pd.to_numeric(sess_averages['proportion correct'] - 0.5)
+        stats = Stats(levels=['animal', 'session_id'], units='sessions', results_io=self.results_io,
+                      approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+        stats.run(sess_averages, dependent_vars=['proportion correct'], group_vars=['update_type'],
+                  filename=f'prop_correct_vs_chance{tags}', pairs=[[['switch']], [['stay']], [['delay only']]])
 
         return sfig
 
