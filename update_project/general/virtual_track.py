@@ -50,6 +50,10 @@ class VirtualTrack:
                                                                left_arm_max + edge_spacing / 4),
                                                          right=(right_arm_min - edge_spacing / 2,
                                                                 right_arm_max)))
+        bound_size = self.choice_boundaries['y_position']['left'][-1] - self.choice_boundaries['y_position']['left'][0]
+        update_loc = self.cue_start_locations['y_position']['update cue']
+        self.home_boundaries['y_position'] = (update_loc - (bound_size / 2),
+                                              update_loc + (bound_size / 2))
         self.edge_spacing = [(home_arm_max, left_arm_min), (left_arm_max, right_arm_min)]
 
         return linear_position
@@ -84,7 +88,8 @@ class UpdateTrack(VirtualTrack):
                              view_angle={'home left max': -np.pi / 4, 'home right max': np.pi / 4},
                              y_position={'initial cue': 120.35, 'delay cue': 145.35, 'update cue': 215.35,
                                          'delay2 cue': 250.35, 'choice cue': 255},  # TODO - update based on linearized pos bc that shifts the cue locations
-                             dynamic_choice={'p_left': -0.4, 'p_right': 0.4})
+                             dynamic_choice={'p_left': -0.4, 'p_right': 0.4},
+                             choice={'p_left': -0.4, 'p_right': 0.4})
     cue_start_locations = dict(y_position={'initial cue': 5, 'delay cue': 120.325, 'update cue': 145.125,
                                            'delay2 cue': 215.125})
     choice_boundaries = dict(x_position={'left': (-33, -1), 'right': (1, 33)},
@@ -97,7 +102,7 @@ class UpdateTrack(VirtualTrack):
     mappings = dict(update_type={'1': 'non_update', '2': 'switch_update', '3': 'stay_update'},
                     turn_type={'1': 'left', '2': 'right'})
     home_boundaries = dict(x_position=(-1, 1),
-                           y_position=(5, 255),
+                           y_position=(5, 255),  # specifically an equivalent size around update as arm bins
                            view_angle=(2 * np.pi / 9, -2 * np.pi/9),
                            dynamic_choice=(-0.5, 0.5),
                            cue_bias=(-0.4, 0.4))
