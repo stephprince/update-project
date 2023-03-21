@@ -30,11 +30,14 @@ class SingleUnitVisualizer(BaseVisualizationClass):
                                       conditions=['>', '<'], ))
 
     def plot(self):
-        # for g_name, g_data in self.aggregator.group_tuning_curves.groupby(['region', 'feature_name']):
-        #     for cutoff in self.cutoffs:
-        #         self.plot_update_selectivity(g_data, g_name, cutoff)
-        #         self.plot_update_selective_cell_types(g_data, g_name, cutoff)
-        #     self.plot_place_fields(g_data, g_name)
+        for g_name, g_data in self.aggregator.cycle_skipping_data.groupby(['region', 'feature_name']):
+            self.plot_theta_cycle_skipping(g_data, g_name)
+
+        for g_name, g_data in self.aggregator.group_tuning_curves.groupby(['region', 'feature_name']):
+            for cutoff in self.cutoffs:
+                self.plot_update_selectivity(g_data, g_name, cutoff)
+                self.plot_update_selective_cell_types(g_data, g_name, cutoff)
+            self.plot_place_fields(g_data, g_name)
 
         for g_name, g_data in self.aggregator.group_aligned_data.groupby(['region', 'feature_name'], sort='False'):
             title = '_'.join(g_name)
@@ -99,6 +102,28 @@ class SingleUnitVisualizer(BaseVisualizationClass):
         fig.suptitle(f'Goal selectivity - {g_name}')
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_tuning_curves', additional_tags=g_name,
                                  tight_layout=False)
+
+    def plot_theta_cycle_skipping(self, g_data, g_name):
+        cycle_skipping_data = g_data.sort_values(by='cycle_skipping_index')
+        times = cycle_skipping_data['acg_lags'].to_numpy()[0]
+
+        fig = plt.figure()
+        ax = fig.subplots(2, 3, height_ratios=[3, 1])
+        for trial_name, trial_data in cycle_skipping_data.groupby('epoch'):
+            col_ind = np.argwhere(cycle_skipping_data['epoch'].unique() == trial_name)[0][0]
+            data = trial_data.query(f'cell_type == "Pyramidal Cell"')
+            num_units = np.shape(data)[0]
+            zero_index_location = data.reset_index(drop=True)['cycle_skipping_index'].abs().idxmin()
+            ax[0][col_ind].imshow(np.vstack(data['acg_corrected']), cmap='Greys', extent=[times[0], times[-1], 0, num_units],
+                       origin='lower', aspect='auto')
+            ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
+            ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
+
+            ax[1][col_ind].hist(data['cycle_skipping_index'].to_numpy(), bins=np.linspace(-1, 1, 20), density=True)
+            ax[1][col_ind].axvline(0, linestyle='dashed', color='k')
+            ax[1][col_ind].set(title=g_name, xlabel='cycle skipping index', ylabel='density')
+
+        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping', additional_tags=g_name)
 
     def plot_update_selective_cell_types(self, g_data, g_name, cutoff=0.25):
         cutoffs = [cutoff, -cutoff]

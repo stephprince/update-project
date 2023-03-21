@@ -6,12 +6,12 @@ from update_project.single_units.single_unit_visualizer import SingleUnitVisuali
 
 # setup sessions
 animals = [17, 20, 25, 28, 29, 33, 34]
-dates_included = [210913]
+dates_included = []
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
-overwrite = False
+overwrite = True
 plot = True
 feature = 'y_position'
 params = dict(units_types=dict(region=['CA1', 'PFC'],
@@ -37,4 +37,4 @@ for name in session_names:
 
 if plot:
     visualizer = SingleUnitVisualizer(group_data)
-    visualizer
+    visualizer.plot()

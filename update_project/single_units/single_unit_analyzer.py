@@ -1,5 +1,4 @@
 import numpy as np
-import pickle
 import pandas as pd
 import pynapple as nap
 import warnings
@@ -7,7 +6,9 @@ import warnings
 from bisect import bisect, bisect_left
 from pathlib import Path
 from pynwb import NWBFile
+from scipy import signal
 from scipy.stats import sem
+from scipy.ndimage import gaussian_filter1d
 from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
 from update_project.general.results_io import ResultsIO
@@ -30,6 +31,8 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         self.speed_threshold = params.get('speed_threshold', 1000)  # minimum virtual speed to subselect epochs
         self.firing_threshold = params.get('firing_threshold', 0)  # Hz, minimum peak firing rate of place cells to use
         self.encoder_trial_types = params.get('encoder_trial_types', dict(update_type=[1], correct=[0, 1]))  # trials
+        self.switch_trial_types = params.get('switch_trial_types', dict(update_type=[2], correct=[0, 1]))  # trials
+        self.stay_trial_types = params.get('stay_trial_types', dict(update_type=[3], correct=[0, 1]))  # trials
         self.encoder_bin_num = params.get('encoder_bin_num', 50)  # number of bins to build encoder
         self.linearized_features = params.get('linearized_features', ['y_position'])  # which features to linearize
         self.virtual_track = UpdateTrack(linearization=bool(self.linearized_features))
@@ -50,9 +53,9 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
                             f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem,
                                     tags=self.results_tags)
-        self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'goal_selectivity',
-                                                             'update_selectivity', 'aligned_data', 'bins',
-                                                             'trials', 'train_df'],
+        self.data_files = dict(single_unit_output=dict(vars=['spikes', 'tuning_curves', 'cycle_skipping',
+                                                             'goal_selectivity', 'update_selectivity', 'aligned_data',
+                                                             'bins','trials', 'train_df'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'feature_name',
@@ -75,6 +78,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
 
         if overwrite:
             self._preprocess()._encode()  # get tuning curves
+            self._get_theta_cycle_skipping()  # get theta cycle skipping index
             self._get_goal_selectivity()  # get selectivity index
             self._get_aligned_spikes()  # get spiking aligned to task events
             self._get_update_selectivity()  # get units that respond
@@ -199,7 +203,13 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         encoder_trials = self.trials[mask]
         self.train_df = encoder_trials.sort_index()
 
+        # update trials
         self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
+        self.switch_trial_times = self._get_time_intervals(self.trials.query('update_type == 2')['start_time'],
+                                                           self.trials.query('update_type == 2')['stop_time'])
+        self.stay_trial_times = self._get_time_intervals(self.trials.query('update_type == 3')['start_time'],
+                                                         self.trials.query('update_type == 3')['stop_time'])
+
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.theta = nap.TsdFrame(self.theta.iloc[::self.downsample_factor, :], time_units='s')
         self.velocity = nap.TsdFrame(self.velocity.iloc[::self.downsample_factor, :], time_units='s')
@@ -391,3 +401,109 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         err = sem(firing_rate, axis=0)  # just filled with nan values
 
         return dict(psth_mean=mean, psth_err=err, psth_times=tt)
+
+    def correct_acg(self, raw, total_dur, sd):
+        # correct raw autocorr for triangular shape from finite duration data A
+        # ACG (t) = ACG_raw(time_lag) / (1 - |time_lag| / total_spike_train_duration)
+        triangle_corrected = []
+        for r, t in zip(raw.to_numpy(), raw.index):
+            triangle_corrected.append(r / ((1 - np.abs(t)) / total_dur))
+
+        # smooth corrected ACG (gaussian kernel, SD 20ms) and peak-normalize (2 bc each bin = 10 ms)
+        smoothed = gaussian_filter1d(triangle_corrected, sigma=sd, mode='nearest')
+
+        # peak normalize
+        normalized = smoothed / np.max(smoothed)
+
+        return normalized
+
+    def get_theta_modulation_power(self, acg, bin_size):
+        theta_band = (6, 10)
+        full_band = (1, 50)
+
+        # get power spectra with FFT and relative theta power by dividing theta band (6-10Hz) by total in (1-50Hz)
+        freqs, psd = signal.welch(acg, 1 / bin_size)
+        theta_power = np.sum(psd[np.logical_and(freqs >= theta_band[0], freqs <= theta_band[1])])
+        full_power = np.sum(psd[np.logical_and(freqs >= full_band[0], freqs <= full_band[1])])
+
+        # # using fft (very very similar so will use simpler version for now)
+        # freqs = np.fft.fftfreq(len(acg), d=bin_size)
+        # ps = np.abs(np.fft.fft(acg))**2
+        # idx = np.argsort(freqs)
+        # full_power_test = sum(ps[idx][np.logical_and(freqs[idx] > full_band[0], freqs[idx] < full_band[1])])
+        # theta_power_test = sum(ps[idx][np.logical_and(freqs[idx] > theta_band[0], freqs[idx] < theta_band[1])])
+        # fft_output = theta_power_test / full_power_test
+
+        return theta_power / full_power
+
+    def get_cycle_skipping_index(self, acg, times, bin_size):
+        # bandpass filter theta-modulated ACGs between 1-10Hz  (lowpass for now, TODO - check this)
+        # order = 4
+        # fs = 1 / bin_size
+        # nyq = 0.5 * fs
+        # bands = [1 / nyq, 10 / nyq]
+        # b, a = signal.butter(order, bands, 'bandpass')
+        # acg_filtered = signal.filtfilt(b, a, acg)
+        acg_filtered = acg.to_numpy()  # not filtering for now bc I don't think the kay paper does
+        # bandpass filtering leads to negative values which result in a CSI not necessarily between -1 to 1
+
+        # find first peak near t=0 in 90-200ms window
+        first_window = np.logical_and(times >= 0.089, times <= 0.2)
+        first_peak_ind, _ = signal.find_peaks(acg_filtered[first_window])
+        if first_peak_ind.any():
+            first_peak = acg_filtered[first_window][first_peak_ind[0]]
+        else:
+            first_peak = np.max(acg_filtered[first_window])
+
+        # find second peak near t=0 in 200-400ms window
+        second_window = np.logical_and(times >= 0.199, times <= 0.4)
+        second_peak_ind, _ = signal.find_peaks(acg_filtered[second_window])
+        if second_peak_ind.any():
+            second_peak = acg_filtered[second_window][second_peak_ind[0]]
+        else:
+            second_peak = np.min(acg_filtered[second_window])
+
+        # CSI = p2 - p1 / max(p1, p2)  -> higher indicate more skipping
+        cycle_skipping_index = (second_peak - first_peak) / np.max([first_peak, second_peak])
+
+        return cycle_skipping_index
+
+    def _get_theta_cycle_skipping(self):
+        epochs = dict(delay=self.encoder_times, switch=self.switch_trial_times, stay=self.stay_trial_times)
+
+        df_list = []
+        for ep_name, ep in epochs.items():
+            # calculate ACG over 400ms interval with 10m time lags (raw autocorr)
+            bin_size = 0.01
+            window_size = 0.4
+            corr_raw = nap.compute_autocorrelogram(group=self.spikes, ep=ep, binsize=bin_size,
+                                                   windowsize=window_size, norm=False)
+
+            # triangle-correct, smooth, and peak-normalize ACGs
+            total_dur = np.sum(self.encoder_times['end'] - self.encoder_times['start'])
+            sd = 0.02 / bin_size  # for gaussian convolution to smooth, want 20 ms smoothing (kay paper used 10 ms)
+            corr_corrected = corr_raw.apply(lambda x: self.correct_acg(raw=x, total_dur=total_dur, sd=sd), axis=0)
+
+            # get theta modulated cells
+            theta_modulation = corr_corrected.apply(lambda x: self.get_theta_modulation_power(x, bin_size=bin_size), axis=0)
+            theta_modulated_bool = theta_modulation > 0.15  # considered theta modulated if relative power > 0.15
+            corr_corrected_theta_only = corr_corrected.iloc[:, theta_modulated_bool.to_numpy()]
+
+            # get theta cycling index
+            times = corr_raw.index.to_numpy()
+            theta_cycling_index = corr_corrected_theta_only.apply(lambda x: self.get_cycle_skipping_index(x,
+                                                                                                   times=times,
+                                                                                                   bin_size=bin_size),
+                                                                  axis=0)
+
+            # make final output data structure
+            cycle_skipping_data = pd.concat([self.units['region'][theta_modulated_bool],
+                                             self.units['cell_type'][theta_modulated_bool]], axis=1)
+            cycle_skipping_data['cycle_skipping_index'] = theta_cycling_index
+            cycle_skipping_data['theta_modulation'] = theta_modulation[theta_modulated_bool]
+            cycle_skipping_data['epoch'] = ep_name
+            cycle_skipping_data['acg_corrected'] = list(corr_corrected_theta_only.T.to_numpy())
+            cycle_skipping_data['acg_lags'] = [corr_corrected_theta_only.index.to_numpy()] * len(theta_cycling_index)
+            df_list.append(cycle_skipping_data)
+
+        self.cycle_skipping = pd.concat(df_list, axis=0)

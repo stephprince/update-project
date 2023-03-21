@@ -17,6 +17,7 @@ class SingleUnitAggregator:
         # aggregate session data
         for sess_dict in data:
             sess_dict.update(dict(tuning_curves=sess_dict['analyzer'].tuning_curves,
+                                  cycle_skipping=sess_dict['analyzer'].cycle_skipping,
                                   goal_selectivity=sess_dict['analyzer'].goal_selectivity,
                                   update_selectivity=sess_dict['analyzer'].update_selectivity,
                                   aligned_data=sess_dict['analyzer'].aligned_data,
@@ -32,9 +33,10 @@ class SingleUnitAggregator:
         if self.flip_trials_by_turn:
             self._flip_aligned_trials()
         self.group_tuning_curves = self._get_group_tuning_curves()
+        self.cycle_skipping_data = self._get_cycle_skipping_data()
 
         # save memory once information is extracted
-        self.group_df.drop(['tuning_curves', 'goal_selectivity', 'aligned_data'], axis=1, inplace=True)
+        self.group_df.drop(['tuning_curves', 'goal_selectivity', 'aligned_data', 'cycle_skipping'], axis=1, inplace=True)
 
     def _meets_exclusion_criteria(self, data):
         exclude_session = False  # default to include session
@@ -77,6 +79,22 @@ class SingleUnitAggregator:
         tuning_curve_df = pd.concat(tuning_curve_list, axis=0)
 
         return tuning_curve_df
+
+    def _get_cycle_skipping_data(self):
+        cycle_skipping_list = []
+        for _, sess_data in self.group_df.iterrows():
+            data = sess_data['cycle_skipping']
+            data = data.rename_axis('unit_id').reset_index()
+            data.insert(loc=0, column='feature_name', value=sess_data['feature_name'])
+            data.insert(loc=0, column='session_id', value=sess_data['session_id'])
+            data.insert(loc=0, column='animal', value=sess_data['animal'])
+
+            # tuning_curves = tuning_curves.merge(sess_data['goal_selectivity'], how='left', on='unit_id')
+            cycle_skipping_list.append(data)
+
+        cycle_skipping_df = pd.concat(cycle_skipping_list, axis=0)
+
+        return cycle_skipping_df
 
     def _get_aligned_data(self):
         aligned_data_list = []
