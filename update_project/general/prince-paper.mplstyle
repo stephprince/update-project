@@ -1,0 +1,53 @@
+# Prince paper context - based on seaborn style sheets
+figure.figsize: 11, 8.5
+figure.facecolor: white
+figure.titlesize: 18
+
+axes.labelsize: 10
+axes.titlesize: 12
+axes.linewidth: 1
+axes.facecolor: white
+axes.labelpad: 3
+axes.spines.top: False
+axes.spines.right: False
+#axes.prop_cycle: cycler('color', ['4C72B0', '55A868', 'C44E52', '8172B2', 'CCB974', '64B5CD'])
+axes.prop_cycle: cycler('color', ['f77189', 'bb9832', '50b131', '36ada4', '3ba3ec', 'e866f4'])
+
+image.cmap: rocket_r
+
+legend.fontsize: 8
+legend.frameon: False
+legend.numpoints: 1
+legend.scatterpoints: 1
+legend.labelspacing: 0.25
+legend.borderpad: 0.1
+legend.borderaxespad: 0.3
+legend.handlelength: 1
+legend.handletextpad: 0.5
+
+lines.linewidth: 1.5
+lines.markersize: 9
+lines.markeredgewidth: 0
+lines.solid_capstyle: round
+
+patch.facecolor: 4C72B0
+patch.linewidth: .3
+
+xtick.direction: out
+xtick.labelsize: 8
+xtick.major.pad: 2
+xtick.major.width: 1
+xtick.minor.size: 0
+xtick.minor.width: 0.5
+
+ytick.direction: out
+ytick.labelsize: 8
+ytick.major.pad: 2
+ytick.major.width: 1
+ytick.minor.size: 0
+ytick.minor.width: 0.5
+
+font.family: sans-serif
+font.sans-serif: Arial, Helvetica, DejaVu Sans, Bitstream Vera Sans, Liberation Sans, sans-serif
+pdf.fonttype: 42
+ps.fonttype: 42

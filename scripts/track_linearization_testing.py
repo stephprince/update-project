@@ -5,8 +5,8 @@ from bisect import bisect
 from pynwb import NWBHDF5IO
 from track_linearization import make_track_graph, plot_track_graph, get_linearized_position, plot_graph_as_1D
 
-from update_project.session_loader import SessionLoader
-from update_project.results_io import ResultsIO
+from update_project.general.session_loader import SessionLoader
+from update_project.general.results_io import ResultsIO
 
 # setup sessions
 animals = [17, 20, 25, 28, 29]  # 17, 20, 25, 28, 29

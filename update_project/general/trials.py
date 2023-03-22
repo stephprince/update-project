@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from update_project.virtual_track import UpdateTrack
+from update_project.general.virtual_track import UpdateTrack
 from update_project.general.timeseries import align_by_time_intervals
 
 

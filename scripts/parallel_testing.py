@@ -1,7 +1,7 @@
 import itertools
 
 from multiprocessing import Pool
-from update_project.session_loader import SessionLoader
+from update_project.general.session_loader import SessionLoader
 
 
 def test_func(name, reg, feat, trial_types, enc_bins, dec_bins, speed):

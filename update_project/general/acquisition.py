@@ -8,6 +8,9 @@ def get_velocity(nwbfile):
     velocity = np.abs(rotational_velocity[:]) + np.abs(translational_velocity[:])
     rate = nwbfile.acquisition['translational_velocity'].rate
     timestamps = np.arange(0, len(velocity) / rate, 1 / rate)
-    velocity = pd.Series(index=timestamps[:], data=velocity)
+
+    velocity = pd.DataFrame(dict(combined=pd.Series(index=timestamps[:], data=velocity),
+                                 rotational=pd.Series(index=timestamps[:], data=rotational_velocity),
+                                 translational=pd.Series(index=timestamps[:], data=translational_velocity)))
 
     return velocity
