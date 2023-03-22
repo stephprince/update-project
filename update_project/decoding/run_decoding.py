@@ -11,7 +11,7 @@ from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderV
 
 def run_decoding():
     # setup flags
-    overwrite = True  # when False, this will only load data if the parameters match
+    overwrite = False  # when False, this will only load data if the parameters match
     plot = False  # this only plots on a session by session basis
     group = True  # this compiles the data for group plotting
     parallel = False  # cannot be run in conjunction with group currently
@@ -24,11 +24,12 @@ def run_decoding():
     session_names = session_db.load_session_names()
 
     # setup parameters - NOTE: not all parameters included here, to see defaults look inside the decoder class
-    features = ['y_position']
-    regions = [['CA1']]
+    features = ['choice']
+    regions = [['PFC']]
     exclusion_criteria = dict(units=20, trials=50)  # include sessions with this minimum number of units/trials
     testing_params = dict(encoder_bin_num=[50],  # switch to 40 for x-position
-                          decoder_bin_size=[0.20])
+                          decoder_bin_size=[0.2],
+                          dec_test_size=[0.2])
 
     # run decoder for all sessions
     args = itertools.product(session_names, regions, features, *list(testing_params.values()))  # like a nested for-loop
@@ -51,7 +52,7 @@ def run_decoding():
     print(f'Finished running {__file__}')
 
 
-def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, name, reg, feat, enc_bins, dec_bins):
+def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, name, reg, feat, enc_bins, dec_bins, dec_test_size):
     # load nwb file
     session_id = session_db.get_session_id(name)
     io = NWBHDF5IO(session_db.get_session_path(name), 'r')
@@ -60,7 +61,8 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     # run decoder
     params = dict(units_types=dict(region=reg, cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']),
                   encoder_bin_num=enc_bins,  # num feature bins
-                  decoder_bin_size=dec_bins,)  # time length of decoding bins
+                  decoder_bin_size=dec_bins,
+                  decoder_test_size=dec_test_size)  # time length of decoding bins
     analyzer = BayesianDecoderAnalyzer(nwbfile=nwbfile, params=params, session_id=session_id,
                                       features=[feat])  # initialize decoder class
     analyzer.run_analysis(overwrite=overwrite)  # build decoding model
@@ -69,7 +71,7 @@ def bayesian_decoding(plot, overwrite, parallel, session_db, testing_params, nam
     if parallel:
         return None  # cannot return output for parallel processing bc contains h5py object which cannot be pickled
     else:
-        params = {k: v for k, v in zip(testing_params.keys(), [enc_bins, dec_bins])}
+        params = {k: v for k, v in zip(list(testing_params.keys()), [enc_bins, dec_bins, dec_test_size])}
         session_decoder_output = dict(session_id=session_id,
                                       animal=session_db.get_animal_id(name),
                                       analyzer=analyzer,

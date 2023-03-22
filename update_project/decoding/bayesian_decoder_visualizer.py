@@ -1829,7 +1829,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps
-        colors = [self.colors[t] for t in ['non_update', 'stay', 'switch']]
+        # colors = [self.colors[t] for t in ['non_update', 'stay', 'switch']]
 
         # plot figure
         ax = sfig.subplots(nrows=1, ncols=2, sharex=True, squeeze=False)
@@ -1845,28 +1845,42 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 row_add = int(comp[2] * 2) if pred == 'choice_made' else 0
                 row_id = np.argwhere(predict_df['input'].unique() == comp[1])[0][0] + row_add
 
-                sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
-                             palette=[self.colors['control']] * 3, ax=ax[row_id][col_id], legend=False,
-                             binrange=(0.475, 0.625),
-                             binwidth=0.005, element='bars', linewidth=0.5, fill=True, stat='proportion', alpha=0.025)
-                sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
-                             hue_order=['non_update', 'switch', 'stay', ],
-                             palette=self.colors['trials'], ax=ax[row_id][col_id], binrange=(0.475, 0.625),
-                             binwidth=0.005, element='step', linewidth=1.5, fill=False, stat='proportion')
-                p_values = []
-                accuracy_scores = []
-                for u in ['switch']:
-                    actual_score = data.query(f'update_type == "{u}" & target == "actual"')['score'].to_numpy()
-                    ax[row_id][col_id].axvline(actual_score, color=self.colors[u], linewidth=2)
-                    shuffled_scores = data.query(f'update_type == "{u}" & target == "shuffled"')['score'].to_numpy()
-                    p_values.append(sum(shuffled_scores >= actual_score) / len(shuffled_scores))
-                    accuracy_scores.append(np.round(actual_score, 4))
-                rainbow_text(0.05, 0.85, p_values, colors, ax=ax[row_id][col_id], size=8)
-                rainbow_text(0.05, 0.85, accuracy_scores, colors, ax=ax[row_id][col_id], size=8)
+                # plot data
+                common_kwargs = dict(data=data.query('target == "shuffled"'), x='update_type', y='score',
+                                     ax=ax[row_id][col_id], errwidth=3, join=False)
+                ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=[self.colors['control']] * 3, scale=1.5, capsize=0.75)
+                ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=['w'] * 3, scale=0.75, errorbar=None)
+                # ax[0].get_legend().remove()
+                # rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
+
+                colors = [self.colors[t] for t in data.query('target == "shuffled"')['update_type'].unique()]
+                common_kwargs = dict(data=data.query('target == "actual"'), x='update_type', y='score',
+                                     ax=ax[row_id][col_id], errwidth=3, join=False,)
+                ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
+                ax[row_id][col_id].set(xlabel=f'update type', ylabel=f'prediction accuracy', ylim=(0.475, 0.625))
+
+                # sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
+                #              palette=[self.colors['control']] * 3, ax=ax[row_id][col_id], legend=False,
+                #              binrange=(0.475, 0.625),
+                #              binwidth=0.005, element='bars', linewidth=0.5, fill=True, stat='proportion', alpha=0.025)
+                # sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
+                #              hue_order=['non_update', 'switch', 'stay', ],
+                #              palette=self.colors['trials'], ax=ax[row_id][col_id], binrange=(0.475, 0.625),
+                #              binwidth=0.005, element='step', linewidth=1.5, fill=False, stat='proportion')
+                # p_values = []
+                # accuracy_scores = []
+                # for u in ['switch']:
+                #     actual_score = data.query(f'update_type == "{u}" & target == "actual"')['score'].to_numpy()
+                #     ax[row_id][col_id].axvline(actual_score, color=self.colors[u], linewidth=2)
+                #     shuffled_scores = data.query(f'update_type == "{u}" & target == "shuffled"')['score'].to_numpy()
+                #     p_values.append(sum(shuffled_scores >= actual_score) / len(shuffled_scores))
+                #     accuracy_scores.append(np.round(actual_score, 4))
+                # rainbow_text(0.05, 0.85, p_values, colors, ax=ax[row_id][col_id], size=8)
+                # rainbow_text(0.05, 0.85, accuracy_scores, colors, ax=ax[row_id][col_id], size=8)
 
                 ax[row_id][col_id].set(title=f'{comp[1]} trials - {comp[0]} cue - {pred} - {groupers[2]}: {comp[2]}')
-                ax[row_id][col_id].set(xlim=(0.475, 0.625), ylim=(0, 0.36))
-                ax[row_id][col_id].get_legend().remove()
+                # ax[row_id][col_id].set(xlim=(0.475, 0.625), ylim=(0, 0.36))
+                # ax[row_id][col_id].get_legend().remove()
 
             # rainbow_text(0.05, 0.85, ['delay only', 'stay', 'switch'], colors, ax=ax[0][0], size=8)
             sfig.suptitle(f'prediction of {comparison} trial types with goal codes', fontsize=12)
