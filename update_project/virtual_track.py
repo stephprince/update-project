@@ -72,7 +72,6 @@ class UpdateTrack(VirtualTrack):
                            view_angle=(2 * np.pi / 9, -2 * np.pi/9),
                            dynamic_choice=(-0.5, 0.5),
                            cue_bias=(-0.4, 0.4))
-    # TODO - add dictionary with delay phase onset locations/ranges
     delay_locations = dict(delay1=(214,216), # latest delay
                          delay2=(179,181), # later delay
                          delay3=(144,146), # middle delay
