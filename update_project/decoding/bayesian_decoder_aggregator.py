@@ -14,12 +14,13 @@ from sklearn.utils import resample
 from sklearn.utils.fixes import loguniform
 from scipy.stats import sem, pearsonr, uniform
 from scipy import signal
+from statsmodels.stats.multitest import fdrcorrection
 from tqdm import tqdm
 
 from update_project.general.interpolate import interp1d_time_intervals, griddata_2d_time_intervals, \
     griddata_time_intervals
 from update_project.general.results_io import ResultsIO
-from update_project.statistics.statistics import get_fig_stats, get_comparative_stats
+from update_project.statistics.statistics import Stats, get_fig_stats, get_comparative_stats
 
 
 class BayesianDecoderAggregator:
@@ -226,15 +227,15 @@ class BayesianDecoderAggregator:
         virtual_track = param_data['virtual_track'].values[0]
         prob_map_bins = param_data['bins'].values[0]
         choice_bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
-        home_bounds = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
-        bounds = dict(**choice_bounds, home=home_bounds)
+        bounds = dict(**choice_bounds)
         bound_mapping = dict(left='initial', right='new', home='home')
         for b_name, b_value in bounds.items():
             theta_phase_df[bound_mapping[b_name]] = theta_phase_df['probability'].apply(
                 lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
 
         # get histogram, ratio, and mean probability values for different theta phases
-        theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), quarter=np.linspace(-np.pi, np.pi, 5))
+        theta_bins = dict(full=np.linspace(-np.pi, np.pi, 12), quarter=np.linspace(-np.pi, np.pi, 5),
+                          half=np.linspace(-np.pi, np.pi, 3))
         time_bins = np.linspace(time_window[0], time_window[-1], n_time_bins)
         data_to_average = [*list(bound_mapping.values()), 'theta_amplitude']
         theta_phase_list = []
@@ -354,12 +355,17 @@ class BayesianDecoderAggregator:
 
         return start_bin, stop_bin
 
-    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False):
+    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False, include_central=False):
         if np.size(aligned_data) and aligned_data is not None:
             # get bounds to use to quantify choices
             bins = param_data['bins'].values[0]
             virtual_track = param_data['virtual_track'].values[0]
             bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
+            if include_central:
+                bounds['home'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
+                choice_mapping = dict(left='initial_stay', right='switch', home='central')
+            else:
+                choice_mapping = dict(left='initial_stay', right='switch')
 
             if isinstance(aligned_data, dict):
                 prob_map = aligned_data['probability']
@@ -403,9 +409,9 @@ class BayesianDecoderAggregator:
                            .set_index('trial_index'))
                 output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'update_type',
                                                    'correct', 'turn_type', 'feature_name', 'time_label', 'times',
-                                                   'rotational_velocity']],
+                                                   'rotational_velocity', 'error']],
                                      list_df, left_index=True, right_index=True)
-                output_df['choice'] = output_df['choice'].map(dict(left='initial_stay', right='switch'))
+                output_df['choice'] = output_df['choice'].map(choice_mapping)
                 return output_df
             else:
                 return prob_choice
@@ -491,24 +497,27 @@ class BayesianDecoderAggregator:
                                 'corr_coeff_sliding', 'lags_sliding', 'times_sliding'])
 
     def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3,
-                                       time_window=(0, 2.5)):
+                                       time_window=(0, 2.5), include_central=False):
         # get data for z-scoring (all trial types but only times around update)
         group_aligned_data = self.select_group_aligned_data(param_data, dict(time_label=['t_update']), ret_df=True)
-        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, include_central=include_central)
         zscore_mean = np.nanmean(np.stack(quant_df[prob_value]))
         zscore_std = np.nanstd(np.stack(quant_df[prob_value]))
 
         # get data for quantification
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
-        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, include_central=include_central)
 
         if np.size(quant_df) and quant_df is not None:
             # get diff from baseline
             prob_sum_mat = np.vstack(quant_df[prob_value])
-            align_time = np.argwhere(quant_df['times'].values[0] >= 0)[0][0]
-            if align_time != 0:
-                align_time = align_time - 1  # get index immediately preceding 0 if not the first one
-            prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_time]
+            align_end = np.argwhere(quant_df['times'].values[0] >= 0)[0][0]
+            align_start = np.argwhere(quant_df['times'].values[0] >= -1.5)[0][0]
+            if align_end != 0:
+                # align_end = align_end - 1  # get index immediately preceding 0 if not the first one
+                prob_sum_diff = prob_sum_mat.T - np.nanmean(prob_sum_mat[:, align_start:align_end], axis=1)
+            elif align_end == 0:
+                prob_sum_diff = prob_sum_mat.T - prob_sum_mat[align_end]  # only use first bin if that's all there is
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
             quant_df['zscore_prob'] = list((prob_sum_mat - zscore_mean) / zscore_std)
 
@@ -516,7 +525,7 @@ class BayesianDecoderAggregator:
             quant_df['trial_index'] = quant_df.index
             quant_df = (quant_df
                         .explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline', 'zscore_prob',
-                                  'rotational_velocity'])
+                                  'rotational_velocity', 'error'])
                         .reset_index())
             quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(*time_window, n_time_bins)).apply(
                 lambda x: x.mid)
@@ -823,39 +832,6 @@ class BayesianDecoderAggregator:
 
         return session_error
 
-    def get_aligned_stats(self, comp, data, tags):
-        data_for_stats = []
-        for ind, v in enumerate(data_dict['comparison']):
-            data = data_dict['data'][data_dict['data'][comp] == v]['data'].values[0]
-            initial_data = dict(prob_sum=quant['left']['prob_sum'], bound='initial', comparison=comp, group=v)
-            new_data = dict(prob_sum=quant['right']['prob_sum'], bound='new', comparison=comp, group=v)
-            data_for_stats.extend([initial_data, new_data])
-
-        # add significance stars to sections of plot
-        prob_sum_df = pd.DataFrame(data_for_stats)
-        prob_sum_df = prob_sum_df.explode('prob_sum').reset_index(drop=True)
-        bins_to_grab = [0, len(dagroupby_colsta['times'])]
-        times = data['times'][bins_to_grab[0]:bins_to_grab[1]]
-        stars_to_plot = dict(initial=[], new=[])
-        blanks_to_plot = dict(initial=[], new=[])
-        for b_ind, b in enumerate(range(bins_to_grab[0], bins_to_grab[1])):
-            prob_sum_df['data'] = prob_sum_df['prob_sum'].apply(lambda x: np.nansum(x[b]))
-            temp_df = prob_sum_df[['bound', 'comparison', 'group', 'data']].explode('data').reset_index(
-                drop=True)
-            df = pd.DataFrame(temp_df.to_dict())
-            for n, group in df.groupby(['comparison', 'bound']):
-                data_to_compare = {'_'.join((*n, str(v))): group[group['group'] == v]['data'].values for v in
-                                   list(group['group'].unique())}
-                comp_stats = get_comparative_stats(*data_to_compare.values())
-                self.results_io.export_statistics(data_to_compare,
-                                                  f'aligned_data_{"_".join(n)}_stats_{tags}_bin{b_ind}')
-                if comp_stats['ranksum']['p_value'] < 0.05:
-                    stars_to_plot[n[1]].append(times[b_ind])
-                else:
-                    blanks_to_plot[n[1]].append(times[b_ind])
-
-        return data_for_stats, dict(sig=stars_to_plot, ns=blanks_to_plot)
-
     def calc_prediction_data(self, group_aligned_df, plot_groups, prob_value, comparison):
         trial_data, _ = self.calc_trial_by_trial_quant_data(group_aligned_df, plot_groups)
         trial_data['pre_or_post'] = pd.cut(trial_data['times'], [-1.5, 0, 1.5], labels=['pre', 'post'])
@@ -998,33 +974,36 @@ class BayesianDecoderAggregator:
 
         return prediction_data
 
-    def calc_significant_bins(self, aligned_data, plot_groups, prob_value):
-        trial_data, _ = self.calc_trial_by_trial_quant_data(aligned_data, plot_groups, prob_value=prob_value)
-        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
-                        'choice']
-        time_window_pre = (-1.5, 0)
-        baseline_value = (trial_data
-                          .query(f'times_binned > {time_window_pre[0]} & times_binned < {time_window_pre[-1]}')
-                          .groupby(groupby_cols)[prob_value]  # group by trial/trial type
-                          .mean()  # get mean, peak, or peak latency for each trial (np.argmax)
-                          .reset_index())
-                          # .assign(choice=lambda x: x['choice'].map({'initial_stay': 'initial', 'switch': 'new'}))
-        # TODO - calculate diff from baseline for each day (might be better to do it like normal diff_baseline)
-        # could also just use diff baseline value and run one-sample test on that for each bin?
+    def calc_significant_bins(self, group_aligned_df, plot_groups, prob_value='prob_sum', tags=None):
+        trial_data, _ = self.calc_trial_by_trial_quant_data(group_aligned_df, plot_groups,
+                                                                    prob_value=prob_value)
+        data_for_stats = (trial_data
+                          .query(f'times > 0')
+                          .groupby(['session_id', 'update_type', 'correct', 'times', 'choice'])
+                          .mean()
+                          .reset_index()
+                          .assign(choice=lambda x: x.choice.map({'initial_stay': 'initial', 'switch': 'new'})))
+                          # average by sessions as a control
+        df_list = []
+        for name, data in data_for_stats.groupby(['update_type', 'correct', 'times']):
+            update_type, correct, time_bin = name
 
-        # setup stats - group variables, pairs to compare, and levels of hierarchical data
-        var = f'{decoding_measures}_mean'
-        group = 'choice'
-        group_list = data_for_stats['choice'].unique()
-        combo_list = [label_map[g] for g in plot_groups[comparison]]
-        combos = list(itertools.combinations(combo_list, r=2))
-        pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
-        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
-                      approaches=['mixed_effects'], tests=['emmeans'], results_type='manuscript')
-        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],
-                  pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+            # setup stats - group variables, pairs to compare, and levels of hierarchical data
+            pairs = [[['initial']], [['new']]]
+            stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
+                          approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+            stats.run(data, dependent_vars=['diff_baseline'], group_vars=['choice'],
+                      pairs=pairs, filename=f'goal_coding_sig_bins_{tags}_{update_type}_{correct}_{time_bin}')
+            stats.stats_df['pair'] = stats.stats_df['pair'].apply(lambda x: x[0][0])  # TODO - add to stats function
+            stats.stats_df.drop_duplicates(inplace=True)
+            stats.stats_df[['update_type', 'correct', 'times']] = name
 
-        return significant_bins
+            df_list.append(stats.stats_df)
+
+        sig_bins_df = pd.concat(df_list)
+        sig_bins_df['fdr'], sig_bins_df['pval_corrected'] = fdrcorrection(sig_bins_df['p_val'].to_numpy())
+
+        return sig_bins_df
 
     def _load_data(self):
         for name, file_info in self.data_files.items():
