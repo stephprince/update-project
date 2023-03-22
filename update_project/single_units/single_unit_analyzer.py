@@ -167,7 +167,12 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             new_starts.append(new_times.left.values)
             new_stops.append(new_times.right.values)
 
-        times = nap.IntervalSet(start=np.hstack(new_starts), end=np.hstack(new_stops), time_units='s')
+        if np.size(new_starts):
+            start = np.hstack(new_starts)
+            end = np.hstack(new_stops)
+        else:
+            start, end = [], []
+        times = nap.IntervalSet(start=start, end=end, time_units='s')
 
         return times
 
@@ -476,34 +481,35 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             # calculate ACG over 400ms interval with 10m time lags (raw autocorr)
             bin_size = 0.01
             window_size = 0.4
-            corr_raw = nap.compute_autocorrelogram(group=self.spikes, ep=ep, binsize=bin_size,
-                                                   windowsize=window_size, norm=False)
+            if np.size(ep):  # if any time periods of that trial type
+                corr_raw = nap.compute_autocorrelogram(group=self.spikes, ep=ep, binsize=bin_size,
+                                                       windowsize=window_size, norm=False)
 
-            # triangle-correct, smooth, and peak-normalize ACGs
-            total_dur = np.sum(self.encoder_times['end'] - self.encoder_times['start'])
-            sd = 0.02 / bin_size  # for gaussian convolution to smooth, want 20 ms smoothing (kay paper used 10 ms)
-            corr_corrected = corr_raw.apply(lambda x: self.correct_acg(raw=x, total_dur=total_dur, sd=sd), axis=0)
+                # triangle-correct, smooth, and peak-normalize ACGs
+                total_dur = np.sum(self.encoder_times['end'] - self.encoder_times['start'])
+                sd = 0.02 / bin_size  # for gaussian convolution to smooth, want 20 ms smoothing (kay paper used 10 ms)
+                corr_corrected = corr_raw.apply(lambda x: self.correct_acg(raw=x, total_dur=total_dur, sd=sd), axis=0)
 
-            # get theta modulated cells
-            theta_modulation = corr_corrected.apply(lambda x: self.get_theta_modulation_power(x, bin_size=bin_size), axis=0)
-            theta_modulated_bool = theta_modulation > 0.15  # considered theta modulated if relative power > 0.15
-            corr_corrected_theta_only = corr_corrected.iloc[:, theta_modulated_bool.to_numpy()]
+                # get theta modulated cells
+                theta_modulation = corr_corrected.apply(lambda x: self.get_theta_modulation_power(x, bin_size=bin_size), axis=0)
+                theta_modulated_bool = theta_modulation > 0.15  # considered theta modulated if relative power > 0.15
+                corr_corrected_theta_only = corr_corrected.iloc[:, theta_modulated_bool.to_numpy()]
 
-            # get theta cycling index
-            times = corr_raw.index.to_numpy()
-            theta_cycling_index = corr_corrected_theta_only.apply(lambda x: self.get_cycle_skipping_index(x,
-                                                                                                   times=times,
-                                                                                                   bin_size=bin_size),
-                                                                  axis=0)
+                # get theta cycling index
+                times = corr_raw.index.to_numpy()
+                theta_cycling_index = corr_corrected_theta_only.apply(lambda x: self.get_cycle_skipping_index(x,
+                                                                                                       times=times,
+                                                                                                       bin_size=bin_size),
+                                                                      axis=0)
 
-            # make final output data structure
-            cycle_skipping_data = pd.concat([self.units['region'][theta_modulated_bool],
-                                             self.units['cell_type'][theta_modulated_bool]], axis=1)
-            cycle_skipping_data['cycle_skipping_index'] = theta_cycling_index
-            cycle_skipping_data['theta_modulation'] = theta_modulation[theta_modulated_bool]
-            cycle_skipping_data['epoch'] = ep_name
-            cycle_skipping_data['acg_corrected'] = list(corr_corrected_theta_only.T.to_numpy())
-            cycle_skipping_data['acg_lags'] = [corr_corrected_theta_only.index.to_numpy()] * len(theta_cycling_index)
-            df_list.append(cycle_skipping_data)
+                # make final output data structure
+                cycle_skipping_data = pd.concat([self.units['region'][theta_modulated_bool],
+                                                 self.units['cell_type'][theta_modulated_bool]], axis=1)
+                cycle_skipping_data['cycle_skipping_index'] = theta_cycling_index
+                cycle_skipping_data['theta_modulation'] = theta_modulation[theta_modulated_bool]
+                cycle_skipping_data['epoch'] = ep_name
+                cycle_skipping_data['acg_corrected'] = list(corr_corrected_theta_only.T.to_numpy())
+                cycle_skipping_data['acg_lags'] = [corr_corrected_theta_only.index.to_numpy()] * len(theta_cycling_index)
+                df_list.append(cycle_skipping_data)
 
         self.cycle_skipping = pd.concat(df_list, axis=0)
