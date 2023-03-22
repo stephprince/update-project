@@ -40,7 +40,7 @@ class Stats:
         self.alternatives = alternatives or ['two-sided']  # 'greater', 'less' as other options
         self.nboot = nboot  # number of iterations to perform for bootstrapping default should be 1000
         self.units = units or 'trials'  # lowest hierarchical level of individual samples to use for description
-        self.results_type = results_type or 'preliminary'
+        self.results_type = results_type or 'preliminary'  # indicates which folder to save the data in
         if self.results_type == 'manuscript':
             folder_name = Path(__file__).parent.parent.parent / 'results' / 'manuscript_figures'
             self.results_io = ResultsIO(creator_file=__file__, folder_name=folder_name)
@@ -142,12 +142,9 @@ class Stats:
                                    df=(len(self.df_processed[var]) - 2), p_val=pval,
                                    alternative=alternative)
                 pair_outputs.append(test_output)
-            elif test == 'summary':
-                if approach == 'mixed_effects':
-                     summary = (ro.r['summary'](self.model))  # (could access variables within using rx2)
 
         # run tests that work on pairs individually
-        if test in ['direct_prob', 'mann-whitney', 'wilcoxon']:
+        if test in ['direct_prob', 'mann-whitney', 'wilcoxon', 'wilcoxon_one_sample']:
             for p in pairs:
                 query = [' & '.join([f'{g_item} == "{p_item}"' if isinstance(p_item, str)
                                      else f'{g_item} == {p_item}' for p_item, g_item in zip(p_var, self.group_vars)])
@@ -183,6 +180,7 @@ class Stats:
                                            test_statistic_name='W-val', df=np.nan,
                                            p_val=output["p-val"].to_numpy()[0],
                                            alternative=output['alternative'].to_numpy()[0])
+                        pair_outputs.append(test_output)
 
                     pair_outputs.append(test_output)
 
@@ -238,12 +236,13 @@ class Stats:
 
     @staticmethod
     def stats_to_text(x):
+        comparison = f'{x["pair"][0][0]} vs. {x["pair"][0][1]}' if len(x['pair'][0]) > 1 else f'{x["pair"][0][0]}'
         if x['df'] is not np.nan:
             text = f'{x["test_statistic_name"]}({x["df"]}) = {x["test_statistic"]}, p = {x["p_val"]:.4f}, ' \
-                   f'{x["variable"]} for {x["pair"][0][0]} vs. {x["pair"][0][1]}, {x["test"]} {new_line} '
+                   f'{x["variable"]} for {comparison}, {x["test"]} {new_line} '
         else:
             text = f'{x["test_statistic_name"]} = {x["test_statistic"]}, p = {x["p_val"]:.4f}, ' \
-                   f'{x["variable"]} for {x["pair"][0][0]} vs. {x["pair"][0][1]}, {x["test"]} {new_line} '
+                   f'{x["variable"]} for {comparison}, {x["test"]} {new_line} '
         return text
 
     def _get_mixed_effects_model(self, data):
