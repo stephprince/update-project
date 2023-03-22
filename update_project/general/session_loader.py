@@ -11,7 +11,7 @@ class SessionLoader:
 
         self.behavior_only = behavior_only
         if self.behavior_only:
-            behavior_spreadsheet_filename = '/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv'
+            behavior_spreadsheet_filename = 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv'
             self.behavior_csv_filename = behavior_spreadsheet_filename
 
         self.animals = animals or [17, 20, 25, 28, 29, 33, 34]
