@@ -14,10 +14,10 @@ session_names = session_db.load_session_names()
 
 feature = 'y_position'
 regions = [['CA1'], ['PFC']]
-exclusion_criteria = dict(units=50, trials=50)  # higher than others bc just plotting examples and both PFC + HPC
+exclusion_criteria = dict(units=20, trials=50)  # higher than others bc just plotting examples and both PFC + HPC
 overwrite = True
 single_unit_params = dict(align_window=2.5, align_times=['t_update'])
-decoding_params = dict(encoder_bin_num=50, decoder_bin_size=0.025, decoder_test_size=1)
+decoding_params = dict(encoder_bin_num=50, decoder_bin_size=0.20, decoder_test_size=0.2)
 
 group_data = []
 for name in session_names:
