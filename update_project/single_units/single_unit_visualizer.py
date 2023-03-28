@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 import seaborn.objects as so
+import seaborn as sns
 
 from pathlib import Path
 from scipy.stats import sem
@@ -107,6 +108,7 @@ class SingleUnitVisualizer(BaseVisualizationClass):
         cycle_skipping_data = g_data.sort_values(by='cycle_skipping_index')
         times = cycle_skipping_data['acg_lags'].to_numpy()[0]
 
+        # plot group heatmaps
         fig = plt.figure()
         ax = fig.subplots(2, 3, height_ratios=[3, 1])
         for trial_name, trial_data in cycle_skipping_data.groupby('epoch'):
@@ -115,15 +117,30 @@ class SingleUnitVisualizer(BaseVisualizationClass):
             num_units = np.shape(data)[0]
             zero_index_location = data.reset_index(drop=True)['cycle_skipping_index'].abs().idxmin()
             ax[0][col_ind].imshow(np.vstack(data['acg_corrected']), cmap='Greys', extent=[times[0], times[-1], 0, num_units],
-                       origin='lower', aspect='auto')
+                       origin='lower', aspect='auto', vmin=0.25, vmax=1)
             ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
             ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
 
-            ax[1][col_ind].hist(data['cycle_skipping_index'].to_numpy(), bins=np.linspace(-1, 1, 20), density=True)
-            ax[1][col_ind].axvline(0, linestyle='dashed', color='k')
-            ax[1][col_ind].set(title=g_name, xlabel='cycle skipping index', ylabel='density')
+        hist_data = (cycle_skipping_data
+                     .query(f'cell_type == "Pyramidal Cell"')
+                     .dropna(subset='cycle_skipping_index'))
+        sns.pointplot(data=hist_data, x='epoch', y='cycle_skipping_index', order=['delay', 'switch', 'stay'],
+                      ax=ax[1][0], palette=self.colors['trials'], scale=1.5)
+        ax[1][0].set(title=f'cycle skipping -  {g_name}')
+        ax[1][0].axhline(0, linestyle='dashed', color='k')
+        sns.histplot(data=hist_data, x='cycle_skipping_index', hue='epoch', hue_order=['delay', 'switch', 'stay'],
+                     ax=ax[1][1], palette=self.colors['trials'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=40)
+        ax[1][1].axvline(0, linestyle='dashed', color='k')
 
-        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping', additional_tags=g_name)
+        sns.histplot(data=hist_data, x='theta_modulation', hue='epoch', hue_order=['delay', 'switch', 'stay'],
+                     ax=ax[1][2], palette=self.colors['trials'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=30)
+
+        # ax[1][col_ind].hist(data['cycle_skipping_index'].to_numpy(), bins=np.linspace(-1, 1, 20), density=True)
+        # ax[col_ind + 1].set(title=g_name, xlabel='cycle skipping index', ylabel='density')
+
+        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping_pre_choice', additional_tags=g_name)
 
     def plot_update_selective_cell_types(self, g_data, g_name, cutoff=0.25):
         cutoffs = [cutoff, -cutoff]
