@@ -111,8 +111,9 @@ class SingleUnitVisualizer(BaseVisualizationClass):
         # plot group heatmaps
         fig = plt.figure()
         ax = fig.subplots(2, 3, height_ratios=[3, 1])
-        for trial_name, trial_data in cycle_skipping_data.groupby('epoch'):
-            col_ind = np.argwhere(cycle_skipping_data['epoch'].unique() == trial_name)[0][0]
+        trial_skipping_data = cycle_skipping_data.query('epoch in ["switch", "stay", "delay"]')
+        for trial_name, trial_data in trial_skipping_data.groupby('epoch', sort=False):
+            col_ind = np.argwhere(trial_skipping_data['epoch'].unique() == trial_name)[0][0]
             data = trial_data.query(f'cell_type == "Pyramidal Cell"')
             num_units = np.shape(data)[0]
             zero_index_location = data.reset_index(drop=True)['cycle_skipping_index'].abs().idxmin()
@@ -121,7 +122,7 @@ class SingleUnitVisualizer(BaseVisualizationClass):
             ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
             ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
 
-        hist_data = (cycle_skipping_data
+        hist_data = (trial_skipping_data
                      .query(f'cell_type == "Pyramidal Cell"')
                      .dropna(subset='cycle_skipping_index'))
         sns.pointplot(data=hist_data, x='epoch', y='cycle_skipping_index', order=['delay', 'switch', 'stay'],
@@ -137,10 +138,40 @@ class SingleUnitVisualizer(BaseVisualizationClass):
                      ax=ax[1][2], palette=self.colors['trials'], element='step', fill=False, stat='density',
                      common_norm=False, bins=30)
 
-        # ax[1][col_ind].hist(data['cycle_skipping_index'].to_numpy(), bins=np.linspace(-1, 1, 20), density=True)
-        # ax[col_ind + 1].set(title=g_name, xlabel='cycle skipping index', ylabel='density')
+        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping_by_trial', additional_tags=g_name)
 
-        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping_pre_choice', additional_tags=g_name)
+        # plot group heatmaps
+        fig = plt.figure()
+        ax = fig.subplots(2, 4, height_ratios=[3, 1])
+        commitment_skipping_data = cycle_skipping_data.query('epoch in ["q0", "q1", "q2", "q3"]')
+        for trial_name, trial_data in commitment_skipping_data.groupby('epoch', sort=False):
+            col_ind = np.argwhere(np.array(['q3', 'q2', 'q1', 'q0']) == trial_name)[0][0]
+            data = trial_data.query(f'cell_type == "Pyramidal Cell"')
+            num_units = np.shape(data)[0]
+            zero_index_location = data.reset_index(drop=True)['cycle_skipping_index'].abs().idxmin()
+            ax[0][col_ind].imshow(np.vstack(data['acg_corrected']), cmap='Greys',
+                                  extent=[times[0], times[-1], 0, num_units],
+                                  origin='lower', aspect='auto', vmin=0.25, vmax=1)
+            ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
+            ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
+
+        hist_data = (commitment_skipping_data
+                     .query(f'cell_type == "Pyramidal Cell"')
+                     .dropna(subset='cycle_skipping_index'))
+        sns.pointplot(data=hist_data, x='epoch', y='cycle_skipping_index', order=['q3', 'q2', 'q1', 'q0'],
+                      ax=ax[1][0], palette=self.colors['all_quartiles'], scale=1.5)
+        ax[1][0].set(title=f'cycle skipping -  {g_name}')
+        ax[1][0].axhline(0, linestyle='dashed', color='k')
+        sns.histplot(data=hist_data, x='cycle_skipping_index', hue='epoch', hue_order=['q3', 'q2', 'q1', 'q0'],
+                     ax=ax[1][1], palette=self.colors['all_quartiles'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=20)
+        ax[1][1].axvline(0, linestyle='dashed', color='k')
+
+        sns.histplot(data=hist_data, x='theta_modulation', hue='epoch', hue_order=['q3', 'q2', 'q1', 'q0'],
+                     ax=ax[1][2], palette=self.colors['all_quartiles'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=20)
+
+        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping_by_commitment', additional_tags=g_name)
 
     def plot_update_selective_cell_types(self, g_data, g_name, cutoff=0.25):
         cutoffs = [cutoff, -cutoff]
