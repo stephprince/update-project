@@ -218,13 +218,13 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         trials_with_delay = self.trials.dropna(subset=['t_delay2', 't_update'])
         self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
         self.delay_trial_times = self._get_time_intervals(trials_with_delay.query('update_type == 1')['t_update'],
-                                                          trials_with_delay.query('update_type == 1')['t_delay2'],
+                                                          trials_with_delay.query('update_type == 1')['t_delay2'] + 2.5,
                                                           min_duration=1.5)
         self.switch_trial_times = self._get_time_intervals(trials_with_delay.query('update_type == 2')['t_update'],
-                                                           trials_with_delay.query('update_type == 2')['t_delay2'],
+                                                           trials_with_delay.query('update_type == 2')['t_delay2'] + 2.5,
                                                            min_duration=1.5)
         self.stay_trial_times = self._get_time_intervals(trials_with_delay.query('update_type == 3')['t_update'],
-                                                         trials_with_delay.query('update_type == 3')['t_delay2'],
+                                                         trials_with_delay.query('update_type == 3')['t_delay2'] + 2.5,
                                                          min_duration=1.5)
         self.commitment_trial_times = dict()
         for q_name, q_trials in self.commitment.groupby('view_angle_quantile'):
@@ -515,7 +515,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
 
                 # triangle-correct, smooth, and peak-normalize ACGs
                 total_dur = np.sum(self.encoder_times['end'] - self.encoder_times['start'])
-                sd = 0.01 / bin_size  # for gaussian convolution to smooth, want 10 ms smoothing (tang paper used 20 ms)
+                sd = 0.02 / bin_size  # for gaussian convolution to smooth, want 10 ms smoothing (tang paper used 20 ms)
                 corr_corrected = corr_raw.apply(lambda x: self.correct_acg(raw=x, total_dur=total_dur, sd=sd), axis=0)
 
                 # get theta modulated cells
@@ -531,8 +531,9 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
                                                                       axis=0)
 
                 # make final output data structure
-                cycle_skipping_data = pd.concat([self.units['region'][fr_inclusion_bool][theta_modulated_bool],
-                                                 self.units['cell_type'][fr_inclusion_bool][theta_modulated_bool]],
+                units_sorted = self.units.sort_index()
+                cycle_skipping_data = pd.concat([units_sorted['region'][fr_inclusion_bool][theta_modulated_bool],
+                                                 units_sorted['cell_type'][fr_inclusion_bool][theta_modulated_bool]],
                                                 axis=1)
                 cycle_skipping_data['cycle_skipping_index'] = theta_cycling_index
                 cycle_skipping_data['theta_modulation'] = theta_modulation[theta_modulated_bool]
