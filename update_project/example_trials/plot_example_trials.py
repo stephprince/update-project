@@ -7,17 +7,18 @@ from update_project.example_trials.example_trial_visualizer import ExampleTrialV
 
 # setup sessions
 animals = [17, 20, 25, 28, 29, 33, 34]
-dates_included = []
+dates_included = [210910]
 dates_excluded = []
 session_db = SessionLoader(animals=animals, dates_included=dates_included, dates_excluded=dates_excluded)
 session_names = session_db.load_session_names()
 
 feature = 'y_position'
 regions = [['CA1'], ['PFC']]
+both_regions_only = True
 exclusion_criteria = dict(units=20, trials=50)  # higher than others bc just plotting examples and both PFC + HPC
 overwrite = True
-single_unit_params = dict(align_window=2.5, align_times=['t_update'])
-decoding_params = dict(encoder_bin_num=50, decoder_bin_size=0.20, decoder_test_size=0.2)
+single_unit_params = dict(align_window=15, align_times=['t_update'])
+decoding_params = dict(encoder_bin_num=50, decoder_bin_size=0.025, decoder_test_size=0.2)
 
 group_data = []
 for name in session_names:
@@ -49,7 +50,7 @@ for name in session_names:
                             feature_name=feature)
         group_data.append(session_data)
 
-visualizer = ExampleTrialVisualizer(group_data, exclusion_criteria=exclusion_criteria, align_window=single_unit_params['align_window'],
-                                    align_times=single_unit_params['align_times'])
+visualizer = ExampleTrialVisualizer(group_data, exclusion_criteria=exclusion_criteria,
+                                    align_window=single_unit_params['align_window'], both_regions=both_regions_only)
 group_data = []  # clear out memory
 visualizer.plot()
