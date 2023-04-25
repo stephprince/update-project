@@ -355,6 +355,27 @@ class BayesianDecoderAggregator:
 
         return start_bin, stop_bin
 
+    def adjust_bound_bins(self, bins, bounds):
+        bin_inds = dict()
+        for bound_name, bound_values in bounds.items():  # loop through left/right bounds
+            start_bin, stop_bin = self.get_bound_bins(bins, bound_values)
+            bin_inds[f'{bound_name}_start'] = start_bin
+            bin_inds[f'{bound_name}_stop'] = stop_bin
+
+        virtual_track = self.group_df['virtual_track'].values[0]
+        while len(np.arange(bin_inds['left_start'], bin_inds['left_stop'])) != \
+                len(np.arange(bin_inds['right_start'], bin_inds['right_stop'])):
+            left_bins = bins[bin_inds['left_start']:bin_inds['left_stop'] + 1]
+            right_bins = bins[bin_inds['right_start']:bin_inds['right_stop'] + 1]
+
+            if len(left_bins) < len(right_bins) and np.max(left_bins) < np.max(virtual_track.edge_spacing[1]):
+                bin_inds['left_stop'] = bin_inds['left_stop'] + 1
+
+            if len(left_bins) > len(right_bins) and np.max(left_bins) >= bounds['left'][-1]:
+                bin_inds['left_stop'] = bin_inds['left_stop'] - 1
+
+        return bin_inds
+
     def quantify_aligned_data(self, param_data, aligned_data, ret_df=False, include_central=False):
         if np.size(aligned_data) and aligned_data is not None:
             # get bounds to use to quantify choices
@@ -373,14 +394,14 @@ class BayesianDecoderAggregator:
                 prob_map = np.stack(aligned_data['probability'])
             prob_choice = dict()
             num_bins = dict()
+            bin_inds = self.adjust_bound_bins(bins, bounds)
+
             output_list = []
             for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                start_bin, stop_bin = self.get_bound_bins(bins, bound_values)
-
                 threshold = 0.1  # total probability density to call a left/right choice
-                integrated_prob = np.sum(prob_map[:, start_bin:stop_bin, :],
+                integrated_prob = np.sum(prob_map[:, bin_inds[f'{bound_name}_start']:bin_inds[f'{bound_name}_stop'], :],
                                             axis=1)  # (trials, feature bins, window)
-                num_bins[bound_name] = len(prob_map[0, start_bin:stop_bin, 0])
+                num_bins[bound_name] = len(prob_map[0, bin_inds[f'{bound_name}_start']:bin_inds[f'{bound_name}_stop'], 0])
                 prob_over_chance = integrated_prob * len(bins) / num_bins[
                     bound_name]  # integrated prob * bins / goal bins
                 assert len(bins) - 1 == np.shape(prob_map)[1], 'Bound bins not being sorted on right dimension'
@@ -517,7 +538,7 @@ class BayesianDecoderAggregator:
                 # align_end = align_end - 1  # get index immediately preceding 0 if not the first one
                 prob_sum_diff = prob_sum_mat.T - np.nanmean(prob_sum_mat[:, align_start:align_end], axis=1)
             elif align_end == 0:
-                prob_sum_diff = prob_sum_mat.T - prob_sum_mat[align_end]  # only use first bin if that's all there is
+                prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_end]  # only use first bin if that's all there is
             quant_df['diff_baseline'] = list(prob_sum_diff.T)
             quant_df['zscore_prob'] = list((prob_sum_mat - zscore_mean) / zscore_std)
 
@@ -576,15 +597,12 @@ class BayesianDecoderAggregator:
         return exploded_df
 
     def _flip_y_position(self, data, bounds, bins=None):
+        if bins is not None:
+            areas = self.adjust_bound_bins(bins, bounds)
+
         flipped_data = []
         for ind, row in data.iteritems():
             if bins is not None:
-                areas = dict()
-                for bound_name, bound_values in bounds.items():  # loop through left/right bounds
-                    start_bin, stop_bin = self.get_bound_bins(bins, bound_values)
-                    areas[f'{bound_name}_start'] = start_bin
-                    areas[f'{bound_name}_stop'] = stop_bin
-
                 left_data = row[areas['left_start']:areas['left_stop'], :].copy()
                 right_data = row[areas['right_start']:areas['right_stop'], :].copy()
 
