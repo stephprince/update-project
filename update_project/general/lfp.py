@@ -4,6 +4,22 @@ import pandas as pd
 from update_project.general.results_io import ResultsIO
 
 
+def get_lfp(nwbfile):
+    electrode_df = nwbfile.electrodes.to_dataframe()
+    ripple_channel = electrode_df.index[electrode_df['ripple_channel'] == 1][0]
+    pfc_channel = electrode_df.query('location == "PFC"').index[-1]  # just take last pfc channel
+
+    lfp_ca1 = nwbfile.processing['ecephys']['LFP']['LFP'].data[:, ripple_channel]
+    lfp_pfc = nwbfile.processing['ecephys']['LFP']['LFP'].data[:, pfc_channel]
+    rate = nwbfile.processing['ecephys']['LFP']['LFP'].rate
+    timestamps = np.arange(0, len(lfp_ca1) / rate, 1 / rate)
+
+    lfp_dict = dict(CA1=pd.Series(index=timestamps[:], data=lfp_ca1),
+                    PFC=pd.Series(index=timestamps[:], data=lfp_pfc))
+
+    return pd.DataFrame.from_dict(lfp_dict)
+
+
 def get_theta(nwbfile, adjust_reference=False, session_id=''):
     electrode_df = nwbfile.electrodes.to_dataframe()
     ripple_channel = electrode_df.index[electrode_df['ripple_channel'] == 1][0]

@@ -24,3 +24,10 @@ def get_commitment_data(nwbfile, results_io):
                                                                data=choice_commitment)))
 
     return commitment
+
+
+def get_view_angle(nwbfile):
+    time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
+    view_angle = pd.DataFrame(dict(view_angle=pd.Series(index=time_series.timestamps[:], data=time_series.data[:])))
+
+    return view_angle

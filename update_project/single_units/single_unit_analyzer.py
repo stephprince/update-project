@@ -13,9 +13,10 @@ from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
 from update_project.general.results_io import ResultsIO
 from update_project.general.virtual_track import UpdateTrack
-from update_project.general.lfp import get_theta
-from update_project.general.acquisition import get_velocity
+from update_project.general.lfp import get_theta, get_lfp
+from update_project.general.acquisition import get_velocity, get_licks
 from update_project.general.place_cells import get_place_fields, get_largest_field_loc
+from update_project.general.preprocessing import get_view_angle
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.units import align_by_time_intervals as align_by_time_intervals_units
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
@@ -70,6 +71,9 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         self.nwb_units = nwbfile.units
         self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
+        self.lfp = get_lfp(nwbfile)
+        self.licks = get_licks(nwbfile)
+        self.view_angle = get_view_angle(nwbfile)
         self.commitment = get_commitment_quartiles(session_id=session_id)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
@@ -234,8 +238,11 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             self.commitment_trial_times[q_name] = trial_times
 
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
+        self.view_angle = nap.TsdFrame(self.view_angle, time_units='s')
         self.theta = nap.TsdFrame(self.theta.iloc[::self.downsample_factor, :], time_units='s')
         self.velocity = nap.TsdFrame(self.velocity.iloc[::self.downsample_factor, :], time_units='s')
+        self.lfp = nap.TsdFrame(self.lfp.iloc[::self.downsample_factor, :], time_units='s')
+        self.licks = nap.TsdFrame(self.licks.iloc[::self.downsample_factor, :], time_units='s')
 
         return self
 
@@ -321,20 +328,27 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
                                               ))
 
             vars = dict(theta_phase=self.theta['phase'], theta_amplitude=self.theta['amplitude'],
-                        rotational_velocity=self.velocity['rotational'], translational_velocity=self.velocity['translational'])
+                        rotational_velocity=self.velocity['rotational'], translational_velocity=self.velocity['translational'],
+                        lfp_CA1=self.lfp['CA1'], lfp_PFC=self.lfp['PFC'], view_angle=self.view_angle['view_angle'],
+                        licks=self.licks['licks'],
+                        )
             dig_data = dict()
             for v_name, v_data in vars.items():
                 dig_data[v_name], timestamps = align_by_time_intervals_ts(v_data, self.trials, return_timestamps=True,
                                                                      start_label=time_label, stop_label=time_label,
                                                                      start_window=window_start, stop_window=window_stop)
-            ts_aligned.append(dict(**dig_data, timestamps=timestamps, new_times=new_times, time_label=time_label,
+                if v_name == 'view_angle':
+                    behavior_timestamps = [b - t for t, b in zip(self.trials[time_label].to_numpy(), timestamps)]
+            ts_aligned.append(dict(**dig_data, new_times=new_times,  # timestamps=timestamps,
+                                   behavior_timestamps=behavior_timestamps, time_label=time_label,
                                    turn_type=self.trials['turn_type'].to_numpy(),
                                    correct=self.trials['correct'].to_numpy(),
                                    update_type=self.trials['update_type'].to_numpy()))
 
         if np.size(self.units_subset):
             aligned_data = (pd.merge(pd.DataFrame(units_aligned), pd.DataFrame(ts_aligned), on='time_label')
-                            .explode(['trial_ids', 'spikes',  *list(vars.keys()), 'timestamps', 'turn_type', 'correct',
+                            .explode(['trial_ids', 'spikes',  *list(vars.keys()),'behavior_timestamps',  # 'timestamps',
+                                      'turn_type', 'correct',
                                       'update_type'])
                             .reset_index(drop=True))
             aligned_data['update_type'] = aligned_data['update_type'].map({1: 'non_update', 2: 'switch', 3: 'stay'})
@@ -502,7 +516,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             bin_size = 0.01
             window_size = 0.4
             min_spikes = 100
-            if np.size(ep):  # if any time periods of that trial type
+            if np.size(ep) and np.size(self.spikes):  # if any time periods of that trial type
                 corr_raw = nap.compute_autocorrelogram(group=self.spikes, ep=ep, binsize=bin_size,
                                                        windowsize=window_size, norm=False)
 
@@ -531,15 +545,19 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
                                                                       axis=0)
 
                 # make final output data structure
-                units_sorted = self.units.sort_index()
-                cycle_skipping_data = pd.concat([units_sorted['region'][fr_inclusion_bool][theta_modulated_bool],
-                                                 units_sorted['cell_type'][fr_inclusion_bool][theta_modulated_bool]],
-                                                axis=1)
-                cycle_skipping_data['cycle_skipping_index'] = theta_cycling_index
-                cycle_skipping_data['theta_modulation'] = theta_modulation[theta_modulated_bool]
-                cycle_skipping_data['epoch'] = ep_name
-                cycle_skipping_data['acg_corrected'] = list(corr_corrected_theta_only.T.to_numpy())
-                cycle_skipping_data['acg_lags'] = [corr_corrected_theta_only.index.to_numpy()] * len(theta_cycling_index)
-                df_list.append(cycle_skipping_data)
+                if theta_modulated_bool.any():
+                    units_sorted = self.units_subset.sort_index()
+                    cycle_skipping_data = pd.concat([units_sorted['region'][fr_inclusion_bool][theta_modulated_bool],
+                                                     units_sorted['cell_type'][fr_inclusion_bool][theta_modulated_bool]],
+                                                    axis=1)
+                    cycle_skipping_data['cycle_skipping_index'] = theta_cycling_index
+                    cycle_skipping_data['theta_modulation'] = theta_modulation[theta_modulated_bool]
+                    cycle_skipping_data['epoch'] = ep_name
+                    cycle_skipping_data['acg_corrected'] = list(corr_corrected_theta_only.T.to_numpy())
+                    cycle_skipping_data['acg_lags'] = [corr_corrected_theta_only.index.to_numpy()] * len(theta_cycling_index)
+                    df_list.append(cycle_skipping_data)
 
-        self.cycle_skipping = pd.concat(df_list, axis=0)
+        if np.size(df_list):
+            self.cycle_skipping = pd.concat(df_list, axis=0)
+        else:
+            self.cycle_skipping = pd.DataFrame()
