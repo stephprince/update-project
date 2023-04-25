@@ -1,17 +1,17 @@
 ID,Animal,Date,Recording,Include,TravelPFC,TravelCA1,Behavior,hemisphere,ProbeAB,ProbeCD,RegAB,RegCD,DOB,Notes
 Letter,#,YYMMDD,#,0 to exlcude,in mm,in mm,"1 = vr behavior, 0 = none (baseline with screen off)",,,,,,YYMMDD,
-S,17,210406,1,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain"
-S,17,210406,2,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain"
-S,17,210406,3,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. try to salvage, will have to stitch together with behavior"
-S,17,210406,4,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,FIX CA1 CHANNEL MAPPING. One or two trials so exclude overall
-S,17,210406,5,0,nan,1.7,0,R,W194,nan,CA1,nan,201117,FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. HCU just turned off at the end so I had to stop
-S,17,210406,6,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,FIX CA1 CHANNEL MAPPING. Exclude for now unless I need the data. HCU just turned off at the end so I had to stop
-S,17,210407,1,1,1.8,1.74,1,R,W194,W189,CA1,PFC,201117,FIX CA1 CHANNEL MAPPING. 
-S,17,210407,2,1,1.8,1.74,0,R,W194,W189,CA1,PFC,201117,FIX CA1 CHANNEL MAPPING. 
-S,17,210407,3,1,1.8,1.74,1,R,W194,W189,CA1,PFC,201117,FIX CA1 CHANNEL MAPPING. 
-S,17,210408,1,0,1.85,2.15,1,R,R405,W189,CA1,PFC,201117,"FIX CA1 CHANNEL MAPPING. Movement noise, proceed with caution. Deeper in the layer. Something weird happened with PFC channels, missing time data so exclude"
-S,17,210408,2,1,1.85,2.15,0,R,R405,W189,CA1,PFC,201117,"FIX CA1 CHANNEL MAPPING. Movement noise, proceed with caution. Deeper in the layer"
-S,17,210408,3,1,1.85,2.15,1,R,R405,W189,CA1,PFC,201117,"FIX CA1 CHANNEL MAPPING. Movement noise, proceed with caution. Deeper in the layer"
+S,17,210406,1,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain. Need to fix CA1 channel mapping"
+S,17,210406,2,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain. Need to fix CA1 channel mapping"
+S,17,210406,3,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain. Need to fix CA1 channel mapping"
+S,17,210406,4,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,"Exclude for now unless I need the data. Errored out during behavior, try to salvage, will have to stitch together with behavior to use. No PFC bc couldn't get probe in brain."
+S,17,210406,5,0,nan,1.7,0,R,W194,nan,CA1,nan,201117,Exclude for now unless I need the data. HCU just turned off at the end so I had to stop.  Need to fix CA1 channel mapping
+S,17,210406,6,0,nan,1.7,1,R,W194,nan,CA1,nan,201117,Exclude for now unless I need the data. HCU just turned off at the end so I had to stop.  Need to fix CA1 channel mapping
+S,17,210407,1,1,1.8,1.74,1,R,W194,W189,CA1,PFC,201117,Fix CA1 channel mapping for flipped adapters before use
+S,17,210407,2,1,1.8,1.74,0,R,W194,W189,CA1,PFC,201117,Fix CA1 channel mapping for flipped adapters before use
+S,17,210407,3,1,1.8,1.74,1,R,W194,W189,CA1,PFC,201117,Fix CA1 channel mapping for flipped adapters before use
+S,17,210408,1,0,1.85,2.15,1,R,R405,W189,CA1,PFC,201117," Movement noise, proceed with caution. Deeper in the layer. Something weird happened with PFC channels, missing time data so exclude. Need to fix CA1 channel mapping"
+S,17,210408,2,1,1.85,2.15,0,R,R405,W189,CA1,PFC,201117,"Movement noise, proceed with caution. Deeper in the layer. Need to fix CA1 channel mapping"
+S,17,210408,3,1,1.85,2.15,1,R,R405,W189,CA1,PFC,201117,"Movement noise, proceed with caution. Deeper in the layer. Need to fix CA1 channel mapping"
 S,17,210409,1,1,1.9,2.45,1,R,R405,W189,CA1,PFC,201117,"Movement noise, proceed with caution. One shank is through the layer and CA1 probe started above I think Great behavior"
 S,17,210410,1,1,2.04,2.04,1,R,R405,W189,CA1,PFC,201117,some movement noise
 S,17,210410,2,1,2.04,2.04,1,R,R405,W189,CA1,PFC,201117,some movement noise
@@ -110,26 +110,26 @@ S,25,210916,3,1,2.424,1.9,1,R,W189,Y777,CA1,PFC,210302,
 S,29,211104,1,1,2.25,1.75,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211104,2,0,2.25,1.75,0,R,W190,Y457,CA1,PFC,210713,
 S,29,211104,3,1,2.25,1.75,1,R,W190,Y457,CA1,PFC,210713,
-S,23,211104,1,1,2.4,2.3,1,R,W189,Y777,CA1,PFC,210302,
-S,23,211104,2,0,2.4,2.3,0,R,W189,Y777,CA1,PFC,210302,
+S,23,211104,1,0,2.4,2.3,1,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
+S,23,211104,2,0,2.4,2.3,0,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
 S,29,211105,1,1,2.3,1.825,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211105,2,1,2.3,1.825,0,R,W190,Y457,CA1,PFC,210713,
 S,29,211105,3,1,2.3,1.825,1,R,W190,Y457,CA1,PFC,210713,
-S,23,211105,1,1,2.2,2.225,1,R,W189,Y777,CA1,PFC,210302,
-S,23,211105,2,1,2.2,2.225,0,R,W189,Y777,CA1,PFC,210302,
-S,23,211105,3,1,2.2,2.225,1,R,W189,Y777,CA1,PFC,210302,
+S,23,211105,1,0,2.2,2.225,1,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
+S,23,211105,2,0,2.2,2.225,0,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
+S,23,211105,3,0,2.2,2.225,1,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
 S,29,211106,1,1,2.35,1.85,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211106,2,1,2.35,1.85,0,R,W190,Y457,CA1,PFC,210713,
 S,29,211106,3,1,2.35,1.85,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211107,1,1,2.4,1.875,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211107,2,1,2.4,1.875,0,R,W190,Y457,CA1,PFC,210713,
 S,29,211107,3,1,2.4,1.875,1,R,W190,Y457,CA1,PFC,210713,
-S,23,211107,1,1,2.6,1.7,1,R,W189,Y777,CA1,PFC,210302,don�t use HPC location was weird
+S,23,211107,1,0,2.6,1.7,1,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
 S,29,211108,1,1,2.425,1.625,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211108,2,0,2.425,1.625,1,R,W190,Y457,CA1,PFC,210713,no licks recorded
 S,29,211108,3,1,2.425,1.625,0,R,W190,Y457,CA1,PFC,210713,no licks recorded
 S,29,211108,4,1,2.425,1.625,1,R,W190,Y457,CA1,PFC,210713,no licks recorded
-S,23,211109,1,1,2.45,2.45,1,R,W189,Y777,CA1,PFC,210302,not sure about HPC location
+S,23,211109,1,0,2.45,2.45,1,R,W189,Y777,CA1,PFC,210302,excluding all of S23 bc weird location + bad behavior
 S,29,211111,1,1,2.4,1.9,1,R,W190,Y457,CA1,PFC,210713,
 S,29,211111,2,1,2.4,1.9,0,R,W190,Y457,CA1,PFC,210713,
 S,29,211111,3,1,2.4,1.9,1,R,W190,Y457,CA1,PFC,210713,
@@ -172,9 +172,9 @@ S,29,211119,3,1,2.325,1.85,1,L,W189,Y777,PFC,CA1,210713,
 S,28,211120,1,1,2.6,1.825,1,R,Y777,Y457,CA1,PFC,210713,
 S,28,211120,2,1,2.6,1.825,0,R,Y777,Y457,CA1,PFC,210713,
 S,28,211120,3,1,2.6,1.825,1,R,Y777,Y457,CA1,PFC,210713,
-S,28,211121,1,1,2.35,1.9,1,R,W189,W190,CA1,PFC,210713,careful. might have to exclude 33-64 channels because large fluctuations in raw signal
-S,28,211121,2,1,2.35,1.9,1,R,W189,W190,CA1,PFC,210713,careful. might have to exclude 33-64 channels because large fluctuations in raw signal
-S,28,211121,3,1,2.35,1.9,1,R,W189,W190,CA1,PFC,210713,careful. might have to exclude 33-64 channels because large fluctuations in raw signal
+S,28,211121,1,0,2.35,1.9,1,R,W189,W190,CA1,PFC,210713,Good quality spikes but excluding bc 33-64 channels wtih large fluctuations in raw signal
+S,28,211121,2,0,2.35,1.9,1,R,W189,W190,CA1,PFC,210713,Good quality spikes but excluding bc 33-64 channels wtih large fluctuations in raw signal
+S,28,211121,3,0,2.35,1.9,1,R,W189,W190,CA1,PFC,210713,Good quality spikes but excluding bc 33-64 channels wtih large fluctuations in raw signal
 S,28,211122,1,1,2.6,2.125,1,R,W190,Y457,CA1,PFC,210713,
 S,28,211122,2,1,2.6,2.125,0,R,W190,Y457,CA1,PFC,210713,
 S,28,211122,3,1,2.6,2.125,1,R,W190,Y457,CA1,PFC,210713,
