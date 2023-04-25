@@ -7,11 +7,13 @@ import seaborn as sns
 
 from pathlib import Path
 from scipy.stats import sem
+from statannotations.Annotator import Annotator
 
 from update_project.general.results_io import ResultsIO
 from update_project.single_units.psth_visualizer import show_psth_raster
 from update_project.single_units.single_unit_aggregator import SingleUnitAggregator
 from update_project.base_visualization_class import BaseVisualizationClass
+from update_project.statistics.statistics import Stats
 
 
 class SingleUnitVisualizer(BaseVisualizationClass):
@@ -122,13 +124,35 @@ class SingleUnitVisualizer(BaseVisualizationClass):
             ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
             ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
 
+        # plot distribution with stats
         hist_data = (trial_skipping_data
                      .query(f'cell_type == "Pyramidal Cell"')
                      .dropna(subset='cycle_skipping_index'))
         sns.pointplot(data=hist_data, x='epoch', y='cycle_skipping_index', order=['delay', 'switch', 'stay'],
                       ax=ax[1][0], palette=self.colors['trials'], scale=1.5)
         ax[1][0].set(title=f'cycle skipping -  {g_name}')
-        ax[1][0].axhline(0, linestyle='dashed', color='k')
+
+        var = 'cycle_skipping_index'
+        group = 'epoch'
+        pairs = list(itertools.combinations(hist_data[group].unique(), r=2))
+        pairs_in_tup = [((p[0],), (p[1],)) for p in pairs]
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+        stats.run(hist_data, dependent_vars=[var], group_vars=[group],
+                  pairs=pairs_in_tup, filename=f'theta_cycle_skipping_by_trial_{g_name}')
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans" & variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs_in_tup]
+        annot = Annotator(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                          order=['delay', 'switch', 'stay'])
+        annot.new_plot(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                       order=['delay', 'switch', 'stay'])
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # plot histogram of cycle skipping and theta modulation
         sns.histplot(data=hist_data, x='cycle_skipping_index', hue='epoch', hue_order=['delay', 'switch', 'stay'],
                      ax=ax[1][1], palette=self.colors['trials'], element='step', fill=False, stat='density',
                      common_norm=False, bins=40)
@@ -155,6 +179,7 @@ class SingleUnitVisualizer(BaseVisualizationClass):
             ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
             ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
 
+        # plot averages with stats
         hist_data = (commitment_skipping_data
                      .query(f'cell_type == "Pyramidal Cell"')
                      .dropna(subset='cycle_skipping_index'))
@@ -162,6 +187,29 @@ class SingleUnitVisualizer(BaseVisualizationClass):
                       ax=ax[1][0], palette=self.colors['all_quartiles'], scale=1.5)
         ax[1][0].set(title=f'cycle skipping -  {g_name}')
         ax[1][0].axhline(0, linestyle='dashed', color='k')
+
+        # plot distribution with stats
+        var = 'cycle_skipping_index'
+        group = 'epoch'
+        pairs = list(itertools.combinations(hist_data[group].unique(), r=2))
+        pairs_in_tup = [((p[0],), (p[1],)) for p in pairs]
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+        stats.run(hist_data, dependent_vars=[var], group_vars=[group],
+                  pairs=pairs_in_tup, filename=f'theta_cycle_skipping_by_trial_{g_name}')
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans" & variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs_in_tup]
+        annot = Annotator(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                          order=['q3', 'q2', 'q1', 'q0'])
+        annot.new_plot(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                       order=['q3', 'q2', 'q1', 'q0'])
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # plot distributions of theta modulation and cycle skipping index
         sns.histplot(data=hist_data, x='cycle_skipping_index', hue='epoch', hue_order=['q3', 'q2', 'q1', 'q0'],
                      ax=ax[1][1], palette=self.colors['all_quartiles'], element='step', fill=False, stat='density',
                      common_norm=False, bins=20)
