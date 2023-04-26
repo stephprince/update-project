@@ -15,7 +15,7 @@ class ExampleTrialAggregator:
 
     def run_aggregation(self, data, exclusion_criteria, align_window=5, align_times=['t_update']):
         # get single unit aggregated data
-        self.single_unit_agg = SingleUnitAggregator(exclusion_criteria=exclusion_criteria)
+        self.single_unit_agg = SingleUnitAggregator(exclusion_criteria=exclusion_criteria, analyzer_name='single_unit')
         self.single_unit_agg.run_aggregation(data)
         spikes = self.single_unit_agg.select_group_aligned_data(self.single_unit_agg.group_aligned_data,
                                                                 self.plot_groups)
@@ -30,10 +30,11 @@ class ExampleTrialAggregator:
                                                                 ret_df=True)
         decoding['region'] = decoding['region'].apply(lambda x: x[0])  # pull region from list
         decoding_goal = self.decoder_agg.quantify_aligned_data(self.decoder_agg.group_aligned_df, decoding, ret_df=True)
+        decoding_goal.drop('rotational_velocity', axis='columns', inplace=True)
 
         cols_merge_on = ['session_id', 'animal', 'feature_name', 'region', 'trial_id']
         decoding.drop(labels=decoding.columns.difference(['feature', 'decoding', 'probability', 'error', 'bins',
-                                                          'turn_type', *cols_merge_on]).to_list(),
+                                                          *cols_merge_on]).to_list(),
                       axis='columns',
                       inplace=True)
         decoding = decoding_goal.merge(decoding, on=cols_merge_on, how='left', validate='many_to_one')
