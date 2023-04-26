@@ -8,9 +8,11 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 from update_project.choice.choice_analyzer import ChoiceAnalyzer
 from update_project.choice.choice_visualizer import ChoiceVisualizer
 from update_project.decoding.bayesian_decoder_analyzer import BayesianDecoderAnalyzer
+from update_project.example_trials.example_trial_analyzer import ExampleTrialAnalyzer
 from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
 from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
 from update_project.single_units.single_unit_visualizer import SingleUnitVisualizer
+from update_project.example_trials.example_trial_visualizer import ExampleTrialVisualizer
 
 
 class UpdateTaskFigureGenerator:
@@ -22,27 +24,31 @@ class UpdateTaskFigureGenerator:
         self.analysis_classes = dict(Behavior=BehaviorAnalyzer,
                                      Choice=ChoiceAnalyzer,
                                      Decoder=BayesianDecoderAnalyzer,
-                                     SingleUnits=SingleUnitAnalyzer)
+                                     SingleUnits=SingleUnitAnalyzer,
+                                     Examples=ExampleTrialAnalyzer)
         self.visualization_classes = dict(Behavior=BehaviorVisualizer,
                                           Choice=ChoiceVisualizer,
                                           Decoder=BayesianDecoderVisualizer,
-                                          SingleUnits=SingleUnitVisualizer)
+                                          SingleUnits=SingleUnitVisualizer,
+                                          Examples=ExampleTrialVisualizer)
 
     def plot_main_figures(self):
-        # self.plot_figure_1()        # figure 1 - experimental paradigm + behavior supplement
-        # self.plot_figure_2()        # figure 2 - HPC position coding + decoding validation + session/animal breakdown
-        # self.plot_figure_3()        # figure 3 - HPC theta sequences
-        # self.plot_figure_4()        # figure 4 - PFC choice coding + decoding validation + session/animal breakdown
-        self.plot_figure_5_and_6()  # figure 5 - HPC + PFC incorrect/correct trial prediction + choice commitment + supplement
+        self.plot_figure_1()        # figure 1 - experimental paradigm + behavior supplement
+        self.plot_figure_2()        # figure 2 - HPC position coding + decoding validation + session/animal breakdown
+        self.plot_figure_3()        # figure 3 - HPC theta modulation
+        self.plot_figure_4()        # figure 4 - PFC choice coding + decoding validation + session/animal breakdown
+        self.plot_figure_5_and_6()  # figure 5 - HPC + PFC accuracy prediction + choice commitment + supplement
 
     def plot_supplemental_figures(self):
+        # rest of supplemental figures are plotted within their corresponding main figure functions to minimize compute
         self.plot_supp_figure_4()  # supp figure 4 - HPC position coding - all trial types supplement
         self.plot_supp_figure_5()  # supp figure 5 - PFC position coding supplement
         self.plot_supp_figure_8()  # supp figure 8 - HPC choice coding supplement
 
-    def run_analysis_pipeline(self, analysis_to_run, analysis_kwargs=dict(), overwrite=False):
+    def run_analysis_pipeline(self, analysis_to_run, analysis_kwargs=dict(), session_names=None,
+                              overwrite=False):
         print(f'Running {analysis_to_run} analysis interface')
-        session_names = self.sessions.load_session_names()
+        session_names = session_names or self.sessions.load_session_names()
         analysis_interface = self.analysis_classes[analysis_to_run]
         visualization_interface = self.visualization_classes[analysis_to_run]
 
@@ -67,17 +73,22 @@ class UpdateTaskFigureGenerator:
         return visualizer
 
     def plot_figure_1(self, with_supplement=True):
-        visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
+        behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
+        example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
+                                                        session_names=[('S', 29, 211118)])
 
         # figure structure
-        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
-        sfigs = fig.subfigures(nrows=2, ncols=2, width_ratios=[2.25, 1], height_ratios=[1, 1.1])
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1.1, 2])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[2.25, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[2.25, 1])
 
         # plot data
-        sfigs[0][0] = self.plot_placeholder(sfigs[0][0], text='Task schematic with example trial types')
-        sfigs[0][1] = visualizer.plot_performance(sfigs[0][1], tags='prop_correct_fig_1')  # behavioral performance
-        sfigs[1][0] = visualizer.plot_trajectories_by_position(sfigs[1][0])  # example  trajectories of each trial type
-        sfigs[1][1] = visualizer.plot_trajectories_by_event(sfigs[1][1])  # average trajectories aligned to update
+        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Task schematic with example trial types')
+        sfigs_row0[1] = behavior_visualizer.plot_performance(sfigs_row0[1], tags='prop_correct_fig_1')  # performance
+        sfigs_row1[0] = behavior_visualizer.plot_trajectories_by_position(sfigs_row1[0])  # example  trajectories
+        sfigs_row1[1] = behavior_visualizer.plot_trajectories_by_event(sfigs_row1[1])  # average trajectories
+        sfigs[2] = example_visualizer.plot_behavior_trial(sfigs[2])  # single unit spiking + behavior metrics
 
         # figure saving
         self.add_panel_labels(sfigs)
@@ -91,10 +102,10 @@ class UpdateTaskFigureGenerator:
             sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1.5])
 
             # plot data
-            sfigs_row0[0] = visualizer.plot_event_durations(sfigs_row0[0])  # average trajectories aligned to update
-            sfigs_row0[1] = visualizer.plot_performance_by_animals(sfigs_row0[1])  # behavioral performance
-            sfigs_row1[0] = visualizer.plot_performance_by_delay(sfigs_row1[0])  # example trajectories
-            sfigs_row1[1] = visualizer.plot_trajectories_all_metrics(sfigs_row1[1])  # example trajectories
+            sfigs_row0[0] = behavior_visualizer.plot_event_durations(sfigs_row0[0])  # trajectories aligned to update
+            sfigs_row0[1] = behavior_visualizer.plot_performance_by_animals(sfigs_row0[1])  # behavioral performance
+            sfigs_row1[0] = behavior_visualizer.plot_performance_by_delay(sfigs_row1[0])  # example trajectories
+            sfigs_row1[1] = behavior_visualizer.plot_trajectories_all_metrics(sfigs_row1[1])  # example trajectories
 
             # figure saving
             self.add_panel_labels(sfigs)
@@ -102,9 +113,11 @@ class UpdateTaskFigureGenerator:
 
     def plot_figure_2(self, with_supplement=True):
         hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-                                                analysis_kwargs=dict(features=['y_position'],
-                                                                     params=dict(region=['CA1'])),
-                                                overwrite=self.overwrite)
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
+                                                        session_names=[('S', 25, 210913)])
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 8))
