@@ -82,9 +82,12 @@ def clean_violin_plot(ax, colors, line_start=0):
     return ax
 
 
-def add_task_phase_lines(ax, cue_locations=dict(), text_height=0.95, text_brackets=False):
-    name_remapping = {'initial cue': 'sample', 'delay cue': 'delay', 'update cue': 'update',
+def add_task_phase_lines(ax, cue_locations=dict(), label_dict=None, text_height=0.95, text_brackets=False,
+                         vline_kwargs=None):
+    name_remapping = label_dict or {'initial cue': 'sample', 'delay cue': 'delay', 'update cue': 'update',
                       'delay2 cue': 'delay'}
+    vline_kwargs = vline_kwargs or dict(linestyle='solid', color='#ececec', linewidth=0.75)
+
     cue_details = dict()
     for i, cue_loc in enumerate([*list(cue_locations.values()), 1][1:]):
         cue_name = list(cue_locations.keys())[i]
@@ -92,7 +95,7 @@ def add_task_phase_lines(ax, cue_locations=dict(), text_height=0.95, text_bracke
                                      start=list(cue_locations.values())[i], end=cue_loc,
                                      label=name_remapping[cue_name])
     for i, (cue_name, cue_loc) in enumerate(cue_locations.items()):
-        ax.axvline(cue_loc, linestyle='solid', color='#ececec', zorder=0, linewidth=0.75)
+        ax.axvline(cue_loc, **vline_kwargs)
 
     if text_brackets:
         for cue_name, cue_loc in cue_details.items():
