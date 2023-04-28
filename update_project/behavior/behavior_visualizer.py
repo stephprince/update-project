@@ -44,7 +44,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
         self.plot_trajectories()
         self.plot_aligned_data()
 
-    def plot_performance(self, sfig, tags=''):
+    def plot_performance(self, sfig, tags='', update_type=['switch_update', 'non_update']):
         """plot performance for manuscript figure"""
         temp_df = (self.group_df[['animal', 'session_id', 'proportion_correct']]
                    .explode('proportion_correct')
@@ -54,7 +54,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                        pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
-                                 .query('type == "rolling"')  # rolling
+                                 .query(f'type == "rolling" & update_type in {update_type}')  # rolling
                                  .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
                                                                                   'switch_update': 'switch',
                                                                                   'stay_update': 'stay'}))
@@ -84,7 +84,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_performance_by_animals(self, sfig):
+    def plot_performance_by_animals(self, sfig, update_type=['switch_update', 'non_update']):
         temp_df = (self.group_df[['animal', 'session_id', 'proportion_correct']]
                    .explode('proportion_correct')
                    .reset_index(drop=True))
@@ -93,7 +93,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                        pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
-                                 .query('type == "rolling"')
+                                 .query(f'type == "rolling" & update_type in {update_type}')  # rolling
                                  .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
                                                                                   'switch_update': 'switch',
                                                                                   'stay_update': 'stay'}))
@@ -138,7 +138,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_trajectories_by_position(self, sfig, var='view_angle', num_trials=20):
+    def plot_trajectories_by_position(self, sfig, var='view_angle', num_trials=20, update_type=['switch', 'delay only']):
         """plot trajectories for manuscript figure"""
 
         # get data for example trial
@@ -152,9 +152,9 @@ class BehaviorVisualizer(BaseVisualizationClass):
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
-        trajectory_df = trajectory_df.query('correct == 1')
+        trajectory_df = trajectory_df.query(f'correct == 1 & update_type in {update_type}')
 
-        ax = sfig.subplots(nrows=1, ncols=3, sharey=True)
+        ax = sfig.subplots(nrows=1, ncols=len(update_type), sharey=True)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
             ax_id = np.argwhere(trajectory_df['update_type'].unique() == update)[0][0]
             linestyle = 'dotted' if turn == 'right' else 'solid'
@@ -195,13 +195,15 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_trajectories_all_metrics(self, sfig, vars=['x_position', 'rotational_velocity', 'translational_velocity']):
+    def plot_trajectories_all_metrics(self, sfig, vars=['x_position', 'rotational_velocity', 'translational_velocity'],
+                                      update_type=['switch_update', 'non_update']):
         # get data for example trial
         temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
                    .explode('trajectories')
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
+        trajectory_df = trajectory_df.query(f'update_type in {update_type}')
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
@@ -254,7 +256,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_trajectories_by_event(self, sfig, var='view_angle'):
+    def plot_trajectories_by_event(self, sfig, var='view_angle', update_type=['switch_update', 'non_update']):
         """plot trajectories aligned to update time for manuscript figure"""
         # get data for example trial
         temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
@@ -262,6 +264,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
+        trajectory_df = trajectory_df.query(f'update_type in {update_type}')
         trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
@@ -304,7 +307,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_event_durations(self, sfig):
+    def plot_event_durations(self, sfig, update_type=['switch', 'delay only']):
         # get data
         group_durations = pd.concat(self.group_df['event_durations'].to_list(), axis=0)
         durations = (group_durations
@@ -314,6 +317,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                            value_vars=['initial_cue', 'delay1', 'update', 'delay2', 'original_to_choice', 'total_trial'])
                      .dropna(subset='duration', axis=0)
                      .assign(update_type=lambda x: x['update_type'].map({1: 'delay only', 2: 'switch', 3: 'stay'}))
+                     .query(f'update_type in {update_type}')
                      .assign(event=lambda x: x['event'].map({'initial_cue': 'original',
                                                              'delay1': '1st delay',
                                                              'update': 'update',
