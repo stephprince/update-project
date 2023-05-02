@@ -26,7 +26,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
             d.pop('analyzer')
         self.data = exploded_data
 
-        self.n_example_trials = 10
+        self.n_example_trials = 20
         self.plot_groups.update(turn_type=[[1], [2]], correct=[[1]])  # only plot example trials with continuous linearized position
         self.align_window = data[0]['analyzer'].single_unit_params['align_window']
         self.both_regions = data[0]['analyzer'].both_regions_only  # only plot session if it has data from both regions
@@ -44,20 +44,20 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
             plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
             tags = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
             self.plot_example_decoding_trial(plot_group_dict, tags)
-            self.plot_example_trial(plot_group_dict, tags)
+            # self.plot_example_trial(plot_group_dict, tags)
             # self.plot_update_trials(plot_group_dict, tags)
 
-    def plot_behavior_trial(self, fig, trial_id=40):
+    def plot_behavior_trial(self, fig, trial_id=155):  # other good trials 113, 160, 165, 166, 173, 175, 176, 179
         plot_group_dict = {k: v[0] for k, v in self.plot_groups.items()}
         plot_group_dict['update_type'] = ['switch']
         data = self.aggregator.select_group_aligned_data(filter_dict=plot_group_dict)
+        data = data.query(f'trial_id == "{trial_id}"')
         pos_limits = self.get_position_limits(plot_group_dict, data)
 
-        data = data.query(f'trial_id == "{trial_id}"')
         n_units = data.dropna(subset='place_field_peak_ind', axis='rows').groupby('region')['unit_id'].nunique()
-        CA1_ratio = 8 * n_units['CA1'] / n_units['PFC']
+        CA1_ratio = 10 * n_units['CA1'] / n_units['PFC']
 
-        ax = fig.subplots(7, 1, sharex='col', height_ratios=[2, 2, CA1_ratio, 8, 3, 1, 2])
+        ax = fig.subplots(7, 1, sharex='col', height_ratios=[3, 3, 1, 3, 3, CA1_ratio, 10])
         times = data['new_times'].to_numpy()[0]  # for full sampled data
         bin_times = np.linspace(times[0], times[-1], 100 * self.align_window)  # for spiking rasters
         feat_raw = data['feature'].to_numpy()[0]
@@ -67,19 +67,37 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         licks_raw = data['licks'].to_numpy()[0]
         licks = (licks_raw - np.min(licks_raw)) / (np.max(licks_raw) - np.min(licks_raw))
 
+        # plot view angle
+        view_angle = np.rad2deg(data['view_angle'].to_numpy()[0])
+        view_angle_limits = (-np.max(np.abs(view_angle)), np.max(np.abs(view_angle)))
+        ax[0].plot(data['behavior_timestamps'].to_numpy()[0], np.rad2deg(data['view_angle'].to_numpy()[0]),
+                   color='k', linewidth=1, label='view angle')
+        ax[0].set(ylabel='degrees', ylim=view_angle_limits)
+
+        # plot speed
+        speed_threshold = 1000
+        speed_total = abs(data['translational_velocity'].values[0]) + abs(data['rotational_velocity'].values[0])
+        ax[1].plot(times, speed_total, color='k', label='movement')
+        ax[1].set(ylabel='roll + pitch (au)')
+        ax[1].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
+                           color='k', alpha=0.2)
+        # plot licks
+        ax[2].plot(times, licks, color='k', linewidth=1, label='licks')
+        ax[2].set(ylabel='voltage')
+
         # plot MUA and single units
         for r_name, r_data in data.groupby('region'):
             row_ind = np.argwhere(np.array(['CA1', 'PFC']) == r_name)[0][0]
             gen_data = (r_data
                         .query('choice == "initial_stay"')  # only use one choice bc otherwise duplicate data
-                        .query('cell_type == "Pyramidal Cell"')
+                        # .query('cell_type == "Pyramidal Cell"')
                         .query(f'place_field_peak_ind in {pos_limits["included_bins"]}')
                         .dropna(subset='place_field_peak_ind', axis='rows')
                         .sort_values('place_field_peak_ind', na_position='first'))
 
             # plot LFP
-            ax[row_ind].plot(times, r_data[f'lfp_{r_name}'].to_numpy()[0], color='k', label='lfp')
-            ax[row_ind].set(ylabel=f'{r_name} lfp')
+            ax[row_ind + 3].plot(times, r_data[f'lfp_{r_name}'].to_numpy()[0], color='k', label='lfp')
+            ax[row_ind + 3].set(ylabel=f'{r_name} lfp', ylim=(-330, 330))
 
             # plot single units
             fr = np.array(
@@ -87,29 +105,18 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
             n_colors_extra = int(np.ceil(0.05 * np.shape(fr)[0]))  # add extra bc cut darkest/lightest
             colors = sns.color_palette('rocket', n_colors=np.shape(fr)[0] + n_colors_extra * 2)
             colors = colors[n_colors_extra:-n_colors_extra]
-            show_psth_raster(gen_data['spikes'].to_list(), ax=ax[row_ind + 2], start=times[0],
+            show_psth_raster(gen_data['spikes'].to_list(), ax=ax[row_ind + 5], start=times[0],
                              end=times[-1],
                              group_inds=np.arange(np.shape(fr)[0]),
                              colors=colors,
                              show_legend=False)
-            ax[row_ind + 2].set(ylabel=f'{r_name} units', xlabel='')
+            ax[row_ind + 5].set(ylabel=f'{r_name} units', xlabel='')
 
             # plot forward position
             position = (feat - np.min(feat)) / (pos_limits['arm_max'] - pos_limits['home_arm_min'])
-            # position = position * (np.shape(fr)[0] - 1)  # scale for the number of units
-            ax[4].plot(r_data['times'].to_numpy()[0], position,
-                       color='k', linewidth=3, alpha=0.25, label='position')
-            ax[4].set(ylabel='fraction of track')
-
-            # plot licks
-            ax[5].plot(times, licks, color='k', linewidth=1, label='licks')
-            ax[5].set(ylabel='voltage')
-
-            # plot view angle
-            ax[6].plot(r_data['behavior_timestamps'].to_numpy()[0],
-                       np.rad2deg(r_data['view_angle'].to_numpy()[0]),
-                       color='k', linewidth=1, label='view angle')
-            ax[6].set(ylabel='degrees')
+            position = position / np.max(position) * (np.shape(fr)[0] - 1)  # scale for the number of units
+            ax[row_ind + 5].plot(r_data['times'].to_numpy()[0], position,
+                                 color='k', linewidth=3, alpha=0.25, label='position')
 
             # plot lines for cues
             event_labels = dict(start_time='start', t_delay='delay', t_update='update', t_delay2='delay',
@@ -121,11 +128,11 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                 colors.update(t_update='k')
             for a in ax:
                 a = add_task_phase_lines(a, cue_locations=event_times, label_dict=event_labels, text_brackets=False,
-                                         vline_kwargs=dict(color='#c6c6c6', alpha=0.5, linewidth=2))
+                                         vline_kwargs=dict(color='#c6c6c6', alpha=0.5, linewidth=2, zorder=0))
 
-            # set limits based on task event times
-            xlim_lower = np.max([event_times['start_time'], -self.align_window])
-            xlim_upper = np.min([event_times['stop_time'], self.align_window])
+            # set limits based on task event times (add 3 to start so when animal can actually start running)
+            xlim_lower = np.max([event_times['start_time'] + 3, -self.align_window])
+            xlim_upper = np.min([event_times['t_choice_made'], self.align_window])
             [a.set_xlim(xlim_lower, xlim_upper) for a in ax]  # set lim
             [a.legend(loc='upper right') for a in ax]
             fig.supxlabel('Time around update cue (s)')
@@ -136,10 +143,10 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         # get position limits
         position_limits = dict()
         if (plot_group_dict['turn_type'][0] == 1 and plot_group_dict['update_type'][0] in ['stay', 'non_update']) or \
-                (plot_group_dict['turn_type'][0] == 2 and plot_group_dict['update_type'][0] in ['switch']):
+                (plot_group_dict['turn_type'][0] == 1 and plot_group_dict['update_type'][0] in ['switch']):
             arm = 'right'
         elif (plot_group_dict['turn_type'][0] == 2 and plot_group_dict['update_type'][0] in ['stay', 'non_update']) or \
-                (plot_group_dict['turn_type'][0] == 1 and plot_group_dict['update_type'][0] in ['switch']):
+                (plot_group_dict['turn_type'][0] == 2 and plot_group_dict['update_type'][0] in ['switch']):
             arm = 'left'
 
         arm_max = self.virtual_track.choice_boundaries['y_position'][arm][-1]
@@ -156,6 +163,123 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         position_limits['arm_max'] = arm_max - 5 - (arm_min - position_limits['home_arm_max'])  # adjust to new max
 
         return position_limits
+
+    def plot_decoding_trial(self, fig, trial_id=155, region='CA1'):
+        plot_group_dict = {k: v[0] for k, v in self.plot_groups.items()}
+        plot_group_dict['update_type'] = ['switch']
+        data = self.aggregator.select_group_aligned_data(filter_dict=plot_group_dict)
+        pos_limits = self.get_position_limits(plot_group_dict, data)
+        data = data.query(f'trial_id == "{trial_id}" & region == "{region}"')
+
+        ax = fig.subplots(7, 1, sharex=True, height_ratios=[1, 1, 4, 4, 1, 1, 1])
+        times = data['new_times'].to_numpy()[0]  # for full sampled data
+        bin_times = np.linspace(times[0], times[-1], 100 * self.align_window)  # for spiking rasters
+
+        # plot MUA and single units
+        gen_data = (data
+                    .query('choice == "initial_stay"')  # only use one choice bc otherwise duplicate data
+                    # .query(f'place_field_peak_ind in {pos_limits["included_bins"]}')
+                    .dropna(subset='place_field_peak_ind', axis='rows')
+                    .sort_values('place_field_peak_ind', na_position='first'))
+
+        # plot LFP
+        ax[0].plot(times, gen_data[f'lfp_{region}'].to_numpy()[0], color='k', label='lfp')
+        ax[0].set(ylabel=f'{region} lfp')
+
+        # plot MUA
+        fr = np.array(
+            [compute_smoothed_firing_rate(x, bin_times, 0.01) for x in gen_data['spikes'].to_numpy()])
+        ax[1].step(bin_times, np.nanmean(fr, axis=0), color='k', label=f'{region} MUA',
+                             where='mid')
+        ax[1].fill_between(bin_times, np.nanmean(fr, axis=0), color='k', alpha=0.2, step='mid')
+        ax[1].set(ylabel=f'{region} mua')
+
+        # plot single units
+        show_psth_raster(gen_data['spikes'].to_list(), ax=ax[2], start=times[0],
+                         end=times[-1],
+                         group_inds=gen_data['max_selectivity_type'].map(
+                             {np.nan: 0, 'switch': 1, 'stay': 2}),
+                         colors=[self.colors[c] for c in ['nan', 'new', 'initial']],
+                         show_legend=False)
+        ax[2].set(ylabel=f'{region} units', xlabel='')
+
+        # plot decoding heatmap
+        prob_map = gen_data['probability'].to_numpy()[0]
+        true_feat = gen_data['feature'].to_numpy()[0]
+        decoding_times = gen_data['times'].to_numpy()[0]
+        feat_bins = np.linspace(gen_data['bins'].apply(np.nanmin).min(),
+                                gen_data['bins'].apply(np.nanmax).max(),
+                                np.shape(prob_map)[0])
+        track_fraction = (feat_bins - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+                  for b in data['bound_values'].unique()]
+        bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+
+        im_times = (decoding_times[0] - np.diff(decoding_times)[0] / 2,
+                    decoding_times[-1] + np.diff(decoding_times)[0] / 2)
+        clipping_masks, images = dict(), dict()
+        for b, arm in zip(bounds, ['home', 'initial', 'new']):
+            mask = mpl.patches.Rectangle(xy=(0, b[0]), width=1, height=b[1] - b[0],
+                                         facecolor='white', alpha=0,
+                                         transform=ax[3].get_yaxis_transform())
+            clipping_masks[arm] = mask
+            images[arm] = ax[3].imshow(prob_map, cmap=self.colors[f'{arm}_cmap'], aspect='auto',
+                                                 origin='lower', vmin=0.01, vmax=0.1,
+                                                 extent=[im_times[0], im_times[-1], track_fraction[0],
+                                                         track_fraction[-1]])
+            images[arm].set_clip_path(clipping_masks[arm])
+            ticks = None if arm == 'home' else []
+            label = f'prob.{self.new_line}density' if arm == 'home' else ''
+            cbar = plt.colorbar(images[arm], ax=ax[3], pad=0.01, fraction=0.046, shrink=0.5,
+                                aspect=12, ticks=ticks)
+            cbar.ax.set_title(label, fontsize=8, ha='center')
+
+            for line in b:
+                ax[3].axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75)
+
+        # plot true position
+        ax[4].plot(decoding_times, true_feat,
+                             color=self.colors[f'incorrect'],
+                             linestyle='dotted', linewidth=1.5, alpha=0.25, label='actual position')
+        ax[4].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
+                            xlim=(decoding_times[0], decoding_times[-1]), xlabel='time around update (s)')
+        ax[4].legend(loc='lower right', labelcolor='linecolor')
+
+        # plot decoding probabilities
+        stay_prob = data.query('choice == "initial_stay"')['prob_sum'].to_numpy()[0]
+        switch_prob = data.query('choice == "switch"')['prob_sum'].to_numpy()[0]
+        ax[5].plot(decoding_times, stay_prob, color=self.colors['initial'], label='initial')
+        ax[5].plot(decoding_times, switch_prob, color=self.colors['new'], label='new')
+        ax[5].set(ylabel='prob / chance')
+
+        # plot speed
+        speed_threshold = 1000
+        speed_total = abs(gen_data['translational_velocity'].values[0]) + abs(
+            gen_data['rotational_velocity'].values[0])
+        ax[6].plot(times, speed_total, color='k', label='movement')
+        ax[6].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
+                            color='k', alpha=0.2)
+        ax[6].set(ylabel='roll + pitch (au)')
+
+        # plot lines for cues
+        event_labels = dict(start_time='start', t_delay='delay', t_update='update', t_delay2='delay',
+                            t_choice_made='reward', stop_time='stop')
+        colors = dict(start_time='w', t_delay='k', t_update='c', t_delay2='k', t_choice_made='y')
+        event_times = (gen_data[list(event_labels.keys())].iloc[0, :] - gen_data['t_update'].iloc[0]).to_dict()
+
+        for a in ax:
+            a = add_task_phase_lines(a, cue_locations=event_times, label_dict=event_labels, text_brackets=False,
+                                     vline_kwargs=dict(color='#c6c6c6', alpha=0.5, linewidth=2))
+
+        # set limits based on task event times (add 3 to start so when animal can actually start running)
+        xlim_lower = np.max([event_times['start_time'] + 3, -self.align_window])
+        xlim_upper = np.min([event_times['t_choice_made'], self.align_window])
+        [a.set_xlim(xlim_lower, xlim_upper) for a in ax]  # set lim
+        [a.legend(loc='upper right') for a in ax]
+        fig.supxlabel('Time around update cue (s)')
+
+        return fig
 
     def plot_example_decoding_trial(self, plot_group_dict, tags):
         prev_group = ''
@@ -293,8 +417,8 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                     a = add_task_phase_lines(a, cue_locations=event_times, label_dict=event_labels, text_brackets=False,
                                              vline_kwargs=dict(color='#c6c6c6', alpha=0.5, linewidth=2))
 
-                # set limits based on task event times
-                xlim_lower = np.max([event_times['start_time'], -self.align_window])
+                # set limits based on task event times (add 3 to start so when animal can actually start running)
+                xlim_lower = np.max([event_times['start_time'] + 3, -self.align_window])
                 xlim_upper = np.min([event_times['stop_time'], self.align_window])
                 [a.set_xlim(xlim_lower, xlim_upper) for a in ax]  # set lim
                 [a.legend(loc='upper right') for a in ax]
