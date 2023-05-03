@@ -45,17 +45,17 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             # self.plot_group_aligned_comparisons(data, **kwargs)
             # self.plot_performance_comparisons(data, tags=tags)
 
-            fig = plt.figure()
-            fig = self.plot_goal_coding_prediction(fig, tags=tags)
-            self.results_io.save_fig(fig=fig, filename=f'goal_coding_prediction', tight_layout=False,
-                                     additional_tags=tags)
+            # fig = plt.figure()
+            # fig = self.plot_goal_coding_prediction(fig, tags=tags)
+            # self.results_io.save_fig(fig=fig, filename=f'goal_coding_prediction', tight_layout=False,
+            #                          additional_tags=tags)
 
             # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
             for plot_types in list(itertools.product(*self.plot_groups.values())):
                 plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
                 title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
                 kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                # self.plot_group_aligned_data(data, **kwargs)
+                self.plot_group_aligned_data(data, **kwargs)
                 # self.plot_scatter_dists_around_update(data, **kwargs)
                 # self.plot_trial_by_trial_around_update(data, **kwargs)
 
@@ -138,10 +138,11 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         return sfig
 
     def plot_goal_coding(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
-                         ylim=None, with_velocity=False, tags=None):
+                         ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update']):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
+        plot_groups.update(update_type=update_type)
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value=prob_value)
         sig_bins_data = self.aggregator.calc_significant_bins(self.aggregator.group_aligned_df, plot_groups, tags=tags)
@@ -159,10 +160,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         elif with_velocity:
             nrows = nrows + 1
             height_ratios = [2, 1]
-        ax = sfig.subplots(nrows=nrows, ncols=len(label_map.keys()), sharex=True, sharey='row', squeeze=False,
+        ax = sfig.subplots(nrows=nrows, ncols=len(update_type), sharex=True, sharey='row', squeeze=False,
                            height_ratios=height_ratios)
         for comp, data in trial_data.groupby(comparison):
-            col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
+            col_id = np.argwhere(np.array(list(update_type)) == comp)[0][0]
             if not heatmap:
                 for s_name, s_data in data.groupby(sub_groups):
                     i = 2 if with_velocity else 1
@@ -221,7 +222,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         ylims = ax[row_id][col_id].get_ylim()
         if not heatmap and not groups:
             for comp, stats_data in sig_bins_data.groupby(comparison):
-                col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
+                col_id = np.argwhere(np.array(list(update_type)) == comp)[0][0]
                 row_id = 0
 
                 heights = (ylims[0] + np.diff(ylims)[0] * 0.02, ylims[0] + np.diff(ylims)[0] * 0.04)
@@ -241,15 +242,18 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         return sfig
 
     def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
-                               time_window=(0, 1.5), use_zscores=False, include_central=False, stripplot=False):
+                               time_window=(0, 1.5), use_zscores=False, include_central=False, stripplot=False,
+                               update_type=['switch', 'non_update']):
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
         choice_mapping = {'initial_stay': 'initial', 'switch': 'new'}
         if include_central:
-            choice_mapping['central'] = 'central'
+            choice_mapping['central'] = 'local'
 
         # get data
         plot_groups = self.plot_group_comparisons_full[comparison]
+        plot_groups.update(update_type=update_type)
         label_map = self.label_maps[comparison]
+        label_map = {k: label_map[k] for k in plot_groups['update_type']}
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
                                                                        prob_value=prob_value, include_central=include_central)
@@ -323,6 +327,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         ax[1] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
         ax[1] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
         ax[1].set(ylabel=f'initial - new prob. density (z-scored')
+        ax[1].axhline(0, color='k', linestyle='dashed', alpha=0.5)
 
         combos = list(itertools.combinations(combo_list, r=2))
         diff_pairs = [((c[0],), (c[1],)) for c in combos]
@@ -557,8 +562,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
     def nan_sem(x):
         return sem(x, nan_policy='omit')
 
-    def plot_decoding_validation(self, sfig, comparison='update_type', tags=''):
-        ax = sfig.subplots(nrows=1, ncols=4)
+    def plot_decoding_validation(self, sfig, comparison='update_type', tags='', update_type=['delay only']):
+        ax = sfig.subplots(nrows=1, ncols=len(update_type) + 1)
         label_map = self.label_maps[comparison]
         feat_map = dict(y_position='position', dynamic_choice='choice', choice='choice')
         feat = self.aggregator.group_df['feature'].to_numpy()[0]
@@ -591,7 +596,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                          for k, v in self.virtual_track.cue_start_locations.get(feat, dict()).items()}
             extent = [0, 1, 0, 1]
 
-        for col_id, label in enumerate(label_map.values()):
+        for col_id, label in enumerate(update_type):
             # plot confusion matrix for each trial type
             index_id = (label, 1.0)
             im = ax[col_id].imshow(confusion_matrix.loc[index_id], cmap=self.colors['control_cmap'],
@@ -1458,9 +1463,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_tuning_curves(self, sfig, title='hippocampal position tuning curves'):
         # get data
-        label_map = dict(model='encoding model',
-                         model_delay_only='decoded trials - delay only',
-                         model_update_only='decoded trials - update only')
+        label_map = dict(model='encoding model',)
+                         # model_delay_only='decoded trials - delay only',
+                         # model_update_only='decoded trials - update only')
         feat = self.aggregator.group_df['feature'].values[0]
         sort_index, tuning_curve_scaled = dict(), dict()
         for model in list(label_map.keys()):
@@ -1491,21 +1496,21 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             extent = [fraction_of_track[0], fraction_of_track[-1]]
 
         # plot data
-        ax = sfig.subplots(nrows=1, ncols=3, sharex=True, sharey=True)
+        ax = sfig.subplots(nrows=1, ncols=len(list(label_map.keys())), sharex=True, sharey=True, squeeze=False)
         for ax_ind, model in enumerate(list(label_map.keys())):
-            im = ax[ax_ind].imshow(tuning_curve_scaled[model][sort_index['model'], :],
+            im = ax[0][ax_ind].imshow(tuning_curve_scaled[model][sort_index['model'], :],
                                    cmap=self.colors['control_cmap_r'],
                                    origin='lower', vmin=0.25, vmax=0.75, aspect='auto',
                                    extent=[*extent, 0, np.shape(tuning_curve_scaled[model])[0]])
             if feat != 'choice':
-                ax[ax_ind] = add_task_phase_lines(ax[ax_ind], cue_locations=locations_fractions_start,
+                ax[0][ax_ind] = add_task_phase_lines(ax[0][ax_ind], cue_locations=locations_fractions_start,
                                                   text_brackets=True)
             for key, value in locations_fractions.items():
-                ax[ax_ind].axvline(value, linestyle='dashed', color='w', alpha=0.5, linewidth=0.5)
-                ax[ax_ind].set(xlim=extent, ylim=(0, np.shape(tuning_curve_scaled[model])[0]))
-            ax[ax_ind].set_title(label_map[model], fontsize=10)
+                ax[0][ax_ind].axvline(value, linestyle='dashed', color='w', alpha=0.5, linewidth=0.5)
+                ax[0][ax_ind].set(xlim=extent, ylim=(0, np.shape(tuning_curve_scaled[model])[0]))
+            ax[0][ax_ind].set_title(label_map[model], fontsize=10)
 
-        plt.colorbar(im, ax=ax[ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
+        plt.colorbar(im, ax=ax[0][ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
 
         sfig.supylabel(f'units sorted by {self.new_line} {label_map["model"]}', fontsize=10)
         sfig.suptitle(title, fontsize=12)
