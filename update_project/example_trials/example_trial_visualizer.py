@@ -109,7 +109,8 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                              end=times[-1],
                              group_inds=np.arange(np.shape(fr)[0]),
                              colors=colors,
-                             show_legend=False)
+                             show_legend=False,
+                             linewidths=0.5)
             ax[row_ind + 5].set(ylabel=f'{r_name} units', xlabel='')
 
             # plot forward position
@@ -171,7 +172,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         pos_limits = self.get_position_limits(plot_group_dict, data)
         data = data.query(f'trial_id == "{trial_id}" & region == "{region}"')
 
-        ax = fig.subplots(7, 1, sharex=True, height_ratios=[1, 1, 4, 4, 1, 1, 1])
+        ax = fig.subplots(6, 1, sharex=True, height_ratios=[1, 1, 1, 4, 4, 1])
         times = data['new_times'].to_numpy()[0]  # for full sampled data
         bin_times = np.linspace(times[0], times[-1], 100 * self.align_window)  # for spiking rasters
 
@@ -183,7 +184,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                     .sort_values('place_field_peak_ind', na_position='first'))
 
         # plot LFP
-        ax[0].plot(times, gen_data[f'lfp_{region}'].to_numpy()[0], color='k', label='lfp')
+        ax[0].plot(times, gen_data[f'lfp_{region}'].to_numpy()[0], color='k', label='lfp', linewidth=0.5)
         ax[0].set(ylabel=f'{region} lfp')
 
         # plot MUA
@@ -194,19 +195,17 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         ax[1].fill_between(bin_times, np.nanmean(fr, axis=0), color='k', alpha=0.2, step='mid')
         ax[1].set(ylabel=f'{region} mua')
 
-        # plot single units
-        show_psth_raster(gen_data['spikes'].to_list(), ax=ax[2], start=times[0],
-                         end=times[-1],
-                         group_inds=gen_data['max_selectivity_type'].map(
-                             {np.nan: 0, 'switch': 1, 'stay': 2}),
-                         colors=[self.colors[c] for c in ['nan', 'new', 'initial']],
-                         show_legend=False)
-        ax[2].set(ylabel=f'{region} units', xlabel='')
+        # plot decoding probabilities
+        decoding_times = gen_data['times'].to_numpy()[0]
+        stay_prob = data.query('choice == "initial_stay"')['prob_sum'].to_numpy()[0]
+        switch_prob = data.query('choice == "switch"')['prob_sum'].to_numpy()[0]
+        ax[2].plot(decoding_times, stay_prob, color=self.colors['initial'], label='initial')
+        ax[2].plot(decoding_times, switch_prob, color=self.colors['new'], label='new')
+        ax[2].set(ylabel='prob / chance')
 
         # plot decoding heatmap
         prob_map = gen_data['probability'].to_numpy()[0]
         true_feat = gen_data['feature'].to_numpy()[0]
-        decoding_times = gen_data['times'].to_numpy()[0]
         feat_bins = np.linspace(gen_data['bins'].apply(np.nanmin).min(),
                                 gen_data['bins'].apply(np.nanmax).max(),
                                 np.shape(prob_map)[0])
@@ -239,28 +238,30 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                 ax[3].axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75)
 
         # plot true position
-        ax[4].plot(decoding_times, true_feat,
-                             color=self.colors[f'incorrect'],
-                             linestyle='dotted', linewidth=1.5, alpha=0.25, label='actual position')
-        ax[4].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
-                            xlim=(decoding_times[0], decoding_times[-1]), xlabel='time around update (s)')
-        ax[4].legend(loc='lower right', labelcolor='linecolor')
+        feat = true_feat / np.max(true_feat)
+        ax[3].plot(decoding_times, feat, color=self.colors[f'incorrect'],
+                   linestyle='dotted', linewidth=1.5, alpha=0.25, label='actual position')
+        ax[3].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
+                        xlim=(decoding_times[0], decoding_times[-1]), xlabel='time around update (s)')
+        ax[3].legend(loc='lower right', labelcolor='linecolor')
 
-        # plot decoding probabilities
-        stay_prob = data.query('choice == "initial_stay"')['prob_sum'].to_numpy()[0]
-        switch_prob = data.query('choice == "switch"')['prob_sum'].to_numpy()[0]
-        ax[5].plot(decoding_times, stay_prob, color=self.colors['initial'], label='initial')
-        ax[5].plot(decoding_times, switch_prob, color=self.colors['new'], label='new')
-        ax[5].set(ylabel='prob / chance')
+        # plot single units
+        show_psth_raster(gen_data['spikes'].to_list(), ax=ax[4], start=times[0],
+                         end=times[-1],
+                         group_inds=gen_data['max_selectivity_type'].map(
+                             {np.nan: 0, 'switch': 1, 'stay': 2}),
+                         colors=[self.colors[c] for c in ['nan', 'new', 'initial']],
+                         show_legend=False)
+        ax[4].set(ylabel=f'{region} units', xlabel='')
 
         # plot speed
         speed_threshold = 1000
         speed_total = abs(gen_data['translational_velocity'].values[0]) + abs(
             gen_data['rotational_velocity'].values[0])
-        ax[6].plot(times, speed_total, color='k', label='movement')
-        ax[6].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
+        ax[5].plot(times, speed_total, color='k', label='movement')
+        ax[5].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
                             color='k', alpha=0.2)
-        ax[6].set(ylabel='roll + pitch (au)')
+        ax[5].set(ylabel='roll + pitch (au)')
 
         # plot lines for cues
         event_labels = dict(start_time='start', t_delay='delay', t_update='update', t_delay2='delay',

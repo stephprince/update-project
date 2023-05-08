@@ -162,6 +162,7 @@ def show_psth_raster(
         align_line_color=(0.7, 0.7, 0.7),
         fontsize=12,
         colors=None,
+        linewidths=1.5,
 ) -> plt.Axes:
     """
     Parameters
@@ -197,7 +198,8 @@ def show_psth_raster(
         ax,
         labels,
         show_legend=show_legend,
-        fontsize=fontsize
+        fontsize=fontsize,
+        linewidths=linewidths,
     )
     ax.axvline(color=align_line_color)
     return ax
@@ -214,6 +216,7 @@ def plot_grouped_events(
         offset=0,
         figsize=(8, 6),
         fontsize=12,
+        linewidths=1.5
 ):
     """
     Parameters
@@ -269,6 +272,7 @@ def plot_grouped_events(
             orientation="horizontal",
             color="k",
             lineoffsets=np.arange(len(data)) + offset,
+            linewidths=linewidths,
         )
 
     ax.set_xlim(window)
