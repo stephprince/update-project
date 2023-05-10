@@ -143,7 +143,7 @@ def get_color_theme():
 
     color_theme_dict['phase_dividers'] = '#ececec'
 
-    for key in ['control', 'nan', 'home', 'non_update', 'non update', 'all', 'delay only', 'correct']:
+    for key in ['control', 'nan', 'home', 'central', 'non_update', 'non update', 'all', 'delay only', 'correct']:
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_light'] = '#c0c0c0'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_medium'] = '#898989'  # black - 0 in degrees, 0 saturation, 20 light

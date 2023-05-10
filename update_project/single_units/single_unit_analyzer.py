@@ -41,7 +41,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         self.align_times = params.get('align_times', ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made'])
         self.window = params.get('align_window', 2.5)  # number of bins to build encoder  # sec to look at aligned psth
         self.align_nbins = np.round((self.window * 2) / 25)  # hardcoded to match binsize of decoder too
-        self.downsample_factor = 40  # downsample signal from 2000Hz to 50Hz
+        self.downsample_factor = 20  # downsample signal from 2000Hz to 100Hz
         self.goal_selectivity_strictness = 'goal_field'  # options are 'only_goal_field' (no fields in rest of track)
                                                          # or 'goal_field' (can have other fields in rest of track)
 
@@ -112,7 +112,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         elif self.feature_name in ['view_angle']:
             time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
             data = time_series.data[:]
-        elif self.feature_name in ['choice', 'turn_type']:
+        elif self.feature_name in ['choice_binarized', 'turn_type']:
             choice_mapping = {'0': np.nan, '1': -1, '2': 1}  # convert to negative/non-negative for flipping
             time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
@@ -133,9 +133,9 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             time_series = nwbfile.processing['behavior']['view_angle'].get_spatial_series('view_angle')
 
             # load dynamic choice from saved output
-            data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type')
+            data_mapping = dict(dynamic_choice='choice', cue_bias='turn_type', choice='choice')
             fname_tag = data_mapping[self.feature_name]
-            choice_path = Path().absolute().parent.parent / 'results' / 'choice'
+            choice_path = Path(__file__).parent.parent.parent / 'results' / 'choice'
             fname = self.results_io.get_data_filename(filename=f'dynamic_choice_output_{fname_tag}',
                                                       results_type='session', format='pkl',
                                                       diff_base_path=choice_path)
