@@ -184,14 +184,14 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                     .sort_values('place_field_peak_ind', na_position='first'))
 
         # plot LFP
-        ax[0].plot(times, gen_data[f'lfp_{region}'].to_numpy()[0], color='k', label='lfp', linewidth=0.5)
+        ax[0].plot(times, gen_data[f'lfp_{region}'].to_numpy()[0], color='k', label='lfp', linewidth=0.75)
         ax[0].set(ylabel=f'{region} lfp')
 
         # plot MUA
         fr = np.array(
             [compute_smoothed_firing_rate(x, bin_times, 0.01) for x in gen_data['spikes'].to_numpy()])
         ax[1].step(bin_times, np.nanmean(fr, axis=0), color='k', label=f'{region} MUA',
-                             where='mid')
+                             where='mid', linewidth=0.75)
         ax[1].fill_between(bin_times, np.nanmean(fr, axis=0), color='k', alpha=0.2, step='mid')
         ax[1].set(ylabel=f'{region} mua')
 
@@ -199,8 +199,8 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         decoding_times = gen_data['times'].to_numpy()[0]
         stay_prob = data.query('choice == "initial_stay"')['prob_sum'].to_numpy()[0]
         switch_prob = data.query('choice == "switch"')['prob_sum'].to_numpy()[0]
-        ax[2].plot(decoding_times, stay_prob, color=self.colors['initial'], label='initial')
-        ax[2].plot(decoding_times, switch_prob, color=self.colors['new'], label='new')
+        ax[2].plot(decoding_times, stay_prob, color=self.colors['initial'], label='initial', linewidth=0.75)
+        ax[2].plot(decoding_times, switch_prob, color=self.colors['new'], label='new', linewidth=0.75)
         ax[2].set(ylabel='prob / chance')
 
         # plot decoding heatmap
@@ -213,7 +213,12 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
         bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
                   for b in data['bound_values'].unique()]
-        bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+        if gen_data['feature_name'].values[0] == 'choice':  # if bounds are on ends of track, make home between
+            bounds = [(bounds[0][1], bounds[1][0]), *bounds]
+            ylabel = 'p(new choice)'
+        else:
+            bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+            ylabel = 'fraction of track'
 
         im_times = (decoding_times[0] - np.diff(decoding_times)[0] / 2,
                     decoding_times[-1] + np.diff(decoding_times)[0] / 2)
@@ -241,7 +246,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         feat = true_feat / np.max(true_feat)
         ax[3].plot(decoding_times, feat, color=self.colors[f'incorrect'],
                    linestyle='dotted', linewidth=1.5, alpha=0.25, label='actual position')
-        ax[3].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
+        ax[3].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
                         xlim=(decoding_times[0], decoding_times[-1]), xlabel='time around update (s)')
         ax[3].legend(loc='lower right', labelcolor='linecolor')
 
@@ -251,14 +256,15 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                          group_inds=gen_data['max_selectivity_type'].map(
                              {np.nan: 0, 'switch': 1, 'stay': 2}),
                          colors=[self.colors[c] for c in ['nan', 'new', 'initial']],
-                         show_legend=False)
+                         show_legend=False,
+                         linewidths=0.75)
         ax[4].set(ylabel=f'{region} units', xlabel='')
 
         # plot speed
         speed_threshold = 1000
         speed_total = abs(gen_data['translational_velocity'].values[0]) + abs(
             gen_data['rotational_velocity'].values[0])
-        ax[5].plot(times, speed_total, color='k', label='movement')
+        ax[5].plot(times, speed_total, color='k', label='movement', linewidth=0.75)
         ax[5].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
                             color='k', alpha=0.2)
         ax[5].set(ylabel='roll + pitch (au)')
@@ -277,6 +283,58 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         xlim_lower = np.max([event_times['start_time'] + 3, -self.align_window])
         xlim_upper = np.min([event_times['t_choice_made'], self.align_window])
         [a.set_xlim(xlim_lower, xlim_upper) for a in ax]  # set lim
+        [a.legend(loc='upper right') for a in ax]
+        fig.supxlabel('Time around update cue (s)')
+
+        return fig
+
+    def plot_theta_trace(self, fig, trial_id=155, region='CA1'):
+        plot_group_dict = {k: v[0] for k, v in self.plot_groups.items()}
+        plot_group_dict['update_type'] = ['switch']
+        data = self.aggregator.select_group_aligned_data(filter_dict=plot_group_dict)
+        data = data.query(f'trial_id == "{trial_id}" & region == "{region}"')
+
+        ax = fig.subplots(4, 1, sharex=True, height_ratios=[1, 1, 4, 1])
+        times = data['new_times'].to_numpy()[0]  # for full sampled data
+        bin_times = np.linspace(times[0], times[-1], 100 * self.align_window)  # for spiking rasters
+
+        # plot theta information
+        gen_data = (data
+                    .query('choice == "initial_stay"')  # only use one choice bc otherwise duplicate data
+                    .dropna(subset='place_field_peak_ind', axis='rows')
+                    .sort_values('place_field_peak_ind', na_position='first'))
+
+        # plot LFP + theta amplitude
+        ax[0].plot(times, gen_data[f'lfp_{region}'].to_numpy()[0], color='k', label='lfp', linewidth=1)
+        ax[0].plot(times, gen_data['theta_amplitude'].to_numpy()[0], color='b', label='theta', alpha=0.25, linewidth=2)
+        ax[0].set(ylabel=f'{region} lfp')
+
+        # plot MUA
+        fr = np.array(
+            [compute_smoothed_firing_rate(x, bin_times, 0.01) for x in gen_data['spikes'].to_numpy()])
+        ax[1].step(bin_times, np.nanmean(fr, axis=0), color='k', label=f'{region} MUA',
+                   where='mid', linewidth=0.75)
+        ax[1].fill_between(bin_times, np.nanmean(fr, axis=0), color='k', alpha=0.2, step='mid')
+        ax[1].set(ylabel=f'{region} mua')
+
+        # plot single units
+        show_psth_raster(gen_data['spikes'].to_list(), ax=ax[2], start=times[0],
+                         end=times[-1],
+                         group_inds=gen_data['max_selectivity_type'].map(
+                             {np.nan: 0, 'switch': 1, 'stay': 2}),
+                         colors=[self.colors[c] for c in ['nan', 'new', 'initial']],
+                         show_legend=False,)
+        ax[2].set(ylabel=f'{region} units', xlabel='')
+
+        # plot speed
+        speed_threshold = 1000
+        speed_total = abs(gen_data['translational_velocity'].values[0]) + abs(
+            gen_data['rotational_velocity'].values[0])
+        ax[3].plot(times, speed_total, color='k', label='movement', linewidth=0.75)
+        ax[3].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
+                           color='k', alpha=0.2)
+        ax[3].set(ylabel='roll + pitch (au)', xlim=(-2, 2))  # restricted xlim so can see individual theta cycles
+
         [a.legend(loc='upper right') for a in ax]
         fig.supxlabel('Time around update cue (s)')
 
