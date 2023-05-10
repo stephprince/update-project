@@ -94,7 +94,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
         bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
                   for b in trial_data['bound_values'].unique()]
-        if aligned_data['feature_name'].values[0] == 'choice':  # if bounds are on ends of track, make home between
+        if aligned_data['feature_name'].values[0] in ['choice', 'x_position']:  # if bounds are on ends of track, make home between
             bounds = [(bounds[0][1], bounds[1][0]), *bounds]
             ylabel = 'p(new choice)'
         else:
@@ -138,7 +138,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         return sfig
 
     def plot_goal_coding(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
-                         ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update']):
+                         ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update'],
+                         correct_type=[1, 0]):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
@@ -147,6 +148,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                        prob_value=prob_value)
         sig_bins_data = self.aggregator.calc_significant_bins(self.aggregator.group_aligned_df, plot_groups, tags=tags)
         sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
+        trial_types = update_type if comparison == 'update_type' else correct_type
 
         # plot figure
         nrows = 1  # default value if no other info provided
@@ -163,7 +165,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         ax = sfig.subplots(nrows=nrows, ncols=len(update_type), sharex=True, sharey='row', squeeze=False,
                            height_ratios=height_ratios)
         for comp, data in trial_data.groupby(comparison):
-            col_id = np.argwhere(np.array(list(update_type)) == comp)[0][0]
+            col_id = np.argwhere(np.array(list(trial_types)) == comp)[0][0]
             if not heatmap:
                 for s_name, s_data in data.groupby(sub_groups):
                     i = 2 if with_velocity else 1
@@ -201,6 +203,22 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                             color=self.colors['new'],
                                                             alpha=0.2)
                         ax[row_id + 1][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+
+                        # add markers to indicate timepoints where data switched
+                        diff_initial_switch = np.nanmean(initial_mat, axis=0) - np.nanmean(new_mat, axis=0)
+                        if np.where(diff_initial_switch < 0)[0].any():
+                            neural_flip_moment = np.where(diff_initial_switch < 0)[0][0] - 1
+                            veloc_flip_moment = np.where(np.nanmean(veloc_mat, axis=0) < 0)[0][0] - 1
+                            x_neural = time_bins[neural_flip_moment] + np.diff(time_bins)[0] / 2
+                            y_neural = np.nanmean(initial_mat, axis=0)[neural_flip_moment]
+                            x_veloc = time_bins[veloc_flip_moment] + np.diff(time_bins)[0] / 2
+                            y_veloc = np.nanmean(veloc_mat, axis=0)[veloc_flip_moment]
+                            ax[row_id][col_id].annotate("", arrowprops=dict(arrowstyle='simple', facecolor='black'),
+                                                        xy=(x_neural, y_neural), xytext=(x_neural, y_neural*1.5),
+                                                        xycoords='data', textcoords='data')
+                            ax[row_id + 1][col_id].annotate("",  arrowprops=dict(arrowstyle='simple', facecolor='black'),
+                                                            xy=(x_veloc, y_veloc), xytext=(x_veloc, y_veloc*2),
+                                                            xycoords='data', textcoords='data')
             else:
                 time_bins = data['times'].unique()
                 color_map = {'switch': 'new', 'initial_stay': 'initial'}
@@ -222,7 +240,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         ylims = ax[row_id][col_id].get_ylim()
         if not heatmap and not groups:
             for comp, stats_data in sig_bins_data.groupby(comparison):
-                col_id = np.argwhere(np.array(list(update_type)) == comp)[0][0]
+                col_id = np.argwhere(np.array(list(trial_types)) == comp)[0][0]
                 row_id = 0
 
                 heights = (ylims[0] + np.diff(ylims)[0] * 0.02, ylims[0] + np.diff(ylims)[0] * 0.04)
@@ -253,7 +271,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         plot_groups = self.plot_group_comparisons_full[comparison]
         plot_groups.update(update_type=update_type)
         label_map = self.label_maps[comparison]
-        label_map = {k: label_map[k] for k in plot_groups['update_type']}
+        label_map = {k: label_map[k] for k in plot_groups[comparison]}
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
                                                                        prob_value=prob_value, include_central=include_central)
@@ -300,7 +318,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                   palette=[self.colors['home_medium']] * len(colors), alpha=0.4, dodge=True, legend=False, )
         ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
         ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
-        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update cue onset (z-score)')
+        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update onset')
         ax[0].get_legend().remove()
         rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
 
@@ -326,7 +344,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                              order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3), )
         ax[1] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
         ax[1] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
-        ax[1].set(ylabel=f'initial - new prob. density (z-scored')
+        ax[1].set(ylabel=f'initial - new prob. density')
         ax[1].axhline(0, color='k', linestyle='dashed', alpha=0.5)
 
         combos = list(itertools.combinations(combo_list, r=2))
@@ -565,7 +583,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
     def plot_decoding_validation(self, sfig, comparison='update_type', tags='', update_type=['delay only']):
         ax = sfig.subplots(nrows=1, ncols=len(update_type) + 1)
         label_map = self.label_maps[comparison]
-        feat_map = dict(y_position='position', dynamic_choice='choice', choice='choice')
+        feat_map = dict(y_position='position', x_position='lateral position', dynamic_choice='choice', choice='choice')
         feat = self.aggregator.group_df['feature'].to_numpy()[0]
         feat_bins = self.aggregator.group_df['bins'].to_numpy()[0]
         bins = (feat_bins[1:] + feat_bins[:-1]) / 2
@@ -1508,7 +1526,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             for key, value in locations_fractions.items():
                 ax[0][ax_ind].axvline(value, linestyle='dashed', color='w', alpha=0.5, linewidth=0.5)
                 ax[0][ax_ind].set(xlim=extent, ylim=(0, np.shape(tuning_curve_scaled[model])[0]))
-            ax[0][ax_ind].set_title(label_map[model], fontsize=10)
+            # ax[0][ax_ind].set_title(label_map[model], fontsize=10)
 
         plt.colorbar(im, ax=ax[0][ax_ind], pad=0.04, location='right', fraction=0.046, label='Normalized firing rate')
 
@@ -1659,14 +1677,14 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_phase_hist',
                                      additional_tags=tags)
 
-    def plot_theta_phase_stats(self, param_data, plot_groups=None, tags=''):
+    def plot_theta_phase_stats(self, param_data, plot_groups=None, tags='', update_type=['switch', 'non_update']):
         plot_group_dict = {k: [i[0] for i in v] if k != 'turn_type' else v[0] for k, v in plot_groups.items()}
         plot_group_dict.update(time_label=['t_update'])
         theta_data = self.aggregator.calc_theta_phase_data(param_data, plot_group_dict, ret_by_trial=True)
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name', 'times',
                         'phase_mid']
         data_for_stats = (theta_data
-                          .query('times == "post" & bin_name == "quarter"')  # only look at post update
+                          .query(f'times == "post" & bin_name == "quarter" & update_type in {update_type}')  # only look at post update
                           .groupby(groupby_cols)[['initial_stay', 'switch', 'home']]  # group by trial/trial type
                           .agg(['mean'])  # get mean, had max, or peak latency for each trial
                           .melt(ignore_index=False)
@@ -1902,7 +1920,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                            ret_by_trial=True)
         averages = (theta_data
                     .query(f'bin_name == "full" & times in {time} & update_type in {update_type}')
-                    .groupby(['update_type', 'times', 'phase_mid'])[['initial', 'new', 'home', 'theta_amplitude']]
+                    .groupby(['update_type', 'times', 'phase_mid'])[['initial', 'new', 'central', 'theta_amplitude']]
                     .agg(['mean', sem])
                     .reset_index())
 
@@ -1910,12 +1928,12 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         diff_pre_post = (theta_data
                          .query('bin_name == "full"')
                          .pivot(index=['animal', 'session_id', 'trial_id', 'update_type', 'phase_mid', 'correct'],
-                                columns='times', values=['initial', 'new', 'home', 'theta_amplitude'])
+                                columns='times', values=['initial', 'new', 'central', 'theta_amplitude'])
                          .reset_index())
         for var in ['initial', 'new', 'home', 'theta_amplitude']:
             diff_pre_post[f'{var}_post_vs_pre'] = diff_pre_post[(var, 'post')] - diff_pre_post[(var, 'pre')]
             diff_pre_post.drop([(var, 'post'), (var, 'pre')], axis=1, inplace=True)
-        new_col_names = [f'{v}_post_vs_pre' for v in ['initial', 'new', 'home', 'theta_amplitude']]
+        new_col_names = [f'{v}_post_vs_pre' for v in ['initial', 'new', 'central', 'theta_amplitude']]
         pre_post_averages = (diff_pre_post
                              .droplevel(1, axis=1)
                              .groupby(['update_type', 'phase_mid'])[new_col_names]
@@ -1935,7 +1953,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             color_adjust = '_light' if name[1] == 'pre' else ''
             # ax[0][col_ind].plot(data[('phase_mid', '')].to_numpy() / np.pi, data[('theta_amplitude', 'mean')],
             #                     color=self.colors[f'home'])
-            for var in ['initial', 'new', 'home']:
+            for var in ['initial', 'new', 'central']:
                 ax[row_ind][col_ind].plot(data[('phase_mid', '')].to_numpy() / np.pi, data[(var, 'mean')],
                                           color=self.colors[f'{var}{color_adjust}'])
                 ax[row_ind][col_ind].fill_between(data[('phase_mid', '')].to_numpy() / np.pi,
@@ -2061,3 +2079,15 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                       pairs=pairs, filename=f'theta_mod_switch_vs_stay_vs_delay_{name}_{comparison}_{tags}')
 
         return sfig
+
+    @staticmethod
+    def plot_phase_reference(fig):
+        x = np.arange(0, 2 * np.pi, 0.1)
+        y = np.cos(x)
+
+        ax = fig.subplots(nrows=1, ncols=1)
+        ax.plot(x, y)
+        ax.set(xlabel='phase', xlim=(0, 2 * np.pi), ylim=(-1, 1))
+
+        return fig
+

@@ -228,7 +228,8 @@ class BayesianDecoderAggregator:
         prob_map_bins = param_data['bins'].values[0]
         choice_bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
         bounds = dict(**choice_bounds)
-        bound_mapping = dict(left='initial', right='new', home='home')
+        bounds['home'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
+        bound_mapping = dict(left='initial', right='new', home='central')
         for b_name, b_value in bounds.items():
             theta_phase_df[bound_mapping[b_name]] = theta_phase_df['probability'].apply(
                 lambda x: self._integrate_prob_density(x, prob_map_bins, b_value))
