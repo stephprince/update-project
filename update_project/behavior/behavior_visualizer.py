@@ -138,11 +138,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_trajectories_by_position(self, sfig, var='view_angle', num_trials=20, update_type=['switch', 'delay only']):
+    def plot_trajectories_by_position(self, sfig, var='view_angle', num_trials=20, update_type=['switch', 'delay only'],
+                                      example_animal=25, example_session='S25_210913'):
         """plot trajectories for manuscript figure"""
 
         # get data for example trial
-        example_animal, example_session = (25, 'S25_210913')  # TODO - find good representative session
         temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
                    .query(f'animal == {example_animal} & session_id == "{example_session}"')
                    .explode('trajectories')
@@ -154,7 +154,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                                                          'stay_update': 'stay'})
         trajectory_df = trajectory_df.query(f'correct == 1 & update_type in {update_type}')
 
-        ax = sfig.subplots(nrows=1, ncols=len(update_type), sharey=True)
+        ax = sfig.subplots(nrows=1, ncols=len(update_type), sharey=True, squeeze=False)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
             ax_id = np.argwhere(trajectory_df['update_type'].unique() == update)[0][0]
             linestyle = 'dotted' if turn == 'right' else 'solid'
@@ -166,7 +166,7 @@ class BehaviorVisualizer(BaseVisualizationClass):
             cue_locations = {k: np.round((v - np.min(y_labels)) / np.max(y_labels - np.min(y_labels)), 4)
                              for k, v in self.virtual_track.cue_start_locations['y_position'].items()}
             if turn == 'right':
-                ax[ax_id] = add_task_phase_lines(ax[ax_id], cue_locations=cue_locations, text_brackets=True)
+                ax[0][ax_id] = add_task_phase_lines(ax[0][ax_id], cue_locations=cue_locations, text_brackets=True)
 
             # plot data
             random_samples = rng.choice(range(np.shape(y_position)[0]), num_trials)  # TODO - only full delay non-update
@@ -174,20 +174,20 @@ class BehaviorVisualizer(BaseVisualizationClass):
             clipping_mask = mpl.patches.Rectangle(xy=(cue_locations['delay cue'], 0),
                                                   width=cue_locations['delay2 cue'] - cue_locations['delay cue'],
                                                   height=1, facecolor='white', alpha=0,
-                                                  transform=ax[ax_id].transAxes)
-            ax[ax_id].add_patch(clipping_mask)
-            ax[ax_id].plot(track_fraction, trajectory, color=self.colors['nan'], alpha=0.2, linestyle=linestyle, label=turn)
-            lines = ax[ax_id].plot(track_fraction, trajectory, color=self.colors['trials'][ax_id], alpha=0.25,
+                                                  transform=ax[0][ax_id].transAxes)
+            ax[0][ax_id].add_patch(clipping_mask)
+            ax[0][ax_id].plot(track_fraction, trajectory, color=self.colors['nan'], alpha=0.2, linestyle=linestyle, label=turn)
+            lines = ax[0][ax_id].plot(track_fraction, trajectory, color=self.colors[update], alpha=0.25,
                                         linestyle=linestyle, clip_path=clipping_mask)
             for line in lines:
                 line.set_clip_path(clipping_mask)
-            ax[ax_id].set_title(update, color=self.colors['trials'][ax_id])
-            ax[ax_id].set(ylim=(-61, 61))
-        handles, labels = ax[0].get_legend_handles_labels()
+            ax[0][ax_id].set_title(update, color=self.colors['trials'][ax_id])
+            ax[0][ax_id].set(ylim=(-61, 61))
+        handles, labels = ax[0][0].get_legend_handles_labels()
         which_handles = [np.where(np.array(labels) == t)[0][0] for t in trajectory_df['turn_type'].unique()]
         handles, labels = np.array([[handles[i], labels[i]] for i in which_handles]).T
         [h.set_alpha(1) for h in handles]
-        ax[0].legend(list(handles), list(labels), loc='lower left')
+        ax[0][0].legend(list(handles), list(labels), loc='lower left')
 
         sfig.suptitle('Example trial trajectories', fontsize=12)
         sfig.supxlabel('fraction of track', fontsize=10)
@@ -289,9 +289,9 @@ class BehaviorVisualizer(BaseVisualizationClass):
             # plot data
             trajectory_mean = np.rad2deg(np.nanmean(np.array(y_position), 0))
             trajectory_err = np.rad2deg(sem(np.array(y_position), 0))
-            ax.plot(track_fraction, trajectory_mean, color=self.colors['trials'][ax_id], linestyle=linestyle, label=update)
+            ax.plot(track_fraction, trajectory_mean, color=self.colors[update], linestyle=linestyle, label=update)
             ax.fill_between(track_fraction, trajectory_mean - trajectory_err, trajectory_mean + trajectory_err,
-                            alpha=0.2, color=self.colors['trials'][ax_id])
+                            alpha=0.2, color=self.colors[update])
 
         ax.set(title='Trajectories', ylabel='view angle (degrees)', xlabel='position relative to update',
                ylim=(-35, 35), xlim=(cue_locations['delay cue'] - cue_locations['update cue'],
@@ -300,10 +300,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
         rainbow_text(0.05, 0.85, trajectory_df['update_type'].unique(), colors, ax=ax, size=10)
 
         handles, labels = ax.get_legend_handles_labels()
-        which_handles = np.where(np.array(labels) == 'delay only')[0]
-        handles, labels = np.array([[handles[i], turn] for i, turn in zip(which_handles,
-                                                                          trajectory_df['turn_type'].unique())]).T
-        ax.legend(list(handles), list(labels), loc='lower left')
+        if 'non_update' in update_type:
+            which_handles = np.where(np.array(labels) == 'delay only')[0]
+            handles, labels = np.array([[handles[i], turn] for i, turn in zip(which_handles,
+                                                                              trajectory_df['turn_type'].unique())]).T
+            ax.legend(list(handles), list(labels), loc='lower left')
 
         return sfig
 

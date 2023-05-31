@@ -47,7 +47,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
             # self.plot_example_trial(plot_group_dict, tags)
             # self.plot_update_trials(plot_group_dict, tags)
 
-    def plot_behavior_trial(self, fig, trial_id=155):  # other good trials 113, 160, 165, 166, 173, 175, 176, 179
+    def plot_behavior_trial(self, fig, trial_id=155):  # other good trials 113, 155, 160, 165, 166, 173, 175, 176, 179
         plot_group_dict = {k: v[0] for k, v in self.plot_groups.items()}
         plot_group_dict['update_type'] = ['switch']
         data = self.aggregator.select_group_aligned_data(filter_dict=plot_group_dict)
