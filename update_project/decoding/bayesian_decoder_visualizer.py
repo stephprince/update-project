@@ -148,6 +148,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                        prob_value=prob_value)
         sig_bins_data = self.aggregator.calc_significant_bins(self.aggregator.group_aligned_df, plot_groups, tags=tags)
         sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
+        trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
         trial_types = update_type if comparison == 'update_type' else correct_type
 
         # plot figure
@@ -206,9 +207,11 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
                         # add markers to indicate timepoints where data switched
                         diff_initial_switch = np.nanmean(initial_mat, axis=0) - np.nanmean(new_mat, axis=0)
+                        diff_veloc = np.diff(np.diff(np.nanmean(veloc_mat, axis=0), prepend=np.nan), prepend=np.nan)
+                        post_update = int(len(time_bins) / 2)
                         if np.where(diff_initial_switch < 0)[0].any():
                             neural_flip_moment = np.where(diff_initial_switch < 0)[0][0] - 1
-                            veloc_flip_moment = np.where(np.nanmean(veloc_mat, axis=0) < 0)[0][0] - 1
+                            veloc_flip_moment = np.where(diff_veloc[post_update:] < 0)[0][0] + post_update - 1
                             x_neural = time_bins[neural_flip_moment] + np.diff(time_bins)[0] / 2
                             y_neural = np.nanmean(initial_mat, axis=0)[neural_flip_moment]
                             x_veloc = time_bins[veloc_flip_moment] + np.diff(time_bins)[0] / 2
@@ -261,7 +264,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
                                time_window=(0, 1.5), use_zscores=False, include_central=False, stripplot=False,
-                               update_type=['switch', 'non_update']):
+                               update_type=['switch', 'non_update'], correct_type=[1, 0]):
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
         choice_mapping = {'initial_stay': 'initial', 'switch': 'new'}
         if include_central:
@@ -275,6 +278,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
                                                                        prob_value=prob_value, include_central=include_central)
+        trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
         data_for_stats = (trial_data
@@ -602,11 +606,19 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         .reset_index())
             extent = [-0.5, 0.5, -0.5, 0.5]
             locations_fractions = self.virtual_track.cue_end_locations.get('dynamic_choice', dict())
+        elif feat == 'x_position':
+            error_df = (summary_df
+                        .query('correct == 1')
+                        .assign(error_fraction=lambda x: (x.decoding_error) / (np.max(bins) - np.min(bins)))
+                        .reset_index())
+            locations_fractions = {k: (v) / (np.max(bins) - np.min(bins))
+                                   for k, v in self.virtual_track.cue_end_locations.get(feat, dict()).items()}
+            extent = [-0.5, 0.5, -0.5, 0.5]
         else:
             error_df = (summary_df
                         .query('correct == 1')
                         .assign(
-                error_fraction=lambda x: (x.decoding_error - np.min(bins)) / (np.max(bins) - np.min(bins)))
+                error_fraction=lambda x: (x.decoding_error) / (np.max(bins) - np.min(bins)))
                         .reset_index())
             locations_fractions = {k: (v - np.min(bins)) / (np.max(bins) - np.min(bins))
                                    for k, v in self.virtual_track.cue_end_locations.get(feat, dict()).items()}
@@ -1501,6 +1513,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         if feat == 'choice':
             extent = [-0.5, 0.5]
             locations_fractions = self.virtual_track.cue_end_locations.get('dynamic_choice', dict())
+        elif feat == 'x_position':
+            extent = [-0.5, 0.5]
+            locations_fractions = {k: (v) / (np.max(tuning_curve_bins) - np.min(tuning_curve_bins))
+                                   for k, v in self.virtual_track.cue_end_locations.get(feat, dict()).items()}
         else:
             locations = self.aggregator.group_df.virtual_track.values[0].cue_end_locations.get(feat, dict())
             fraction_of_track = (tuning_curve_bins - np.min(tuning_curve_bins)) / (
@@ -1520,7 +1536,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                    cmap=self.colors['control_cmap_r'],
                                    origin='lower', vmin=0.25, vmax=0.75, aspect='auto',
                                    extent=[*extent, 0, np.shape(tuning_curve_scaled[model])[0]])
-            if feat != 'choice':
+            if feat not in ['choice', 'x_position']:
                 ax[0][ax_ind] = add_task_phase_lines(ax[0][ax_ind], cue_locations=locations_fractions_start,
                                                   text_brackets=True)
             for key, value in locations_fractions.items():
@@ -1859,7 +1875,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         predicted_value = ['correct']  # 'choice_made'
         for ind, pred in enumerate(predicted_value):
             predict_df = self.aggregator.predict_trial_outcomes(self.aggregator.group_aligned_df, plot_groups,
-                                                                prob_value, comparison=pred, iterations=100,
+                                                                prob_value, comparison=pred, iterations=1000,
                                                                 results_io=self.results_io, tags=tags)
             groupers = ['pre_or_post', 'input', 'correct'] if pred == 'choice_made' else ['pre_or_post', 'input',
                                                                                           'region']
@@ -1930,7 +1946,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                          .pivot(index=['animal', 'session_id', 'trial_id', 'update_type', 'phase_mid', 'correct'],
                                 columns='times', values=['initial', 'new', 'central', 'theta_amplitude'])
                          .reset_index())
-        for var in ['initial', 'new', 'home', 'theta_amplitude']:
+        for var in ['initial', 'new', 'central', 'theta_amplitude']:
             diff_pre_post[f'{var}_post_vs_pre'] = diff_pre_post[(var, 'post')] - diff_pre_post[(var, 'pre')]
             diff_pre_post.drop([(var, 'post'), (var, 'pre')], axis=1, inplace=True)
         new_col_names = [f'{v}_post_vs_pre' for v in ['initial', 'new', 'central', 'theta_amplitude']]
@@ -1979,22 +1995,23 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         theta_data = self.aggregator.calc_theta_phase_data(self.aggregator.group_aligned_df, plot_groups,
                                                            ret_by_trial=True)
         cats = ['-2.3565', '-0.7855', '0.7855', '2.3565'] if divider == 'quarter' else ['-1.571', '1.571']
+        arm_cats = ['initial', 'new', 'central']
 
         modulation = (theta_data
                       .query(f'bin_name == "{divider}" & update_type in {update_type}')
-                      .melt(value_name='prob_value', value_vars=['initial', 'new', 'home'], var_name='choice',
+                      .melt(value_name='prob_value', value_vars=arm_cats, var_name='choice',
                             id_vars=['animal', 'session_id', 'trial_id', 'update_type', 'phase_mid', 'times'])
                       .assign(phase_mid=lambda x: pd.Categorical(x['phase_mid'].astype(str), ordered=True,
                                                                  categories=cats)))
         post_modulation = modulation.query('times == "post"')
         stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                       approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
-        combos = [('initial', 'home'), ('new', 'home')]
+        combos = [('initial', 'central'), ('new', 'central')]
         group_list = post_modulation['phase_mid'].unique()
         pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
 
         # plot phase modulation comparisons between goal arm locations
-        colors = [self.colors[t] for t in ['initial', 'new', 'home']]
+        colors = [self.colors[t] for t in arm_cats]
         col_multiplier = 2 if type == 'pre_vs_post' else 1
         col_multiplier = col_multiplier * 2 if divider == 'quarter' else col_multiplier
         ax = sfig.subplots(nrows=1, ncols=len(update_type) * col_multiplier, sharey='row', squeeze=False)
@@ -2003,7 +2020,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             for comp, data in post_modulation.groupby(comparison):
                 col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
                 common_kwargs = dict(data=data, x='phase_mid', y='prob_value', hue='choice', ax=ax[row_id][col_id],
-                                     hue_order=['initial', 'new', 'home'], errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+                                     hue_order=arm_cats, errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
                 ax[row_id][col_id].set(title=comp)
@@ -2019,24 +2036,24 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
                 # annotate the plot
                 annot = Annotator(ax[row_id][col_id], pairs=pairs, data=data, x='phase_mid', y='prob_value', hue='choice',
-                                  hue_order=['initial', 'new', 'home'])
+                                  hue_order=arm_cats)
                 annot.new_plot(ax[row_id][col_id], pairs=pairs, data=data,  x='phase_mid', y='prob_value', hue='choice',
-                               hue_order=['initial', 'new', 'home'])
+                               hue_order=arm_cats)
                 (annot
                  .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
                  .set_pvalues(pvalues=pvalues)
                  .annotate(line_offset=0.1, line_offset_to_group=0.025))
-            rainbow_text(0.01, 0.9, ['initial', 'new', 'home'], colors, ax=ax[row_id][0], size=8)
+            rainbow_text(0.01, 0.9, arm_cats, colors, ax=ax[row_id][0], size=8)
         elif type == 'pre_vs_post':
             # plot pre vs. post comparisons and between trial types
             group_list = modulation['times'].unique()
-            pairs = [((group_list[0], c), (group_list[1], c)) for c in ['initial', 'new', 'home']]
+            pairs = [((group_list[0], c), (group_list[1], c)) for c in arm_cats]
             for comp, data in modulation.groupby([comparison, 'phase_mid']):  # TODO - query only some phases first
                 col_multiplier = np.argwhere(modulation['phase_mid'].unique() == comp[1])[0][0]
                 col_id = np.argwhere(np.array(update_type) == comp[0])[0][0] * 2 + col_multiplier
 
                 common_kwargs = dict(data=data, x='times', y='prob_value', hue='choice', ax=ax[row_id][col_id],
-                                     hue_order=['initial', 'new', 'home'], errwidth=3, dodge=(0.8 - 0.8 / 3), )
+                                     hue_order=arm_cats, errwidth=3, dodge=(0.8 - 0.8 / 3), )
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), join=False,
                                                    scale=0.75, errorbar=None)
@@ -2052,20 +2069,20 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
                 # annotate the plot
                 annot = Annotator(ax[row_id][col_id], pairs=pairs, data=data, x='times', y='prob_value', hue='choice',
-                                  hue_order=['initial', 'new', 'home'])
+                                  hue_order=arm_cats)
                 annot.new_plot(ax[row_id][col_id], pairs=pairs, data=data, x='times', y='prob_value', hue='choice',
-                               hue_order=['initial', 'new', 'home'])
+                               hue_order=arm_cats)
                 (annot
                  .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
                  .set_pvalues(pvalues=pvalues)
                  .annotate(line_offset=0.1, line_offset_to_group=0.025))
-            rainbow_text(0.01, 0.9, ['initial', 'new', 'home'], colors, ax=ax[row_id][0], size=8)
+            rainbow_text(0.01, 0.9, arm_cats, colors, ax=ax[row_id][0], size=8)
             ax[row_id][0].set(ylim=(0.1, 0.18))
 
         # run stats for comparisons between trial types
         modulation = (theta_data
                       .query(f'bin_name == "{divider}" & times == "post"')
-                      .melt(value_name='prob_value', value_vars=['initial', 'new', 'home'], var_name='choice',
+                      .melt(value_name='prob_value', value_vars=arm_cats, var_name='choice',
                             id_vars=['animal', 'session_id', 'trial_id', 'update_type', 'phase_mid', 'times'])
                       .assign(phase_mid=lambda x: pd.Categorical(x['phase_mid'].astype(str), ordered=True,
                                                                  categories=cats)))

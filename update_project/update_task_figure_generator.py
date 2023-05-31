@@ -44,7 +44,7 @@ class UpdateTaskFigureGenerator:
         self.plot_supp_figure_4()  # supp figure 4 - HPC position coding - all trial types supplement
         self.plot_supp_figure_5()  # supp figure 5 - PFC position coding supplement
         self.plot_supp_figure_6()  # supp figure 6 - HPC/PFC lateral position coding supplement
-        self.plot_supp_figure_8()  # supp figure 8 - HPC choice coding supplement
+        self.plot_supp_figure_9()  # supp figure 8 - HPC choice coding supplement
 
     def run_analysis_pipeline(self, analysis_to_run, analysis_kwargs=dict(), session_names=None,
                               overwrite=False):
@@ -89,7 +89,7 @@ class UpdateTaskFigureGenerator:
         sfigs_row0[1] = behavior_visualizer.plot_performance(sfigs_row0[1], tags='prop_correct_fig_1')  # performance
         sfigs_row1[0] = behavior_visualizer.plot_trajectories_by_position(sfigs_row1[0])  # example  trajectories
         sfigs_row1[1] = behavior_visualizer.plot_trajectories_by_event(sfigs_row1[1])  # average trajectories
-        sfigs[2] = example_visualizer.plot_behavior_trial(sfigs[2])  # single unit spiking + behavior metrics
+        sfigs[2] = example_visualizer.plot_behavior_trial(sfigs[2], trial_id=175)  # or example 155
 
         # figure saving
         self.add_panel_labels(sfigs)
@@ -118,25 +118,23 @@ class UpdateTaskFigureGenerator:
                                                                          params=dict(region=['CA1'])),
                                                     overwrite=self.overwrite)
         example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
-                                                        session_names=[('S', 29, 211118)])
+                                                        session_names=[('S', 25, 210910)]) # ('S', 29, 211118)
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=4, ncols=1, width_ratios=[1], height_ratios=[1.5, 1, 1, 1])
+        sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1.5, 1, 1, 1])
         sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=3, width_ratios=[1, 2, 2])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=3, width_ratios=[1, 2, 2])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
         sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Recording setup + position schematic')
-        sfigs_row0[1] = example_visualizer.plot_decoding_trial(sfigs_row0[1], region='CA1')
+        sfigs_row0[1] = example_visualizer.plot_decoding_trial(sfigs_row0[1], region='CA1', trial_id=231) #154, 207, 231, 168
         sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Position schematic')
-        sfigs_row1[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1])
+        sfigs_row1[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], update_type='switch')
         sfigs_row1[2] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[2], update_type='non_update')
         sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Trial schematic')
-        sfigs_row2[1] = hpc_visualizer.plot_goal_coding(sfigs_row2[1], tags='CA1_position_fig2', update_type=['switch'])
-        sfigs_row2[2] = hpc_visualizer.plot_goal_coding(sfigs_row2[2], tags='CA1_position_fig2',
-                                                        update_type=['non_update'])
+        sfigs_row2[1] = hpc_visualizer.plot_goal_coding(sfigs_row2[1], tags='CA1_position_fig2')
         sfigs_row3[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags='CA1_position_fig_2')
 
         # figure saving
@@ -147,8 +145,8 @@ class UpdateTaskFigureGenerator:
             ##### supp figure 2
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 3])
-            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
-            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1.5])
+            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
 
             # plot data
             sfigs[0] = self.plot_placeholder(sfigs[0], text='probe tract visualization + histological images')
@@ -178,16 +176,16 @@ class UpdateTaskFigureGenerator:
                                                         session_names=[('S', 29, 211118)])
 
         # figure structure
-        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
-        sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[2, 1, 1])
-        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=2, ncols=1, width_ratios=[1], height_ratios=[1.5, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 5])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=3, width_ratios=[1, 1, 2])
 
-        sfigs[0] = example_visualizer.plot_theta_trace(sfigs[0])
-        sfigs_row1[0] = visualizer.plot_theta_phase_modulation(sfigs_row1[0], update_type=['switch'], time=['pre'])
-        sfigs_row1[1] = visualizer.plot_theta_phase_modulation(sfigs_row1[1], update_type=['switch'], time=['post'])
-        sfigs_row2[0] = visualizer.plot_phase_reference(sfigs_row2[0])
-        sfigs_row2[1] = visualizer.plot_theta_phase_stats(sfigs_row2[1], type='pre_vs_post', update_type=['switch'],
+        sfigs_row0[0] = visualizer.plot_phase_reference(sfigs_row0[0])
+        sfigs_row0[1] = example_visualizer.plot_theta_trace(sfigs_row0[1])
+        sfigs_row1[0] = visualizer.plot_theta_phase_modulation(sfigs_row1[0], update_type=['switch'], time=['pre', 'post'])
+        sfigs_row1[1] = visualizer.plot_theta_phase_modulation(sfigs_row1[1], update_type=['switch'], time=['pre', 'post'])
+        sfigs_row1[2] = visualizer.plot_theta_phase_stats(sfigs_row1[2], type='pre_vs_post', update_type=['switch'],
                                                           tags='CA1_theta_fig_3', divider='half')
 
         # figure saving
@@ -235,8 +233,7 @@ class UpdateTaskFigureGenerator:
         sfigs_row1[1] = example_visualizer.plot_decoding_trial(sfigs_row1[1], region='PFC')
         sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Choice schematic')
         sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], feat='choice')
-        sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice',
-                                                                    update_type='non_update')
+        sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice', update_type='non_update')
         sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='Trial schematic')
         sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], with_velocity=True, tags='PFC_choice_fig_4',)
         sfigs_row4[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row4[0], tags='PFC_choice_fig_4',)
@@ -248,16 +245,15 @@ class UpdateTaskFigureGenerator:
         if with_supplement:
             ##### supp figure 2
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-            sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 3])
-            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=3, width_ratios=[1, 1, 1])
-            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
+            sfigs = fig.subfigures(nrows=2, ncols=1, height_ratios=[1, 1, 3])
+            sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
 
             # plot data
-            sfigs[0] = self.plot_placeholder(sfigs[0], text='probe tract visualization + histological images')
-            sfigs_row1[0] = pfc_visualizer.plot_tuning_curves(sfigs_row1[0], title='prefrontal cortex choice')
-            sfigs_row1[1] = pfc_visualizer.plot_decoding_validation(sfigs_row1[1], tags='PFC_choice')
-            sfigs_row2[0] = pfc_visualizer.plot_goal_coding(sfigs_row2[0], groups='animal', tags='pfc_by_animal')
-            sfigs_row2[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[1], tags='PFC_choice_pre_supp_fig_6',
+            sfigs_row0[0] = pfc_visualizer.plot_tuning_curves(sfigs_row0[0], title='prefrontal cortex choice')
+            sfigs_row0[1] = pfc_visualizer.plot_decoding_validation(sfigs_row0[1], tags='PFC_choice')
+            sfigs_row1[0] = pfc_visualizer.plot_goal_coding(sfigs_row1[0], groups='animal', tags='pfc_by_animal')
+            sfigs_row1[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row1[1], tags='PFC_choice_pre_supp_fig_6',
                                                                   title='pre', time_window=(-1.5, 0))
 
             # figure saving
@@ -321,10 +317,10 @@ class UpdateTaskFigureGenerator:
         sfigs[0][1] = self.plot_placeholder(sfigs[0][1], text='Region schematic with PFC')
         sfigs[1][0] = hpc_visualizer.plot_goal_coding(sfigs[1][0], comparison='correct',
                                                       tags='HPC_choice_accuracy_fig_5')
-        sfigs[1][1] = pfc_visualizer.plot_goal_coding(sfigs[1][1], comparison='correct',
-                                                      tags='PFC_position_accuracy_fig_5')
-        sfigs[2][0] = hpc_visualizer.plot_goal_coding_stats(sfigs[2][0], comparison='correct', title='hippocampal',
+        sfigs[1][1] = hpc_visualizer.plot_goal_coding_stats(sfigs[1][1], comparison='correct', title='hippocampal',
                                                             tags='HPC_position_accuracy_fig_5')
+        sfigs[2][0] = pfc_visualizer.plot_goal_coding(sfigs[2][0], comparison='correct',
+                                                      tags='PFC_position_accuracy_fig_5')
         sfigs[2][1] = pfc_visualizer.plot_goal_coding_stats(sfigs[2][1], comparison='correct', title='prefrontal',
                                                             tags='PFC_choice_accuracy_fig_5')
         sfigs[3][0] = hpc_visualizer.plot_goal_coding_prediction(sfigs[3][0], comparison='all_update',
@@ -425,16 +421,19 @@ class UpdateTaskFigureGenerator:
                                                     overwrite=self.overwrite)
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=5, ncols=1, height_ratios=[1.25, 1, 1.25, 1, 1.5])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2)
+        sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
+        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         # plot data
-        sfigs[0] = pfc_visualizer.plot_tuning_curves(sfigs[0], title='prefrontal  position')
-        sfigs[1] = pfc_visualizer.plot_decoding_validation(sfigs[1], tags='PFC_position')
-        sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='PFC schematic')
-        sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1])
-        sfigs[3] = pfc_visualizer.plot_goal_coding(sfigs[3], ylim=(0.0, 0.18825), tags='PFC_position')  # pulled upper lim from HPC plot
-        sfigs[4] = pfc_visualizer.plot_goal_coding_stats(sfigs[4], tags='PFC_position')
+        sfigs_row0[0] = pfc_visualizer.plot_tuning_curves(sfigs_row0[0], title='prefrontal  position')
+        sfigs_row0[1] = pfc_visualizer.plot_decoding_validation(sfigs_row0[1], tags='PFC_position')
+        sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='PFC schematic')
+        sfigs_row1[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1])
+        sfigs_row2[1] = pfc_visualizer.plot_goal_coding(sfigs_row2[1], ylim=(0.0, 0.18825), tags='PFC_position')  # pulled upper lim from HPC plot
+        sfigs_row3[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags='PFC_position')
 
         # figure saving
         self.add_panel_labels(sfigs)
@@ -453,19 +452,17 @@ class UpdateTaskFigureGenerator:
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
         sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1, 1, 1])
-        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=3, width_ratios=[1, 1, 2])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
         sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         # plot data
-        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Recording setup + position schematic')
-        sfigs_row0[1] = hpc_visualizer.plot_tuning_curves(sfigs_row0[1], title='hippocampal lateral position')
-        sfigs_row0[2] = hpc_visualizer.plot_decoding_validation(sfigs_row0[2], tags='HPC_lateral_position')
+        sfigs_row0[0] = hpc_visualizer.plot_tuning_curves(sfigs_row0[0], title='hippocampal lateral position')
+        sfigs_row0[1] = hpc_visualizer.plot_decoding_validation(sfigs_row0[1], tags='HPC_lateral_position')
         sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])
         sfigs_row1[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], update_type='non_update')
-        sfigs_row2[0] = hpc_visualizer.plot_goal_coding(sfigs_row2[0], tags='HPC_lateral_position', update_type=['switch'])
-        sfigs_row2[1] = hpc_visualizer.plot_goal_coding(sfigs_row2[1], tags='HPC_lateral_position', update_type=['non_update'])
+        sfigs[2] = hpc_visualizer.plot_goal_coding(sfigs[2], tags='HPC_lateral_position',
+                                                        update_type=['switch', 'non_update'])
         sfigs_row3[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags='HPC_lateral_position')
 
         # figure saving
@@ -475,14 +472,13 @@ class UpdateTaskFigureGenerator:
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
         sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1, 1, 1])
-        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=3, width_ratios=[1, 1, 2])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
         sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
         sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
-        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Recording setup + position schematic')
-        sfigs_row0[1] = pfc_visualizer.plot_tuning_curves(sfigs_row0[1], title='prefrontal lateral position')
-        sfigs_row0[2] = pfc_visualizer.plot_decoding_validation(sfigs_row0[2], tags='PFC_lateral_position')
+        sfigs_row0[0] = pfc_visualizer.plot_tuning_curves(sfigs_row0[0], title='prefrontal lateral position')
+        sfigs_row0[1] = pfc_visualizer.plot_decoding_validation(sfigs_row0[1], tags='PFC_lateral_position')
         sfigs_row1[0] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])
         sfigs_row1[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], update_type='non_update')
         sfigs_row2[0] = pfc_visualizer.plot_goal_coding(sfigs_row2[0], tags='PFC_lateral_position',
@@ -502,17 +498,19 @@ class UpdateTaskFigureGenerator:
                                                     overwrite=self.overwrite)
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=5, ncols=1, height_ratios=[1.25, 1, 1.25, 1, 1.5])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2)
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         # plot data
-        sfigs[0] = hpc_visualizer.plot_tuning_curves(sfigs[0], title='hippocampal choice')
-        sfigs[1] = hpc_visualizer.plot_decoding_validation(sfigs[1], tags='CA1_choice')
-        sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='CA1 schematic')
-        sfigs_row2[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1])
-        sfigs[3] = hpc_visualizer.plot_goal_coding(sfigs[3], tags='CA1_choice')
-        sfigs[4] = hpc_visualizer.plot_goal_coding_stats(sfigs[4], tags='CA1_choice',
-                                                         time_window=(0, 2))
+        sfigs_row0[0] = hpc_visualizer.plot_tuning_curves(sfigs_row0[0], title='hippocampal choice')
+        sfigs_row0[1] = hpc_visualizer.plot_decoding_validation(sfigs_row0[1], tags='CA1_choice')
+        sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])
+        sfigs_row1[1] = hpc_visualizer.plot_goal_coding(sfigs_row1[1], tags='CA1_choice',
+                                                        update_type=['switch', 'non_update'])
+        sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags='CA1_choice',
+                                                              time_window=(0, 2))
 
         # figure saving
         self.add_panel_labels(sfigs)
