@@ -3,14 +3,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 import seaborn.objects as so
+import seaborn as sns
 
 from pathlib import Path
 from scipy.stats import sem
+from statannotations.Annotator import Annotator
 
 from update_project.general.results_io import ResultsIO
 from update_project.single_units.psth_visualizer import show_psth_raster
 from update_project.single_units.single_unit_aggregator import SingleUnitAggregator
 from update_project.base_visualization_class import BaseVisualizationClass
+from update_project.statistics.statistics import Stats
 
 
 class SingleUnitVisualizer(BaseVisualizationClass):
@@ -107,23 +110,116 @@ class SingleUnitVisualizer(BaseVisualizationClass):
         cycle_skipping_data = g_data.sort_values(by='cycle_skipping_index')
         times = cycle_skipping_data['acg_lags'].to_numpy()[0]
 
+        # plot group heatmaps
         fig = plt.figure()
         ax = fig.subplots(2, 3, height_ratios=[3, 1])
-        for trial_name, trial_data in cycle_skipping_data.groupby('epoch'):
-            col_ind = np.argwhere(cycle_skipping_data['epoch'].unique() == trial_name)[0][0]
+        trial_skipping_data = cycle_skipping_data.query('epoch in ["switch", "stay", "delay"]')
+        for trial_name, trial_data in trial_skipping_data.groupby('epoch', sort=False):
+            col_ind = np.argwhere(trial_skipping_data['epoch'].unique() == trial_name)[0][0]
             data = trial_data.query(f'cell_type == "Pyramidal Cell"')
             num_units = np.shape(data)[0]
             zero_index_location = data.reset_index(drop=True)['cycle_skipping_index'].abs().idxmin()
             ax[0][col_ind].imshow(np.vstack(data['acg_corrected']), cmap='Greys', extent=[times[0], times[-1], 0, num_units],
-                       origin='lower', aspect='auto')
+                       origin='lower', aspect='auto', vmin=0.25, vmax=1)
             ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
             ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
 
-            ax[1][col_ind].hist(data['cycle_skipping_index'].to_numpy(), bins=np.linspace(-1, 1, 20), density=True)
-            ax[1][col_ind].axvline(0, linestyle='dashed', color='k')
-            ax[1][col_ind].set(title=g_name, xlabel='cycle skipping index', ylabel='density')
+        # plot distribution with stats
+        hist_data = (trial_skipping_data
+                     .query(f'cell_type == "Pyramidal Cell"')
+                     .dropna(subset='cycle_skipping_index'))
+        sns.pointplot(data=hist_data, x='epoch', y='cycle_skipping_index', order=['delay', 'switch', 'stay'],
+                      ax=ax[1][0], palette=self.colors['trials'], scale=1.5)
+        ax[1][0].set(title=f'cycle skipping -  {g_name}')
 
-        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping', additional_tags=g_name)
+        var = 'cycle_skipping_index'
+        group = 'epoch'
+        pairs = list(itertools.combinations(hist_data[group].unique(), r=2))
+        pairs_in_tup = [((p[0],), (p[1],)) for p in pairs]
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+        stats.run(hist_data, dependent_vars=[var], group_vars=[group],
+                  pairs=pairs_in_tup, filename=f'theta_cycle_skipping_by_trial_{g_name}')
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans" & variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs_in_tup]
+        annot = Annotator(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                          order=['delay', 'switch', 'stay'])
+        annot.new_plot(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                       order=['delay', 'switch', 'stay'])
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # plot histogram of cycle skipping and theta modulation
+        sns.histplot(data=hist_data, x='cycle_skipping_index', hue='epoch', hue_order=['delay', 'switch', 'stay'],
+                     ax=ax[1][1], palette=self.colors['trials'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=40)
+        ax[1][1].axvline(0, linestyle='dashed', color='k')
+
+        sns.histplot(data=hist_data, x='theta_modulation', hue='epoch', hue_order=['delay', 'switch', 'stay'],
+                     ax=ax[1][2], palette=self.colors['trials'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=30)
+
+        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping_by_trial', additional_tags=g_name)
+
+        # plot group heatmaps
+        fig = plt.figure()
+        ax = fig.subplots(2, 4, height_ratios=[3, 1])
+        commitment_skipping_data = cycle_skipping_data.query('epoch in ["q0", "q1", "q2", "q3"]')
+        for trial_name, trial_data in commitment_skipping_data.groupby('epoch', sort=False):
+            col_ind = np.argwhere(np.array(['q3', 'q2', 'q1', 'q0']) == trial_name)[0][0]
+            data = trial_data.query(f'cell_type == "Pyramidal Cell"')
+            num_units = np.shape(data)[0]
+            zero_index_location = data.reset_index(drop=True)['cycle_skipping_index'].abs().idxmin()
+            ax[0][col_ind].imshow(np.vstack(data['acg_corrected']), cmap='Greys',
+                                  extent=[times[0], times[-1], 0, num_units],
+                                  origin='lower', aspect='auto', vmin=0.25, vmax=1)
+            ax[0][col_ind].set(title=trial_name, xlabel='lag (s)', ylabel='single units')
+            ax[0][col_ind].axhline(zero_index_location, linestyle='dashed', color='r')
+
+        # plot averages with stats
+        hist_data = (commitment_skipping_data
+                     .query(f'cell_type == "Pyramidal Cell"')
+                     .dropna(subset='cycle_skipping_index'))
+        sns.pointplot(data=hist_data, x='epoch', y='cycle_skipping_index', order=['q3', 'q2', 'q1', 'q0'],
+                      ax=ax[1][0], palette=self.colors['all_quartiles'], scale=1.5)
+        ax[1][0].set(title=f'cycle skipping -  {g_name}')
+        ax[1][0].axhline(0, linestyle='dashed', color='k')
+
+        # plot distribution with stats
+        var = 'cycle_skipping_index'
+        group = 'epoch'
+        pairs = list(itertools.combinations(hist_data[group].unique(), r=2))
+        pairs_in_tup = [((p[0],), (p[1],)) for p in pairs]
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+        stats.run(hist_data, dependent_vars=[var], group_vars=[group],
+                  pairs=pairs_in_tup, filename=f'theta_cycle_skipping_by_trial_{g_name}')
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans" & variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs_in_tup]
+        annot = Annotator(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                          order=['q3', 'q2', 'q1', 'q0'])
+        annot.new_plot(ax[1][0], pairs=pairs, data=hist_data, x=group, y=var,
+                       order=['q3', 'q2', 'q1', 'q0'])
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # plot distributions of theta modulation and cycle skipping index
+        sns.histplot(data=hist_data, x='cycle_skipping_index', hue='epoch', hue_order=['q3', 'q2', 'q1', 'q0'],
+                     ax=ax[1][1], palette=self.colors['all_quartiles'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=20)
+        ax[1][1].axvline(0, linestyle='dashed', color='k')
+
+        sns.histplot(data=hist_data, x='theta_modulation', hue='epoch', hue_order=['q3', 'q2', 'q1', 'q0'],
+                     ax=ax[1][2], palette=self.colors['all_quartiles'], element='step', fill=False, stat='density',
+                     common_norm=False, bins=20)
+
+        self.results_io.save_fig(fig=fig, axes=ax, filename=f'theta_cycle_skipping_by_commitment', additional_tags=g_name)
 
     def plot_update_selective_cell_types(self, g_data, g_name, cutoff=0.25):
         cutoffs = [cutoff, -cutoff]

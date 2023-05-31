@@ -14,3 +14,13 @@ def get_velocity(nwbfile):
                                  translational=pd.Series(index=timestamps[:], data=translational_velocity)))
 
     return velocity
+
+
+def get_licks(nwbfile):
+    lick_voltage = nwbfile.acquisition['licks'].data
+    rate = nwbfile.acquisition['licks'].rate
+    timestamps = np.arange(0, len(lick_voltage) / rate, 1 / rate)
+
+    licks = pd.DataFrame(dict(licks=pd.Series(index=timestamps[:], data=lick_voltage),))
+
+    return licks

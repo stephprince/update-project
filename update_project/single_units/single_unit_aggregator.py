@@ -8,25 +8,27 @@ from nwbwidgets.analysis.spikes import compute_smoothed_firing_rate
 
 class SingleUnitAggregator:
 
-    def __init__(self, exclusion_criteria=dict()):
+    def __init__(self, exclusion_criteria=dict(), analyzer_name=None):
         self.flip_trials_by_turn = True  # default false
         self.turn_to_flip = 2
         self.exclusion_criteria = exclusion_criteria
+        self.analyzer_name = analyzer_name or 'analyzer'
 
     def run_aggregation(self, data):
         # aggregate session data
         for sess_dict in data:
-            sess_dict.update(dict(tuning_curves=sess_dict['analyzer'].tuning_curves,
-                                  cycle_skipping=sess_dict['analyzer'].cycle_skipping,
-                                  goal_selectivity=sess_dict['analyzer'].goal_selectivity,
-                                  update_selectivity=sess_dict['analyzer'].update_selectivity,
-                                  aligned_data=sess_dict['analyzer'].aligned_data,
-                                  tuning_bins=sess_dict['analyzer'].bins,
-                                  trial_info=sess_dict['analyzer'].trials,
-                                  excluded_session=self._meets_exclusion_criteria(sess_dict['analyzer'])),)
+            sess_dict.update(dict(tuning_curves=sess_dict[self.analyzer_name].tuning_curves,
+                                  cycle_skipping=sess_dict[self.analyzer_name].cycle_skipping,
+                                  goal_selectivity=sess_dict[self.analyzer_name].goal_selectivity,
+                                  update_selectivity=sess_dict[self.analyzer_name].update_selectivity,
+                                  aligned_data=sess_dict[self.analyzer_name].aligned_data,
+                                  tuning_bins=sess_dict[self.analyzer_name].bins,
+                                  trial_info=sess_dict[self.analyzer_name].trials,
+                                  excluded_session=self._meets_exclusion_criteria(sess_dict[self.analyzer_name]),
+                                  feature_name=sess_dict[self.analyzer_name].feature_name),)
         self.group_df = pd.DataFrame(data)
         self.group_df = self.group_df[~self.group_df['excluded_session']]  # only keep non-excluded sessions
-        self.group_df.drop('analyzer', axis='columns', inplace=True)
+        self.group_df.drop(self.analyzer_name, axis='columns', inplace=True)
 
         # get aligned dataframe:
         self.group_aligned_data = self._get_aligned_data()
@@ -36,7 +38,8 @@ class SingleUnitAggregator:
         self.cycle_skipping_data = self._get_cycle_skipping_data()
 
         # save memory once information is extracted
-        self.group_df.drop(['tuning_curves', 'goal_selectivity', 'aligned_data', 'cycle_skipping'], axis=1, inplace=True)
+        self.group_df.drop(['tuning_curves', 'goal_selectivity', 'aligned_data', 'cycle_skipping'],
+                           axis=1, inplace=True)
 
     def _meets_exclusion_criteria(self, data):
         exclude_session = False  # default to include session

@@ -31,7 +31,6 @@ for name in session_names:
     session_data = dict(session_id=session_db.get_session_id(name),
                         animal=session_db.get_animal_id(name),
                         analyzer=analyzer,
-                        feature_name=feature,
                         **params)
     group_data.append(session_data)
 

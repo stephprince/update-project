@@ -250,7 +250,7 @@ class Stats:
         for var in self.dependent_vars:
 
             formula = f'{var} ~ predictor + (1|animal) + (1|animal:session_id)'  # equivalent to var ~ predictor + 1|animal/session_id
-            model = lme4.lmer(formula, data=self.pandas_to_r_df(data), REML=False)
+            model = lme4.lmer(formula, data=self.pandas_to_r_df(data))
             # TODO - add checks for assumptions of mixed effects models
 
             # extra outputs that might be good to know

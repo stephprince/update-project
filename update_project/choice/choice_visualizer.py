@@ -108,7 +108,7 @@ class ChoiceVisualizer(BaseVisualizationClass):
         stats.get_summary(cue_performance, dependent_vars=['log_likelihood'],
                           group_vars=['cue'], filename=f'choice_commitment')
 
-        sfig.suptitle('Choice commitment estimation', fontsize=12)
+        sfig.suptitle('Choice estimation from behavioral readouts', fontsize=12)
 
         return sfig
 
