@@ -2,7 +2,8 @@
 
 ## overview
 
-The goal of this project is to look at neural activity from hippocampal CA1 and medial prefrontal cortex in mice during the update virtual-reality task. This project is currently in development.
+The goal of this project is to look at neural activity from hippocampal CA1 and medial prefrontal cortex in mice during 
+the update virtual-reality task. This project is currently in development.
 
 ## getting started
 
@@ -12,7 +13,8 @@ To get started using this project, follow the instructions below. First, clone t
 git clone "https://github.com/stephprince/update-project.git"
 ```
 
-Then, create a new conda environment to work with the data. Within this environment, you can then install the package in development mode. This command will also install all dependencies.
+Then, create a new conda environment to work with the data. Within this environment, you can then install the package in
+development mode. This command will also install all dependencies.
 ```bash
 conda create --name update-project
 conda activate update-project
@@ -21,10 +23,19 @@ cd /path/to/files/update-project/
 pip install -e .
 ```
 
-Once installed, you can use the command below in python to import the modules. This project is currently in development, but there will eventually be a `run_all.py` script to run all analyses.
-```python
-import update_project
+To generate figures for the manuscript, run the main figure-generating script.
+All figures will save in a local update-project/results/manuscript-figures folder.
+(Note: these commands assume data is stored in the [project structures and locations](#project-structure-and-locations) 
+format described below. Future examples will include instructions for data deposited online.)
+
+```bash
+python run_all_figures.py
 ```
+
+If you would like to run any of the modules individually, 
+or generate figures not included in the final version of the paper, 
+each analysis stream has its own submodule.
+(e.g. `run_decoding.py` found in the update_project/decoding folder)
 
 ## project structure and locations
 
@@ -62,4 +73,4 @@ import update_project
 
 ## related papers
 
-None.
+preprint coming soon...
