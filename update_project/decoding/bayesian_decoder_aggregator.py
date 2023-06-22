@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 import pandas as pd
 import warnings
+import statsmodels.api as sm
 
 from math import sqrt
 from pathlib import Path
@@ -431,7 +432,7 @@ class BayesianDecoderAggregator:
                            .set_index('trial_index'))
                 output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'update_type',
                                                    'correct', 'turn_type', 'feature_name', 'time_label', 'times',
-                                                   'rotational_velocity', 'error']],
+                                                   'rotational_velocity', 'translational_velocity', 'error']],
                                      list_df, left_index=True, right_index=True)
                 output_df['choice'] = output_df['choice'].map(choice_mapping)
                 return output_df
@@ -547,7 +548,7 @@ class BayesianDecoderAggregator:
             quant_df['trial_index'] = quant_df.index
             quant_df = (quant_df
                         .explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline', 'zscore_prob',
-                                  'rotational_velocity', 'error'])
+                                  'rotational_velocity', 'translational_velocity', 'error'])
                         .reset_index())
             quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(*time_window, n_time_bins)).apply(
                 lambda x: x.mid)
@@ -591,7 +592,8 @@ class BayesianDecoderAggregator:
         aligned_data_df.drop(['aligned_data'], axis='columns', inplace=True)  # remove the extra aligned data column
 
         data_to_explode = ['trial_id', 'feature', 'decoding', 'error', 'probability', 'turn_type', 'correct',
-                           'theta_phase', 'theta_amplitude', 'rotational_velocity', 'choice_commitment', 'view_angle']
+                           'theta_phase', 'theta_amplitude', 'rotational_velocity', 'translational_velocity',
+                           'choice_commitment', 'view_angle']
         exploded_df = aligned_data_df.explode(data_to_explode).reset_index(drop=True)
         exploded_df.dropna(axis='rows', inplace=True)
 
@@ -754,12 +756,14 @@ class BayesianDecoderAggregator:
                 phase_col = np.argwhere(decoder.theta.columns == 'phase')[0][0]
                 amp_col = np.argwhere(decoder.theta.columns == 'amplitude')[0][0]
                 rot_col = np.argwhere(decoder.velocity.columns == 'rotational')[0][0]
+                trans_col = np.argwhere(decoder.velocity.columns == 'translational')[0][0]
                 view_col = np.argwhere(decoder.commitment.columns == 'view_angle')[0][0]
                 choice_col = np.argwhere(decoder.commitment.columns == 'choice_commitment')[0][0]
                 vars = dict(feature=decoder.features_test.iloc[:, 0], decoded=decoder.decoded_values,
                             probability=decoder.decoded_probs, theta_phase=decoder.theta.iloc[:, phase_col],
                             theta_amplitude=decoder.theta.iloc[:, amp_col],
                             rotational_velocity=decoder.velocity.iloc[:, rot_col],
+                            translational_velocity=decoder.velocity.iloc[:, trans_col],
                             choice_commitment=decoder.commitment.iloc[:, choice_col],
                             view_angle=decoder.commitment.iloc[:, view_col])
                 locs = self._get_start_stop_locs(vars, mid_times, window_start, window_stop)
@@ -793,21 +797,16 @@ class BayesianDecoderAggregator:
 
                 # get means and sem
                 data = dict()
+                vars_to_save = ['feature', 'error', 'probability', 'theta_phase', 'theta_amplitude',
+                                'rotational_velocity', 'translational_velocity', 'choice_commitment', 'view_angle']
                 for name in decoder.feature_names:
                     assert np.shape(np.array(interp_dict[name]['feature']))[0] == np.shape(turns)[0]
                     data = dict(feature_name=name,
                                 update_type=trial_name,
                                 time_label=time_label,
                                 trial_id=trials,
-                                feature=np.array(interp_dict[name]['feature']),
                                 decoding=np.array(interp_dict[name]['decoded']),
-                                error=np.array(interp_dict[name]['error']),
-                                probability=interp_dict[name]['probability'],
-                                theta_phase=interp_dict[name]['theta_phase'],
-                                theta_amplitude=interp_dict[name]['theta_amplitude'],
-                                rotational_velocity=interp_dict[name]['rotational_velocity'],
-                                choice_commitment=interp_dict[name]['choice_commitment'],
-                                view_angle=interp_dict[name]['view_angle'],
+                                **{k: v for k, v in interp_dict[name].items() if k in vars_to_save},
                                 turn_type=turns,
                                 correct=outcomes,
                                 window_start=-window_start,
@@ -930,7 +929,8 @@ class BayesianDecoderAggregator:
 
         # preprocess the data - balance classes and scale
         prediction_outputs = []
-        for name, data in data_for_prediction.groupby(prediction_groups):
+        data_for_prediction = data_for_prediction.query('pre_or_post == "post"')
+        for name, data in data_for_prediction.groupby(prediction_groups): # print (name), filter data_for prediction, then rerun here
             unbalanced_data = dict()
             for var in input_variables:
                 unbalanced_data[var] = data[var].to_numpy()
@@ -970,7 +970,7 @@ class BayesianDecoderAggregator:
 
                         # use randomized search to get best hyperparameters
                         model = svm.SVC(kernel='rbf')  # will have to tune the hyperparameters
-                        clf = RandomizedSearchCV(model, distributions, n_iter=10, cv=LeaveOneOut(), n_jobs=14)
+                        clf = RandomizedSearchCV(model, distributions, n_iter=10, cv=LeaveOneOut(), n_jobs=8)
                         input_data = inputs[i] if np.ndim(inputs[i]) > 1 else inputs[i].reshape(-1, 1)
                         search = clf.fit(input_data, target)
                         model_params = search.best_params_
@@ -1023,6 +1023,32 @@ class BayesianDecoderAggregator:
         sig_bins_df['fdr'], sig_bins_df['pval_corrected'] = fdrcorrection(sig_bins_df['p_val'].to_numpy())
 
         return sig_bins_df
+
+    @staticmethod
+    def get_residuals(trial_data, prob_value='prob_sum'):
+        residual_data = (trial_data
+                         .dropna(subset=[prob_value, 'choice', 'rotational_velocity', 'translational_velocity'], axis=0)
+                         .sort_values(by=['choice', 'update_type', 'session_id', 'trial_id']))
+        switch_data = residual_data.query('choice == "switch"')
+        input_data = pd.DataFrame().assign(switch=switch_data[prob_value].to_numpy(),
+                                           initial_stay=residual_data.query('choice == "initial_stay"')[
+                                               prob_value].to_numpy(),
+                                           rotation=switch_data['rotational_velocity'].to_numpy(),
+                                           translation=switch_data['translational_velocity'].to_numpy(), )
+
+        # fit GLM and get residuals
+        residuals = []
+        for choice in residual_data['choice'].unique():
+            y = input_data[choice]  # changed from choice
+            x = input_data[['rotation', 'translation']]
+            x = sm.add_constant(x)
+            poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
+            glm_results = poisson_model.fit()
+            # print(glm_results.summary())
+            residuals.append(glm_results.resid_pearson)
+        residual_data['resid'] = pd.concat(residuals).to_numpy()
+
+        return residual_data
 
     def _load_data(self):
         for name, file_info in self.data_files.items():
