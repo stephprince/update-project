@@ -4,7 +4,6 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import seaborn.objects as so
 
 from pathlib import Path
 from matplotlib import ticker
@@ -40,33 +39,29 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         for g_name, data in self.aggregator.group_aligned_df.groupby(groups):
             tags = "_".join([str(n) for n in g_name])
             kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
+            self.plot_motor_controls(data, **kwargs)
             # self.plot_theta_data(data, kwargs)
             # self.plot_group_aligned_stats(data, **kwargs)
             # self.plot_group_aligned_comparisons(data, **kwargs)
             # self.plot_performance_comparisons(data, tags=tags)
+            #
+            # # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
+            # for plot_types in list(itertools.product(*self.plot_groups.values())):
+            #     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
+            #     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
+            #     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
+            #     self.plot_group_aligned_data(data, **kwargs)
+            #     self.plot_scatter_dists_around_update(data, **kwargs)
+            #     self.plot_trial_by_trial_around_update(data, **kwargs)
 
-            # fig = plt.figure()
-            # fig = self.plot_goal_coding_prediction(fig, tags=tags)
-            # self.results_io.save_fig(fig=fig, filename=f'goal_coding_prediction', tight_layout=False,
-            #                          additional_tags=tags)
-
-            # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
-            for plot_types in list(itertools.product(*self.plot_groups.values())):
-                plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
-                title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-                kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-                self.plot_group_aligned_data(data, **kwargs)
-                # self.plot_scatter_dists_around_update(data, **kwargs)
-                # self.plot_trial_by_trial_around_update(data, **kwargs)
-
-        # plot model metrics (comparing parameters across brain regions and features)
+        # # plot model metrics (comparing parameters across brain regions and features)
         # for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
-        # self.plot_group_confusion_matrices(data, name, )
-        # self.plot_tuning_curves(data, name, )
-        # self.plot_all_confusion_matrices(data, name)
-        # self.plot_parameter_comparison(data, name, thresh_params=True)
-
-        #  make plots with both brain regions
+        #     self.plot_group_confusion_matrices(data, name, )
+        #     self.plot_tuning_curves(data, name, )
+        #     self.plot_all_confusion_matrices(data, name)
+        #     self.plot_parameter_comparison(data, name, thresh_params=True)
+        #
+        # # make plots with both brain regions
         # self.plot_multiregional_data()
         # self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
         # self.plot_all_groups_error(main_group=group_names, sub_group='animal')
@@ -139,7 +134,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_goal_coding(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
                          ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update'],
-                         correct_type=[1, 0]):
+                         correct_type=[1, 0], use_residuals=False):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
@@ -150,6 +145,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
         trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
         trial_types = update_type if comparison == 'update_type' else correct_type
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data)
+            prob_value = 'resid'
 
         # plot figure
         nrows = 1  # default value if no other info provided
@@ -201,8 +199,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         ax[row_id + 1][col_id].plot(time_bins, np.mean(veloc_mat, axis=0), color=self.colors['home'])
                         ax[row_id + 1][col_id].fill_between(time_bins, np.nanmean(veloc_mat, axis=0) + sem(veloc_mat),
                                                             np.nanmean(veloc_mat, axis=0) - sem(veloc_mat),
-                                                            color=self.colors['new'],
-                                                            alpha=0.2)
+                                                            color=self.colors['new'], alpha=0.2)
                         ax[row_id + 1][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
 
                         # add markers to indicate timepoints where data switched
@@ -222,6 +219,32 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                             ax[row_id + 1][col_id].annotate("",  arrowprops=dict(arrowstyle='simple', facecolor='black'),
                                                             xy=(x_veloc, y_veloc), xytext=(x_veloc, y_veloc*2),
                                                             xycoords='data', textcoords='data')
+
+                        # on a trial-by-trial basis look at initial - new event triggered average
+                        diff_initial_switch_indiv_trials = (initial_mat - new_mat)[:, post_update:] #TODO - should this be
+                        veloc = np.pad(veloc_mat, pad_width=[(0, 0), (0, np.shape(veloc_mat)[1])],
+                                       constant_values=np.nan)
+                        neural_flip_inds = []
+                        for d in diff_initial_switch_indiv_trials:
+                            if np.where(d < 0)[0].any():
+                                neural_flip_inds.append(np.where(d < 0)[0][0] + post_update)
+                            else:
+                                neural_flip_inds.append(np.nan)
+                        sample_ind = np.arange(26 + 13) - 13  # adjust so plotting before and after
+                        ind = np.array(neural_flip_inds)[:, None] + sample_ind[None, :]
+                        chunks = np.array([v[i.astype(int)] for i, v in zip(ind, veloc) if not np.isnan(i).any()])
+
+                        test_fig = plt.figure()
+                        test_ax = test_fig.subplots()
+                        times_to_plot = np.concatenate([time_bins,
+                                                        time_bins + time_bins.max() - time_bins.min()])[:np.shape(chunks)[1]]
+                        test_ax.plot(times_to_plot, np.nanmean(chunks, axis=0), color=self.colors['home'])
+                        test_ax.fill_between(times_to_plot, np.nanmean(chunks, axis=0) + self.nan_sem(chunks),
+                                                        np.nanmean(chunks, axis=0) - self.nan_sem(chunks),
+                                                        color=self.colors['home'], alpha=0.2)
+                        test_ax.axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                        test_ax.set_title(f'{comp} {s_name}')
+                        plt.show()
             else:
                 time_bins = data['times'].unique()
                 color_map = {'switch': 'new', 'initial_stay': 'initial'}
@@ -264,7 +287,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
                                time_window=(0, 1.5), use_zscores=False, include_central=False, stripplot=False,
-                               update_type=['switch', 'non_update'], correct_type=[1, 0]):
+                               update_type=['switch', 'non_update'], use_residuals=True):
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
         choice_mapping = {'initial_stay': 'initial', 'switch': 'new'}
         if include_central:
@@ -279,6 +302,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
                                                                        prob_value=prob_value, include_central=include_central)
         trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data)
+            decoding_measures = 'resid'
+
         groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
                         'choice']
         data_for_stats = (trial_data
@@ -1063,34 +1090,34 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 plt.colorbar(im1, cax=caxes[0], label='initial corr', pad=0.01, fraction=0.04, )
                 plt.colorbar(im2, cax=caxes[1], label='switch corr', pad=0.01, fraction=0.04, )
 
-                (  # plot corr coeffs over time
-                    so.Plot(g_data_by_time, x='times_sliding', y='corr_coeff_sliding', color='choice')
-                        .facet(col='time_label')
-                        .add(so.Band(), so.Est(errorbar='se'), )
-                        .add(so.Line(linewidth=2), so.Agg(), )
-                        .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
-                        .limit(
-                        x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
-                        .theme(rcparams)
-                        .layout(engine='constrained')
-                        .on(sfigs[1][0])
-                        .plot()
-                )
+                # (  # plot corr coeffs over time  # TODO - adapt to not use seaborn objects
+                #     so.Plot(g_data_by_time, x='times_sliding', y='corr_coeff_sliding', color='choice')
+                #         .facet(col='time_label')
+                #         .add(so.Band(), so.Est(errorbar='se'), )
+                #         .add(so.Line(linewidth=2), so.Agg(), )
+                #         .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
+                #         .limit(
+                #         x=(np.min(interaction_data['times'].values[-1]), np.max(interaction_data['times'].values[1])))
+                #         .theme(rcparams)
+                #         .layout(engine='constrained')
+                #         .on(sfigs[1][0])
+                #         .plot()
+                # )
 
                 g_data['corr_coeff'][g_data['corr_coeff'].isna()] = 0
-                (  # plot initial - switch difference over time (averages with bar)
-                    so.Plot(g_data, x='corr_coeff', color='choice')
-                        .facet(col='time_label')
-                        .add(so.Bars(alpha=0.5, edgealpha=0.5),
-                             so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1), )
-                        .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
-                        .limit(x=(-1, 1))
-                        .label(y='proportion')
-                        .theme(rcparams)
-                        .layout(engine='constrained')
-                        .on(sfigs[2][0])
-                        .plot()
-                )
+                # (  # plot initial - switch difference over time (averages with bar)  # TODO - adapt to not use so
+                #     so.Plot(g_data, x='corr_coeff', color='choice')
+                #         .facet(col='time_label')
+                #         .add(so.Bars(alpha=0.5, edgealpha=0.5),
+                #              so.Hist(stat='proportion', binrange=(-1, 1), binwidth=0.1), )
+                #         .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
+                #         .limit(x=(-1, 1))
+                #         .label(y='proportion')
+                #         .theme(rcparams)
+                #         .layout(engine='constrained')
+                #         .on(sfigs[2][0])
+                #         .plot()
+                # )
                 add_lines = [[a.axvline(0, color='k', linestyle='dashed') for a in sf.axes]
                              for sf in [sfigs[2][0], sfigs[1][0], sfigs[0][0]]]
                 leg = fig.legends.pop(0)
@@ -1237,32 +1264,32 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             fig = plt.figure(figsize=(11, 20), constrained_layout=True)
             sfigs = fig.subfigures(nrows, 2, height_ratios=[0.23, *([0.11] * 10)], width_ratios=[0.99, 0.01])
 
-            # time traces
-            (  # plot initial - switch difference over time (averages with bar)
-                so.Plot(trial_data, x='times', color='choice')
-                    .facet(col='time_label')
-                    .pair(y=['prob_sum', 'diff_baseline'])
-                    .add(so.Band(), so.Est(errorbar='se'), )
-                    .add(so.Line(linewidth=2), so.Agg(), )
-                    .scale(color=[self.colors[c] for c in trial_data['choice'].unique()])
-                    .theme(rcparams)
-                    .layout(engine='constrained')
-                    .on(sfigs[0][0])
-                    .plot()
-            )
-            sfigs[0][0].suptitle(title)
-            (  # plot diff over time (averages with error bar)
-                so.Plot(old_vs_new_data, x='times', y='diff_switch_stay')
-                    .facet(col='time_label',
-                           order=self.aggregator.align_times)
-                    .add(so.Line(linewidth=2), so.Agg())
-                    .add(so.Band(), so.Est(errorbar='se'))
-                    .scale(color=self.colors['control'])
-                    .theme(rcparams)
-                    .layout(engine='constrained')
-                    .on(sfigs[7][0])
-                    .plot()
-            )
+            # time traces  # TODO - adapt to not use seaborn objects so
+            # (  # plot initial - switch difference over time (averages with bar)
+            #     so.Plot(trial_data, x='times', color='choice')
+            #         .facet(col='time_label')
+            #         .pair(y=['prob_sum', 'diff_baseline'])
+            #         .add(so.Band(), so.Est(errorbar='se'), )
+            #         .add(so.Line(linewidth=2), so.Agg(), )
+            #         .scale(color=[self.colors[c] for c in trial_data['choice'].unique()])
+            #         .theme(rcparams)
+            #         .layout(engine='constrained')
+            #         .on(sfigs[0][0])
+            #         .plot()
+            # )
+            sfigs[0][0].suptitle(title)  # TODO - adapt to not use seaborn objects so
+            # (  # plot diff over time (averages with error bar)
+            #     so.Plot(old_vs_new_data, x='times', y='diff_switch_stay')
+            #         .facet(col='time_label',
+            #                order=self.aggregator.align_times)
+            #         .add(so.Line(linewidth=2), so.Agg())
+            #         .add(so.Band(), so.Est(errorbar='se'))
+            #         .scale(color=self.colors['control'])
+            #         .theme(rcparams)
+            #         .layout(engine='constrained')
+            #         .on(sfigs[7][0])
+            #         .plot()
+            # )
 
             # heatmaps of data by session and by trial
             locations = dict(prob_sum=dict(sfig=1, nrows=2, groupby=['time_label', 'choice'], df=trial_data),
@@ -1837,21 +1864,21 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
                 for row, level in enumerate(['trials_binned', 'session_id', 'animal']):
                     plot_data = g_data.groupby([level, 'choice', 'region']).mean().reset_index()
-
-                    (  # plot scatters with estimates
-                        so.Plot(plot_data, x='correct', color='choice')
-                            .pair(y=['diff_baseline', ])  # 'prob_over_chance' remove for now
-                            .add(so.Dot(alpha=0.3))
-                            .add(so.Line(), so.PolyFit(order=1), )
-                            .share(y='row')
-                            .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
-                            .theme(rcparams)
-                            .layout(engine='constrained')
-                            .limit(x=(0, 1))
-                            .label(title=g_name, x='proportion correct')
-                            .on(sfigs[row][col])
-                            .plot()
-                    )
+                    #
+                    # (  # plot scatters with estimates # TODO - adapt to not use seaborn objects so
+                    #     so.Plot(plot_data, x='correct', color='choice')
+                    #         .pair(y=['diff_baseline', ])  # 'prob_over_chance' remove for now
+                    #         .add(so.Dot(alpha=0.3))
+                    #         .add(so.Line(), so.PolyFit(order=1), )
+                    #         .share(y='row')
+                    #         .scale(color=[self.colors[c] for c in g_data['choice'].unique()])
+                    #         .theme(rcparams)
+                    #         .layout(engine='constrained')
+                    #         .limit(x=(0, 1))
+                    #         .label(title=g_name, x='proportion correct')
+                    #         .on(sfigs[row][col])
+                    #         .plot()
+                    # )
                     for ax in sfigs[row][col].axes:
                         metric = ax.get_ylabel().replace(' ', '_')
                         stats = plot_data.groupby('choice').apply(lambda x: pearsonr(x['correct'], x[metric])).to_dict()
@@ -2108,3 +2135,100 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         return fig
 
+    def plot_motor_controls(self, param_data, plot_groups=None, comparison='correct', tags=''):
+        filter_dict = {k: [val[0] for val in v] for k, v in plot_groups.items()}
+        filter_dict.update(turn_type=[1, 2])
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(param_data, filter_dict)
+        trial_types = ['correct', 'incorrect'] if comparison == 'correct' else ['switch', 'stay', 'non_update']
+        resid_data = self.aggregator.get_residuals(trial_data)
+
+        for trial_type, t_data in resid_data.groupby('update_type'):
+            sfig = plt.figure()
+            ax = sfig.subplots(nrows=4, ncols=len(resid_data[comparison].unique()), sharey='row', squeeze=False)
+            for comp, data in t_data.groupby(comparison):
+                for row_id, val in enumerate(['prob_sum', 'resid', 'rotational_velocity', 'translational_velocity']):
+                    col_id = np.argwhere(np.array(t_data[comparison].unique()) == comp)[0][0]
+                    trial_mat = data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                           values=val)
+                    new_mat = trial_mat.query('choice == "switch"').to_numpy()
+                    initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                    time_bins = trial_mat.columns.to_numpy()
+
+                    ax[row_id][col_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'])
+                    ax[row_id][col_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'])
+                    ax[row_id][col_id].fill_between(time_bins,
+                                                    np.nanmean(new_mat, axis=0) + sem(new_mat, nan_policy='omit'),
+                                                    np.nanmean(new_mat, axis=0) - sem(new_mat, nan_policy='omit'),
+                                                    color=self.colors['new'], alpha=0.2)
+                    ax[row_id][col_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat,
+                                                                                                     nan_policy='omit'),
+                                                    np.nanmean(initial_mat, axis=0) - sem(initial_mat,
+                                                                                          nan_policy='omit'),
+                                                    color=self.colors['initial'],
+                                                    alpha=0.2)
+                    ax[row_id][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                    ax[row_id][col_id].set_title(f'{comp} {val}')
+            sfig.supylabel('prob. density', fontsize=10)
+            sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
+
+            colors = [self.colors[t] for t in ['initial', 'new']]
+            rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+
+            self.results_io.save_fig(fig=sfig, axes=ax, filename=f'motor_controls_{comparison}_{trial_type}',
+                                     additional_tags=tags)
+
+    def plot_residuals(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum',
+                         ylim=None, update_type=['switch', 'non_update'], correct_type=[1, 0]):
+        # load up data
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        label_map = self.label_maps[comparison]
+        plot_groups.update(update_type=update_type)
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value)
+        sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
+        trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+        trial_types = update_type if comparison == 'update_type' else correct_type
+        resid_data = self.aggregator.get_residuals(trial_data)
+
+        # plot figure
+        nrows = 1  # default value if no other info provided
+        height_ratios = [1]
+        if groups:
+            nrows = len(resid_data[groups].unique())
+            height_ratios = [1] * nrows
+        ax = sfig.subplots(nrows=nrows, ncols=len(update_type), sharex=True, sharey='row', squeeze=False,
+                           height_ratios=height_ratios)
+        for comp, data in resid_data.groupby(comparison):
+            col_id = np.argwhere(np.array(list(trial_types)) == comp)[0][0]
+            for s_name, s_data in data.groupby(sub_groups):
+                row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0]
+                trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                         values='resid')
+                new_mat = trial_mat.query('choice == "switch"').to_numpy()
+                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                time_bins = trial_mat.columns.to_numpy()
+
+                ax[row_id][col_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'])
+                ax[row_id][col_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'])
+                ax[row_id][col_id].fill_between(time_bins,
+                                                np.nanmean(new_mat, axis=0) + sem(new_mat, nan_policy='omit'),
+                                                np.nanmean(new_mat, axis=0) - sem(new_mat, nan_policy='omit'),
+                                                color=self.colors['new'], alpha=0.2)
+                ax[row_id][col_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat,
+                                                                                                 nan_policy='omit'),
+                                                np.nanmean(initial_mat, axis=0) - sem(initial_mat,
+                                                                                      nan_policy='omit'),
+                                                color=self.colors['initial'],
+                                                alpha=0.2)
+                ax[row_id][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                if ylim:
+                    ax[row_id][col_id].set(ylim=ylim)
+
+            ax[0][col_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
+
+        sfig.supylabel('prob. density', fontsize=10)
+        sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
+        colors = [self.colors[t] for t in ['initial', 'new']]
+        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+
+        return sfig

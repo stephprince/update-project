@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import seaborn.objects as so
 
 from pathlib import Path
 from scipy.stats import sem
@@ -533,26 +532,26 @@ class BehaviorVisualizer(BaseVisualizationClass):
         summary.columns = summary.columns.droplevel()
         summary.reset_index(inplace=True)
 
-        fig = plt.figure(figsize=(10, 5))
-        (
-            so.Plot(durations, x='event', y='duration')
-                .facet(col='update_type')
-                .add(so.Dots(marker="o", pointsize=10, fillalpha=1), so.Agg())
-                .add(so.Range(), so.Est(errorbar="sd"))
-                .share(y=True)
-                .theme(self.rcparams)
-                .on(fig)
-                .plot()
-        )
+        fig = plt.figure(figsize=(10, 5))  # TODO - adapt so doesn't use seaborn objects
+        # (
+        #     so.Plot(durations, x='event', y='duration')
+        #         .facet(col='update_type')
+        #         .add(so.Dots(marker="o", pointsize=10, fillalpha=1), so.Agg())
+        #         .add(so.Range(), so.Est(errorbar="sd"))
+        #         .share(y=True)
+        #         .theme(self.rcparams)
+        #         .on(fig)
+        #         .plot()
+        # )
 
-        # add text of medians + sd of
-        new_line = '\n'
-        plus_minus = '\u00B1'
-        for ax in fig.axes:
-            data = summary.query(f'update_type == "{ax.get_title()}"')
-            text = [f'{r["event"]}: {r["median"]:.2f} {plus_minus} {r["std"]:.2f} {new_line}' for _, r in
-                    data.iterrows()]
-            ax.text(0.05, 0.75, ''.join(text), transform=ax.transAxes)
+        # # add text of medians + sd of
+        # new_line = '\n'
+        # plus_minus = '\u00B1'
+        # for ax in fig.axes:
+        #     data = summary.query(f'update_type == "{ax.get_title()}"')
+        #     text = [f'{r["event"]}: {r["median"]:.2f} {plus_minus} {r["std"]:.2f} {new_line}' for _, r in
+        #             data.iterrows()]
+        #     ax.text(0.05, 0.75, ''.join(text), transform=ax.transAxes)
 
         fig.suptitle('Task event durations')
         self.results_io.save_fig(fig=fig, filename=f'event_durations', results_type=self.results_type)

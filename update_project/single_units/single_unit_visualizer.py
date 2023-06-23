@@ -2,7 +2,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
-import seaborn.objects as so
 import seaborn as sns
 
 from pathlib import Path
@@ -237,17 +236,17 @@ class SingleUnitVisualizer(BaseVisualizationClass):
             selectivity_dict = dict(cell_selectivity_type=dict(ind=0, group='cell_type',),
                                     goal_selectivity_type=dict(ind=1, group='goal_selectivity_type',))
             for s_key, s_value in selectivity_dict.items():
-                # plot distribution data
-                (
-                    so.Plot(g_data, x=metric, color=s_value['group'])
-                        # .facet(row='update_selectivity_type')
-                        .add(so.Area(), so.Hist(stat='proportion', binwidth=0.1, common_norm=False))
-                        .theme(rcparams)
-                        .scale(color=[self.colors[c] for c in g_data[s_value['group']].unique()])
-                        .on(sfigs[0][s_value['ind']])
-                        .label(y='proportion', title=s_key)
-                        .plot()
-                )
+                # plot distribution data  # TODO - adapt to not use seaborn objects so
+                # (
+                #     so.Plot(g_data, x=metric, color=s_value['group'])
+                #         # .facet(row='update_selectivity_type')
+                #         .add(so.Area(), so.Hist(stat='proportion', binwidth=0.1, common_norm=False))
+                #         .theme(rcparams)
+                #         .scale(color=[self.colors[c] for c in g_data[s_value['group']].unique()])
+                #         .on(sfigs[0][s_value['ind']])
+                #         .label(y='proportion', title=s_key)
+                #         .plot()
+                # )
                 medians = g_data.groupby(s_value['group'])[metric].median().to_dict()
                 for m_key, m_value in medians.items():
                     sfigs[0][s_value['ind']].axes[0].axvline(m_value, color=self.colors[m_key], linestyle='dashed')
@@ -258,17 +257,17 @@ class SingleUnitVisualizer(BaseVisualizationClass):
                                    .value_counts(normalize=True)
                                    .reset_index()
                                    .rename(columns={0: 'proportion'}))
-                (
-                    so.Plot(proportion_data, x='update_selectivity_type', y='proportion', color=s_value['group'])
-                        .add(so.Dot(alpha=0.5), so.Dodge(), so.Jitter(0.5))
-                        .add(so.Dash(), so.Agg(), so.Dodge())
-                        .add(so.Range(), so.Est(errorbar='sd'), so.Dodge())
-                        .theme(rcparams)
-                        .scale(color=[self.colors[c] for c in proportion_data[s_value['group']].unique()])
-                        .on(sfigs[1][s_value['ind']])
-                        .label(title=s_key)
-                        .plot()
-                )
+                # ( # TODO - adapt to not use seaborn objects so
+                #     so.Plot(proportion_data, x='update_selectivity_type', y='proportion', color=s_value['group'])
+                #         .add(so.Dot(alpha=0.5), so.Dodge(), so.Jitter(0.5))
+                #         .add(so.Dash(), so.Agg(), so.Dodge())
+                #         .add(so.Range(), so.Est(errorbar='sd'), so.Dodge())
+                #         .theme(rcparams)
+                #         .scale(color=[self.colors[c] for c in proportion_data[s_value['group']].unique()])
+                #         .on(sfigs[1][s_value['ind']])
+                #         .label(title=s_key)
+                #         .plot()
+                # )
 
                 info = g_data.groupby(['update_selectivity_type'])[s_value['group']].value_counts(normalize=True).to_dict()
                 text = ''.join([f'{k}: {v:.2f}, {new_line}' for k, v in info.items()])

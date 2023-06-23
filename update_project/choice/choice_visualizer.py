@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import seaborn.objects as so
 import more_itertools as mit
 
 from matplotlib.lines import Line2D
@@ -202,16 +201,16 @@ class ChoiceVisualizer(BaseVisualizationClass):
                 axes_s[mi].set(title=f'Group {m} average', xlabel='fracton of track', ylabel=m)
 
         sess_performance = predict_df_by_time.groupby(['quadrant', 'session_id'])['log_likelihood'].mean().reset_index()
-        (  # plot averages for log likelihood and overall position by trial
-            so.Plot(sess_performance, x='quadrant', y='log_likelihood')
-                .add(so.Line(marker="o"), so.Agg())
-                .add(so.Range(), so.Est(errorbar="sd"))
-                .theme(rcparams)
-                .layout(engine='constrained')
-                .label(title='Session averages of estimated choice')
-                .on(sfigs[2])
-                .plot()
-        )
+        # (  # plot averages for log likelihood and overall position by trial  # TODO - adapt for seaborn without object
+        #     so.Plot(sess_performance, x='quadrant', y='log_likelihood')
+        #         .add(so.Line(marker="o"), so.Agg())
+        #         .add(so.Range(), so.Est(errorbar="sd"))
+        #         .theme(rcparams)
+        #         .layout(engine='constrained')
+        #         .label(title='Session averages of estimated choice')
+        #         .on(sfigs[2])
+        #         .plot()
+        # )
         sfigs[2].axes[0].axhline(-1, linestyle='dashed', color='k')
         sfigs[2].axes[0].axhline(0, linestyle='dashed', color='k')
         self.results_io.save_fig(fig=fig, axes=axes, filename=f'prediction_group', tight_layout=False)
