@@ -1,7 +1,7 @@
 ## notes on electrophysiology recordings and noise
 
-If using this dataset, you should be aware of some noise issues I observered/encountered during these recordings.
-In all cases, this noise was attempted to be controlled during the recording, but there are some cases where it may still be observed in the collected data.
+If using this dataset, you should be aware of some noise issues I observed/encountered during these recordings.
+In all cases, this noise was attempted to be controlled during the recording, but there are some cases where it may still be present in the collected data.
 
 ### sharp movement noise
 Sometimes I observed larger sharp deflections in the raw signal that look like spikes in the high pass filter view.

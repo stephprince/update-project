@@ -30,7 +30,7 @@ class ExampleTrialAggregator:
                                                                 ret_df=True)
         decoding['region'] = decoding['region'].apply(lambda x: x[0])  # pull region from list
         decoding_goal = self.decoder_agg.quantify_aligned_data(self.decoder_agg.group_aligned_df, decoding, ret_df=True)
-        decoding_goal.drop('rotational_velocity', axis='columns', inplace=True)
+        decoding_goal.drop(['rotational_velocity', 'translational_velocity'], axis='columns', inplace=True)
 
         cols_merge_on = ['session_id', 'animal', 'feature_name', 'region', 'trial_id']
         decoding.drop(labels=decoding.columns.difference(['feature', 'decoding', 'probability', 'error', 'bins',
