@@ -66,7 +66,7 @@ def get_trials_with_pseudoupdate(nwbfile):
 
     # fill in trial data
     assert np.sum(trials[mask]['t_update'].isna()) == len(t_update)  # check that filling in right number of na values
-    trials['t_update'].iloc[trial_inds] = t_update
-    trials['t_delay2'].iloc[trial_inds] = t_delay2
+    trials.loc[mask, 't_update'] = t_update
+    trials.loc[mask, 't_delay2'] = t_delay2
 
     return trials
