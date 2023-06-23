@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "update-project"
+version = "0.1.0"
+description = "research code for update task project"
+authors = ["Steph Prince <stephanie.m.prince1@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "update_project"}]
+classifiers = ["Development Status :: 3 - Alpha", "Intended Audience :: Science/Research", "License :: OSI Approved :: MIT License", "Operating System :: OS Independent", "Programming Language :: Python", "Topic :: Scientific/Engineering"]
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.11"
+git-python = "^1.0.3"
+h5py = "^3.6.0"
+imageio = "^2.16.2"
+matplotlib = "^3.6.2"
+more-itertools = '^8.14.0'
+numpy = "^1.21.5"
+nwbwidgets = "^0.8.0"
+opencv-python = "^4.5.5"
+pandas = "^1.4.1"
+pingouin = "^0.5.2"
+pynwb = "^2.0.1"
+pynapple = "^0.2.3"
+scikit-learn = "^1.0.2"
+scipy = "^1.7.3"
+seaborn = "^0.11"
+statannotations = "^0.5.0"
+tensorflow = "^2.9.1"
+# tensorflow-io-gcs-filesystem = '0.31.0' - use for poetry install issues
+track-linearization = "^2.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.8"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+'Homepage' = 'https://github.com/stephprince/update-project'
+'Bug Tracker' = 'https://github.com/stephprince/update-project/issues'
