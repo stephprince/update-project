@@ -5,7 +5,6 @@ import pingouin as pg
 import warnings
 
 from ast import literal_eval
-from statsmodels.regression.mixed_linear_model import MixedLM
 from pathlib import Path
 from scipy.stats import sem, ranksums, kstest, spearmanr
 from tqdm import tqdm
@@ -22,7 +21,7 @@ package_names = ['lme4', 'lmerTest', 'emmeans', 'report']
 packages_to_install = [x for x in package_names if not isinstalled(x)]
 utils.install_packages(ro.StrVector(packages_to_install))
 lme4 = importr('lme4')
-lme4= importr('lmerTest')  # TODO - determine if I need this or not
+lme4 = importr('lmerTest')  # TODO - determine if I need this or not
 emmeans = importr('emmeans')
 report = importr('report')
 
