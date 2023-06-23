@@ -22,3 +22,9 @@ seemed to maybe be too fixed? Either way, there were severe difficulties in cutt
 This brain was drop-fixed with 4% PFA for 48-72 hours, but when examined it seemed that the fixing process had not fully occurred. Not sure if it was the PFA or what. The brain
 was re-fixed for 48 hours with new PFA, but this seemed to maybe be too fixed? Either way, there were severe difficulties in cutting the tissue and the data was lost for the 
 PFC coordinates for this brain.
+
+# S33
+No issues reported.
+
+# S34
+No issues reported.
