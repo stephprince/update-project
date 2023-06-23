@@ -751,7 +751,7 @@ class BayesianDecoderAggregator:
                 turns = trials_to_agg['turn_type'][~mid_times.isna()].values
                 outcomes = trials_to_agg['correct'][~mid_times.isna()].values
                 trials = trials_to_agg.index[~mid_times.isna()].values
-                mid_times.dropna(inplace=True)
+                mid_times = mid_times.dropna()
 
                 phase_col = np.argwhere(decoder.theta.columns == 'phase')[0][0]
                 amp_col = np.argwhere(decoder.theta.columns == 'amplitude')[0][0]
