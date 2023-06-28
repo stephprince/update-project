@@ -33,9 +33,9 @@ class UpdateTaskFigureGenerator:
                                           Examples=ExampleTrialVisualizer)
 
     def plot_main_figures(self):
-        self.plot_figure_1()              # figure 1 - experimental paradigm + behavior supplement
+        # self.plot_figure_1()              # figure 1 - experimental paradigm + behavior supplement
         self.plot_figure_2()              # figure 2 - HPC/PFC position coding + decoding validation + animal breakdown
-        self.plot_figure_3()              # figure 3 - HPC theta modulation
+        # self.plot_figure_3()              # figure 3 - HPC theta modulation
         self.plot_figure_4()              # figure 4 - PFC/HPC choice coding + decoding validation + animal breakdown
         self.plot_figure_5_and_6_and_7()  # figure 5 - HPC + PFC stay + accuracy prediction + choice commitment + supp
 
@@ -126,21 +126,23 @@ class UpdateTaskFigureGenerator:
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
         sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1.5, 1, 1, 1])
         sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
-        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=3, width_ratios=[1, 2, 2])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
-        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=3, width_ratios=[1.5, 1, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=4, width_ratios=[1, 2, 2, 2])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=3, width_ratios=[1, 4, 2])
+        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=4, width_ratios=[1, 2, 2, 2])
 
         sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Recording setup + position schematic')
         sfigs_row0[1] = example_visualizer.plot_decoding_trial(sfigs_row0[1], region='CA1', trial_id=231) #154, 207, 231, 168
         sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Position schematic')
         sfigs_row1[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], update_type='switch')
         sfigs_row1[2] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[2], update_type='non_update')
+        sfigs_row1[3] = self.plot_placeholder(sfigs_row1[3], text='')
         sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Trial schematic')
-        sfigs_row2[1] = hpc_visualizer.plot_goal_coding(sfigs_row2[1], ylim=(0.0, 0.18825), tags='CA1_position_fig2')
-        sfigs_row3[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags='CA1_position_fig_2')
-        sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.0, 0.18825),
+        sfigs_row2[1] = hpc_visualizer.plot_goal_coding(sfigs_row2[1], ylim=(0.0325, 0.18), tags='CA1_position_fig2')
+        sfigs_row2[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[2], ylim=(0.05, 0.1625), tags='CA1_position_fig_2')
+        sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='PFC schematic')
+        sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.0325, 0.18), update_type=['switch'],
                                                         tags='PFC_position')  # pulled upper lim from HPC plot
-        sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], tags='PFC_position')
+        sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], ylim=(0.05, 0.1625), tags='PFC_position')
 
         # figure saving
         self.add_panel_labels(sfigs)
@@ -253,9 +255,9 @@ class UpdateTaskFigureGenerator:
         sfigs = fig.subfigures(nrows=5, ncols=1, width_ratios=[1], height_ratios=[1, 2, 1, 1, 1])
         sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2)
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
-        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=3, width_ratios=[1, 2, 2])
-        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
-        sfigs_row4 = sfigs[4].subfigures(nrows=1, ncols=3, width_ratios=[1.5, 1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=4, width_ratios=[1, 2, 2, 2])
+        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=3, width_ratios=[1, 4, 2])
+        sfigs_row4 = sfigs[4].subfigures(nrows=1, ncols=4, width_ratios=[1, 2, 2, 2])
 
         sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
         sfigs_row0[1] = choice_visualizer.plot_choice_commitment(sfigs_row0[1])  # TODO - check which trial types included
@@ -264,11 +266,14 @@ class UpdateTaskFigureGenerator:
         sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Choice schematic')
         sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], feat='choice')
         sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice', update_type='non_update')
+        sfigs_row2[3] = self.plot_placeholder(sfigs_row2[3], text='')
         sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='Trial schematic')
-        sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], with_velocity=True, tags='PFC_choice_fig_4',)
-        sfigs_row4[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row4[0], tags='PFC_choice_fig_4',)
-        sfigs_row4[1] = hpc_visualizer.plot_goal_coding(sfigs_row4[1], tags='CA1_choice',
-                                                        update_type=['switch', 'non_update'])
+        sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.06, 0.25), with_velocity=True, tags='PFC_choice_fig_4',)
+        sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], tags='PFC_choice_fig_4',)
+
+        sfigs_row4[0] = self.plot_placeholder(sfigs_row4[0], text='CA1 schematic')
+        sfigs_row4[1] = hpc_visualizer.plot_goal_coding(sfigs_row4[1], ylim=(0.06, 0.25), tags='CA1_choice',
+                                                        update_type=['switch'])
         sfigs_row4[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row4[2], tags='CA1_choice',
                                                               time_window=(0, 2))
         # figure saving
@@ -278,7 +283,7 @@ class UpdateTaskFigureGenerator:
         if with_supplement:
             ##### supp figure 7
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-            sfigs = fig.subfigures(nrows=2, ncols=1, height_ratios=[1, 1, 3])
+            sfigs = fig.subfigures(nrows=2, ncols=1, height_ratios=[1, 3])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
             sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
 
@@ -334,12 +339,11 @@ class UpdateTaskFigureGenerator:
         behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
 
         # figure structure
-        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-        sfigs = fig.subfigures(nrows=4, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1.25, 1.25])
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+        sfigs = fig.subfigures(nrows=4, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
         sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=4, width_ratios=[1, 1, 1, 1])
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
         sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
-        sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
 
         sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Task schematic with example stay trial')
         sfigs_row0[1] = behavior_visualizer.plot_performance(sfigs_row0[1], tags='perf_fig_5',
@@ -348,15 +352,11 @@ class UpdateTaskFigureGenerator:
                                                                           example_animal=29,
                                                                           example_session='S29_211118')
         sfigs_row0[3] = behavior_visualizer.plot_trajectories_by_event(sfigs_row0[3], update_type=['stay_update'])
-
-        sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0], update_type='stay')
-        sfigs_row2[0] = hpc_visualizer.plot_goal_coding(sfigs_row2[0], tags='HPC_position_fig_5', update_type=['stay'],)
-        sfigs_row3[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags='HPC_position_fig_5_stats',
+        sfigs_row1[0] = hpc_visualizer.plot_goal_coding(sfigs_row1[0], tags='HPC_position_fig_5', update_type=['stay'],)
+        sfigs_row1[1] = hpc_visualizer.plot_goal_coding_stats(sfigs_row1[1], tags='HPC_position_fig_5_stats',
                                                               update_type=['stay', 'switch', 'non_update'])
-
-        sfigs_row1[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], feat='choice', update_type='stay')
-        sfigs_row2[1] = pfc_visualizer.plot_goal_coding(sfigs_row2[1], tags='PFC_choice_fig_5', update_type=['stay'])
-        sfigs_row3[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[1], tags='PFC_choice_fig_5_stats',
+        sfigs_row2[0] = pfc_visualizer.plot_goal_coding(sfigs_row2[0], tags='PFC_choice_fig_5', update_type=['stay'])
+        sfigs_row2[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[1], tags='PFC_choice_fig_5_stats',
                                                               update_type=['stay', 'switch', 'non_update'])
 
         # figure saving
