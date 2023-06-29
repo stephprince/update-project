@@ -43,7 +43,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         for plot_types in list(itertools.product(*self.plot_groups.values())):
             plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
             tags = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-            self.plot_example_decoding_trial(plot_group_dict, tags)
+            self.plot_example_decoding_trial(plot_group_dict, f'{self.data[0]["feature_name"]}_{tags}')
             # self.plot_example_trial(plot_group_dict, tags)
             # self.plot_update_trials(plot_group_dict, tags)
 
