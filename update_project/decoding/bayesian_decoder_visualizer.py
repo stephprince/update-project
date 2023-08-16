@@ -21,14 +21,14 @@ from update_project.base_visualization_class import BaseVisualizationClass
 
 
 class BayesianDecoderVisualizer(BaseVisualizationClass):
-    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None):
+    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None, window=2.5):
         super().__init__(data)
         self.exclusion_criteria = exclusion_criteria or dict(units=20, trials=50)
         self.params = params
         self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
                                                          num_trials=[self.exclusion_criteria['trials']])
         self.aggregator = BayesianDecoderAggregator(exclusion_criteria=self.exclusion_criteria)
-        self.aggregator.run_df_aggregation(data, overwrite=True, window=2.5)
+        self.aggregator.run_df_aggregation(data, overwrite=True, window=window)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 
     def plot(self, group_by=None):
@@ -162,8 +162,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         elif with_velocity:
             nrows = nrows + 1
             height_ratios = [2, 1]
-            test_fig = plt.figure()
-            test_ax = test_fig.subplots(nrows=2, ncols=2)
         ax = sfig.subplots(nrows=nrows, ncols=len(update_type), sharex=True, sharey='row', squeeze=False,
                            height_ratios=height_ratios)
         for comp, data in trial_data.groupby(comparison):
@@ -195,19 +193,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         ax[row_id][col_id].set(ylim=ylim)
 
                     if with_velocity:
-                        switch_data = trial_data.query(f"{comparison} == 'switch' & {sub_groups} == '{s_name}'")
-                        switch_veloc_data = switch_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
-                                                              columns='times',
-                                                              values='rotational_velocity')
-                        switch_veloc_mat = switch_veloc_data.query('choice == "switch"').to_numpy()
-                        switch_veloc_flip_inds = []
-                        for v in switch_veloc_mat:
-                            post_update = int(len(time_bins) / 2)
-                            if np.where(v[post_update:] < 0)[0].any():
-                                switch_veloc_flip_inds.append(np.where(v[post_update:] < 0)[0][0] + post_update)
-                            else:
-                                switch_veloc_flip_inds.append(np.nan)
-
                         veloc_data = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
                                                   columns='times',
                                                   values='rotational_velocity')
@@ -222,6 +207,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         diff_initial_switch = np.nanmean(initial_mat, axis=0) - np.nanmean(new_mat, axis=0)
                         diff_veloc = np.diff(np.diff(np.nanmean(veloc_mat, axis=0), prepend=np.nan), prepend=np.nan)
                         if np.where(diff_initial_switch < 0)[0].any():
+                            post_update = int(len(time_bins) / 2)
                             neural_flip_moment = np.where(diff_initial_switch < 0)[0][0] - 1
                             veloc_flip_moment = np.where(diff_veloc[post_update:] < 0)[0][0] + post_update - 1
                             x_neural = time_bins[neural_flip_moment] + np.diff(time_bins)[0] / 2
@@ -234,76 +220,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                             ax[row_id + 1][col_id].annotate("",  arrowprops=dict(arrowstyle='simple', facecolor='black'),
                                                             xy=(x_veloc, y_veloc), xytext=(x_veloc, y_veloc*2),
                                                             xycoords='data', textcoords='data')
-
-                        # on a trial-by-trial basis look at initial - new event triggered average
-                        diff_indiv_trials = initial_mat - new_mat
-                        pad_width = [(0, 0), (0, np.shape(veloc_mat)[1])]
-                        diff_pad = np.pad(diff_indiv_trials, pad_width=pad_width, constant_values=np.nan)
-                        initial_pad = np.pad(initial_mat, pad_width=pad_width, constant_values=np.nan)
-                        new_pad = np.pad(new_mat, pad_width=pad_width, constant_values=np.nan)
-
-                        veloc_flip_inds = []
-                        for v in veloc_mat:
-                            if np.where(v[post_update:] < 0)[0].any():
-                                veloc_flip_inds.append(np.where(v[post_update:] < 0)[0][0] + post_update)
-                            else:
-                                veloc_flip_inds.append(np.nan)
-                        sample_ind = np.arange(26 + 13) - 13  # adjust so plotting before and after
-
-                        # use the switch veloc inds to get the non_update data for plotting
-                        if comp == 'switch':
-                            ind = np.array(veloc_flip_inds)[:, None] + sample_ind[None, :]
-                        elif comp == 'non_update':
-                            mean_flip_ind = np.round(np.nanmean(switch_veloc_flip_inds))
-                            flip_inds = [mean_flip_ind] * len(veloc_flip_inds)  # use the average switch one instead
-                            ind = np.array(flip_inds)[:, None] + sample_ind[None, :]
-                        d_chunks = np.array([n[i.astype(int)] for i, n in zip(ind, diff_pad) if not np.isnan(i).any()])
-                        i_chunks = np.array([n[i.astype(int)] for i, n in zip(ind, initial_pad) if not np.isnan(i).any()])
-                        n_chunks = np.array([n[i.astype(int)] for i, n in zip(ind, new_pad) if not np.isnan(i).any()])
-
-                        # # get correlations of data
-                        # corrs = []
-                        # for d, v in zip(diff_indiv_trials, veloc_mat):
-                        #     d = d - np.nanmean(d)  # mean subtract so average is around 0
-                        #     v = v - np.nanmean(v)  # mean subtract so average is around 0
-                        #     d = d / np.linalg.norm(d)  # normalize so output values interpretable
-                        #     v = v / np.linalg.norm(v)  # normalize so output values interpretable
-                        #
-                        #     corrs.append(signal.correlate(d, v, mode='full'))
-                        #     corr_lags = signal.correlation_lags(len(d), len(v), mode='full') * np.diff(time_bins)[0]
-                        #
-                        # corr_fig = plt.figure()
-                        # corr_ax = corr_fig.subplots()
-                        # corr_ax.plot(corr_lags, np.nanmean(corrs, axis=0))
-                        # corr_ax.axvline(0, linestyle='dashed', color='black')
-                        # corr_ax.set(title=comp)
-
-                        r = 0 if comp == 'switch' else 1
-                        for i, chunks in enumerate([d_chunks, i_chunks, n_chunks]):
-                            name = ['difference', 'initial', 'new'][i]
-                            ylim = [(-0.1, 0.1), (0.06, 0.18), (0.06, 0.18)][i]
-                            c = 0 if name == 'difference' else 1
-                            color = [self.colors['control'], self.colors['initial'], self.colors['new']][i]
-                            times_to_plot = np.concatenate([time_bins,
-                                                            time_bins + time_bins.max() - time_bins.min()])[:np.shape(chunks)[1]]
-                            test_ax[r][c].plot(times_to_plot, np.nanmean(chunks, axis=0), color=color, label=name)
-                            test_ax[r][c].fill_between(times_to_plot, np.nanmean(chunks, axis=0) + self.nan_sem(chunks),
-                                                            np.nanmean(chunks, axis=0) - self.nan_sem(chunks),
-                                                            color=color, alpha=0.2)
-                            test_ax[r][c].axvline(0, color='k', linestyle='dashed', alpha=0.5)
-                            test_ax[r][c].set(title=f'{comp} {s_name} {name}', ylim=ylim, xlabel='time around motor response (s)')
-                            test_ax[r][c].legend()
-
-                        # for t in range(int(np.floor(np.shape(diff_indiv_trials)[0] / 25))):
-                        #     t_add = t * 25
-                        #     test_fig2 = plt.figure()
-                        #     test_ax2 = test_fig2.subplots(nrows=5, ncols=5, sharex=True, sharey=True)
-                        #     for i, a in enumerate(test_ax2.flatten()):
-                        #         a.plot(time_bins, initial_mat[i + t_add, :], color='b')
-                        #         a.plot(time_bins, new_mat[i + t_add, :], color='m')
-                        #         a.plot(time_bins, diff_indiv_trials[i + t_add, :], color='purple')
-                        #         a.plot(time_bins, veloc_mat[i + t_add, :]/np.nanmax(veloc_mat), color='k', linestyle='dashed')
-                        #         a.set(ylim=(-1, 1), title=comp)
             else:
                 time_bins = data['times'].unique()
                 color_map = {'switch': 'new', 'initial_stay': 'initial'}
@@ -341,6 +257,97 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         colors = [self.colors[t] for t in ['initial', 'new']]
         rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+
+        return sfig
+
+    def plot_motor_timing(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', tags=None,
+                          update_type=['switch', 'non_update'], use_residuals=False):
+        # load up data
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        plot_groups.update(update_type=update_type)
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value)
+        sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
+        trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data, by_session=True)
+            prob_value = 'resid'
+
+        # plot figure
+        ax = sfig.subplots(nrows=2, ncols=1, squeeze=False)
+        for comp, data in trial_data.groupby(comparison):
+            for s_name, s_data in data.groupby(sub_groups):
+                # get veloc data
+                trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                         values=prob_value)
+                new_mat = trial_mat.query('choice == "switch"').to_numpy()
+                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                time_bins = trial_mat.columns.to_numpy()
+                veloc_data = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
+                          columns='times',
+                          values='rotational_velocity')
+                veloc_mat = veloc_data.query('choice == "switch"').to_numpy()  # velocity data same for both
+
+                # get switch data to use for calculations if non_update trial
+                switch_data = trial_data.query(f"{comparison} == 'switch' & {sub_groups} == '{s_name}'")
+                switch_veloc_data = switch_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
+                                                      columns='times',
+                                                      values='rotational_velocity')
+                switch_veloc_mat = switch_veloc_data.query('choice == "switch"').to_numpy()
+                switch_veloc_flip_inds = []
+                for v in switch_veloc_mat:
+                    post_update = int(len(time_bins) / 2)
+                    if np.where(v[post_update:] < 0)[0].any():
+                        switch_veloc_flip_inds.append(np.where(v[post_update:] < 0)[0][0] + post_update)
+                    else:
+                        switch_veloc_flip_inds.append(np.nan)
+
+                # on a trial-by-trial basis look at initial - new event triggered average
+                diff_indiv_trials = initial_mat - new_mat
+                pad_width = [(0, 0), (0, np.shape(veloc_mat)[1])]
+                diff_pad = np.pad(diff_indiv_trials, pad_width=pad_width, constant_values=np.nan)
+                initial_pad = np.pad(initial_mat, pad_width=pad_width, constant_values=np.nan)
+                new_pad = np.pad(new_mat, pad_width=pad_width, constant_values=np.nan)
+
+                veloc_flip_inds = []
+                for v in veloc_mat:
+                    veloc_diff = np.diff(v, prepend=v[0])[post_update:]
+                    if np.where(veloc_diff < 0)[0].any():
+                        veloc_flip_inds.append(np.where(veloc_diff < 0)[0][0] + post_update)
+                    else:
+                        veloc_flip_inds.append(np.nan)
+                sample_ind = np.arange(26 + 13) - 13  # adjust so plotting before and after
+
+                # use the switch veloc inds to get the non_update data for plotting
+                if comp == 'switch':
+                    ind = np.array(veloc_flip_inds)[:, None] + sample_ind[None, :]
+                elif comp == 'non_update':
+                    mean_flip_ind = np.round(np.nanmean(switch_veloc_flip_inds))
+                    flip_inds = [mean_flip_ind] * len(veloc_flip_inds)  # use the average switch one instead
+                    ind = np.array(flip_inds)[:, None] + sample_ind[None, :]
+                d_chunks = np.array([n[i.astype(int)] for i, n in zip(ind, diff_pad) if not np.isnan(i).any()])
+                i_chunks = np.array([n[i.astype(int)] for i, n in zip(ind, initial_pad) if not np.isnan(i).any()])
+                n_chunks = np.array([n[i.astype(int)] for i, n in zip(ind, new_pad) if not np.isnan(i).any()])
+
+                # plot the event-triggered average for all data
+                if comp == 'switch':
+                    for i, chunks in enumerate([d_chunks, i_chunks, n_chunks]):
+                        name = ['difference', 'initial', 'new'][i]
+                        ylabel = ['initial - new prob. density', 'prob. density', 'prob. density'][i]
+                        # ylim = [(-0.1, 0.1), (0.06, 0.18), (0.06, 0.18)][i]
+                        c = 0
+                        r = 0 if name == 'difference' else 1
+                        color = [self.colors['control'], self.colors['initial'], self.colors['new']][i]
+                        times_to_plot = np.concatenate([time_bins,
+                                                        time_bins + time_bins.max() - time_bins.min()])[:np.shape(chunks)[1]]
+                        ax[r][c].plot(times_to_plot, np.nanmean(chunks, axis=0), color=color, label=name)
+                        ax[r][c].fill_between(times_to_plot, np.nanmean(chunks, axis=0) + self.nan_sem(chunks),
+                                                        np.nanmean(chunks, axis=0) - self.nan_sem(chunks),
+                                                        color=color, alpha=0.2)
+                        ax[r][c].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                        ax[r][c].set(title=f'{comp} - motor response triggered average', ylabel=ylabel, # ylim=ylim,
+                                     xlabel='time around motor response (s)')
+                        ax[r][c].legend()
 
         return sfig
 
@@ -1986,24 +1993,15 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
                 ax[row_id][col_id].set(xlabel=f'update type', ylabel=f'prediction accuracy', ylim=(0.475, 0.625))
 
-                # sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
-                #              palette=[self.colors['control']] * 3, ax=ax[row_id][col_id], legend=False,
-                #              binrange=(0.475, 0.625),
-                #              binwidth=0.005, element='bars', linewidth=0.5, fill=True, stat='proportion', alpha=0.025)
-                # sns.histplot(data.query('target == "shuffled"'), x='score', hue='update_type',
-                #              hue_order=['non_update', 'switch', 'stay', ],
-                #              palette=self.colors['trials'], ax=ax[row_id][col_id], binrange=(0.475, 0.625),
-                #              binwidth=0.005, element='step', linewidth=1.5, fill=False, stat='proportion')
-                # p_values = []
-                # accuracy_scores = []
-                # for u in ['switch']:
-                #     actual_score = data.query(f'update_type == "{u}" & target == "actual"')['score'].to_numpy()
-                #     ax[row_id][col_id].axvline(actual_score, color=self.colors[u], linewidth=2)
-                #     shuffled_scores = data.query(f'update_type == "{u}" & target == "shuffled"')['score'].to_numpy()
-                #     p_values.append(sum(shuffled_scores >= actual_score) / len(shuffled_scores))
-                #     accuracy_scores.append(np.round(actual_score, 4))
-                # rainbow_text(0.05, 0.85, p_values, colors, ax=ax[row_id][col_id], size=8)
-                # rainbow_text(0.05, 0.85, accuracy_scores, colors, ax=ax[row_id][col_id], size=8)
+                p_values = []
+                accuracy_scores = []
+                for u in ['switch']:
+                    actual_score = data.query(f'update_type == "{u}" & target == "actual"')['score'].to_numpy()
+                    shuffled_scores = data.query(f'update_type == "{u}" & target == "shuffled"')['score'].to_numpy()
+                    p_values.append(sum(shuffled_scores >= actual_score) / len(shuffled_scores))
+                    accuracy_scores.append(np.round(actual_score, 4))
+                rainbow_text(0.05, 0.85, p_values, colors, ax=ax[row_id][col_id], size=8)
+                rainbow_text(0.05, 0.85, accuracy_scores, colors, ax=ax[row_id][col_id], size=8)
 
                 ax[row_id][col_id].set(title=f'{comp[1]} trials - {comp[0]} cue - {pred} - {groupers[2]}: {comp[2]}')
                 # ax[row_id][col_id].set(xlim=(0.475, 0.625), ylim=(0, 0.36))
@@ -2100,9 +2098,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         # plot phase modulation comparisons between goal arm locations
         colors = [self.colors[t] for t in arm_cats]
-        col_multiplier = 2 if type == 'pre_vs_post' else 1
-        col_multiplier = col_multiplier * 2 if divider == 'quarter' else col_multiplier
-        ax = sfig.subplots(nrows=1, ncols=len(update_type) * col_multiplier, sharey='row', squeeze=False)
+        col_dict = dict(modulation=1, pre_vs_post=2, phase_modulation=3, )
+        # col_multiplier = col_multiplier * 2 if divider == 'quarter' else col_multiplier
+        ax = sfig.subplots(nrows=1, ncols=len(update_type) * col_dict[type], sharey='row', squeeze=False)
         row_id = 0
         if type == 'modulation':
             for comp, data in post_modulation.groupby(comparison):
@@ -2166,6 +2164,35 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                  .annotate(line_offset=0.1, line_offset_to_group=0.025))
             rainbow_text(0.01, 0.9, arm_cats, colors, ax=ax[row_id][0], size=8)
             ax[row_id][0].set(ylim=(0.1, 0.18))
+        elif type == 'phase_modulation':
+            # pairs = [((c, p[0]), (c, p[1])) for p in phase_combos for c in ['initial', 'new']]
+            combos = list(itertools.combinations(cats, r=2))
+            pairs = [((c[0],), (c[1],)) for c in combos]
+            for comp, data in post_modulation.groupby('choice'):
+                col_id = np.argwhere(np.array(['initial', 'new', 'central']) == comp)[0][0]
+                common_kwargs = dict(data=data, x='phase_mid', y='prob_value', ax=ax[row_id][col_id],
+                                     errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+                ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=[self.colors[comp]] * len(cats), scale=1.5)
+                ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=['w'] * len(cats), scale=0.75,
+                                                   errorbar=None)
+                ax[row_id][col_id].set(title=comp)
+
+                # get stats
+                stats.run(data, dependent_vars=['prob_value'], group_vars=['phase_mid', ],
+                          pairs=pairs, filename=f'theta_mod_by_phase_{comparison}_{tags}_{comp}')
+                stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                                  f'& variable == "prob_value"')
+                stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+                pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+
+                # annotate the plot
+                annot = Annotator(ax[row_id][col_id], pairs=combos, data=data, x='phase_mid', y='prob_value',)
+                annot.new_plot(ax[row_id][col_id], pairs=combos, data=data, x='phase_mid', y='prob_value')
+                (annot
+                 .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+                 .set_pvalues(pvalues=pvalues)
+                 .annotate(line_offset=0.1, line_offset_to_group=0.025))
+            rainbow_text(0.01, 0.9, arm_cats, colors, ax=ax[row_id][0], size=8)
 
         # run stats for comparisons between trial types
         modulation = (theta_data
@@ -2239,55 +2266,22 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                      additional_tags=tags)
 
     def plot_residual_r_squared(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum',
-                         ylim=None, update_type=['switch', 'non_update'], correct_type=[1, 0]):
+                         xlim=None, update_type=['switch', 'non_update'], correct_type=[1, 0]):
         # load up data
+        xlim = xlim or (0, 0.3)
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         plot_groups.update(update_type=update_type)
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value=prob_value)
         trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
-        trial_types = update_type if comparison == 'update_type' else correct_type
         resid_data = self.aggregator.get_residuals(trial_data, by_session=True)
 
         # plot figure
         ax = sfig.subplots(nrows=1, ncols=1, sharex=True, sharey='row')
         hist_data = resid_data.groupby('session_id').mean('r_squared')
-        ax = sns.histplot(hist_data, x='r_squared', ax=ax)
+        ax = sns.histplot(hist_data, x='r_squared', ax=ax, binwidth=0.01)
         ax.set(title=f"{resid_data['region'].unique()[0][0]} - model goodness of fit", xlabel='pseudo r-squared',
-               ylabel='# sessions')
-
-        for comp, data in resid_data.groupby(comparison):
-            col_id = np.argwhere(np.array(list(trial_types)) == comp)[0][0]
-            for s_name, s_data in data.groupby(sub_groups):
-                row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0]
-                trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
-                                         values='resid')
-                new_mat = trial_mat.query('choice == "switch"').to_numpy()
-                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
-                time_bins = trial_mat.columns.to_numpy()
-
-                ax[row_id][col_id].plot(time_bins, np.nanmean(initial_mat, axis=0), color=self.colors['initial'])
-                ax[row_id][col_id].plot(time_bins, np.nanmean(new_mat, axis=0), color=self.colors['new'])
-                ax[row_id][col_id].fill_between(time_bins,
-                                                np.nanmean(new_mat, axis=0) + sem(new_mat, nan_policy='omit'),
-                                                np.nanmean(new_mat, axis=0) - sem(new_mat, nan_policy='omit'),
-                                                color=self.colors['new'], alpha=0.2)
-                ax[row_id][col_id].fill_between(time_bins, np.nanmean(initial_mat, axis=0) + sem(initial_mat,
-                                                                                                 nan_policy='omit'),
-                                                np.nanmean(initial_mat, axis=0) - sem(initial_mat,
-                                                                                      nan_policy='omit'),
-                                                color=self.colors['initial'],
-                                                alpha=0.2)
-                ax[row_id][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
-                if ylim:
-                    ax[row_id][col_id].set(ylim=ylim)
-
-            ax[0][col_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
-
-        sfig.supylabel('prob. density', fontsize=10)
-        sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
-        colors = [self.colors[t] for t in ['initial', 'new']]
-        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+               ylabel='# sessions', xlim=xlim)
 
         return sfig
