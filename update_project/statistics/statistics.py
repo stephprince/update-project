@@ -17,7 +17,7 @@ from update_project.general.results_io import ResultsIO
 
 utils = importr('utils')
 utils.chooseCRANmirror(ind=1)
-package_names = ['lme4', 'lmerTest', 'emmeans', 'report']
+package_names = ['lme4', 'lmerTest', 'emmeans', 'report', 'pbkrtest']
 packages_to_install = [x for x in package_names if not isinstalled(x)]
 utils.install_packages(ro.StrVector(packages_to_install))
 lme4 = importr('lme4')
@@ -123,12 +123,12 @@ class Stats:
                         pair_outputs.append(test_output)
             elif test == 'anova':
                 if approach == 'mixed_effects':
-                    anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model)))
+                    anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model, ddf="Kenward-Roger")))
                     test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
                                        test_statistic=anova_df['F value'].to_numpy()[0],
                                        test_statistic_name='F value',
                                        df=anova_df['DenDF'], p_val=anova_df["Pr(>F)"].to_numpy()[0],
-                                       alternative='type III anova with Satterthwaite method')
+                                       alternative='anova with Kenward-Rogers method')
                     pair_outputs.append(test_output)
                 else:
                     print('not currently supported')
