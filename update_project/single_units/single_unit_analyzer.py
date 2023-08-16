@@ -16,7 +16,7 @@ from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta, get_lfp
 from update_project.general.acquisition import get_velocity, get_licks
 from update_project.general.place_cells import get_place_fields, get_largest_field_loc
-from update_project.general.preprocessing import get_view_angle
+from update_project.general.preprocessing import get_view_angle, get_position
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.units import align_by_time_intervals as align_by_time_intervals_units
 from update_project.general.timeseries import align_by_time_intervals as align_by_time_intervals_ts
@@ -74,6 +74,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
         self.lfp = get_lfp(nwbfile)
         self.licks = get_licks(nwbfile)
         self.view_angle = get_view_angle(nwbfile)
+        self.position = get_position(nwbfile)
         self.commitment = get_commitment_quartiles(session_id=session_id)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.bounds = list(self.virtual_track.choice_boundaries.get(self.feature_name).values())
@@ -173,7 +174,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             new_starts.append(new_times.left.values)
             new_stops.append(new_times.right.values)
 
-        if np.size(new_starts):
+        if np.size([s[0] for s in new_starts]):
             start = np.hstack(new_starts)
             end = np.hstack(new_stops)
         else:
@@ -239,6 +240,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
 
         self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
         self.view_angle = nap.TsdFrame(self.view_angle, time_units='s')
+        self.position = nap.TsdFrame(self.position, time_units='s')
         self.theta = nap.TsdFrame(self.theta.iloc[::self.downsample_factor, :], time_units='s')
         self.velocity = nap.TsdFrame(self.velocity.iloc[::self.downsample_factor, :], time_units='s')
         self.lfp = nap.TsdFrame(self.lfp.iloc[::self.downsample_factor, :], time_units='s')
@@ -330,7 +332,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
             vars = dict(theta_phase=self.theta['phase'], theta_amplitude=self.theta['amplitude'],
                         rotational_velocity=self.velocity['rotational'], translational_velocity=self.velocity['translational'],
                         lfp_CA1=self.lfp['CA1'], lfp_PFC=self.lfp['PFC'], view_angle=self.view_angle['view_angle'],
-                        licks=self.licks['licks'],
+                        licks=self.licks['licks'], x_position=self.position['x_position'], y_position=self.position['y_position'],
                         )
             dig_data = dict()
             for v_name, v_data in vars.items():
@@ -557,7 +559,7 @@ class SingleUnitAnalyzer(BaseAnalysisClass):
                     cycle_skipping_data['acg_lags'] = [corr_corrected_theta_only.index.to_numpy()] * len(theta_cycling_index)
                     df_list.append(cycle_skipping_data)
 
-        if np.size(df_list):
+        if df_list:
             self.cycle_skipping = pd.concat(df_list, axis=0)
         else:
             self.cycle_skipping = pd.DataFrame()

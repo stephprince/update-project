@@ -31,3 +31,11 @@ def get_view_angle(nwbfile):
     view_angle = pd.DataFrame(dict(view_angle=pd.Series(index=time_series.timestamps[:], data=time_series.data[:])))
 
     return view_angle
+
+
+def get_position(nwbfile):
+    time_series = nwbfile.processing['behavior']['position'].get_spatial_series('position')
+    position = pd.DataFrame(dict(x_position=pd.Series(index=time_series.timestamps[:], data=time_series.data[:, 0]),
+                                 y_position=pd.Series(index=time_series.timestamps[:], data=time_series.data[:, 1])))
+
+    return position

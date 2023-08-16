@@ -14,7 +14,7 @@ from update_project.general.results_io import ResultsIO
 from update_project.example_trials.example_trial_aggregator import ExampleTrialAggregator
 from update_project.single_units.psth_visualizer import show_psth_raster
 from update_project.base_visualization_class import BaseVisualizationClass
-from update_project.general.plots import add_task_phase_lines
+from update_project.general.plots import add_task_phase_lines, colorline
 
 
 class ExampleTrialVisualizer(BaseVisualizationClass):
@@ -48,6 +48,19 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
             # self.plot_update_trials(plot_group_dict, tags)
 
     def plot_behavior_trial(self, fig, trial_id=155):  # other good trials 113, 155, 160, 165, 166, 173, 175, 176, 179
+        event_labels = dict(start_time='start', t_delay='delay', t_update='update', t_delay2='delay',
+                            t_choice_made='reward', stop_time='stop')
+        colors = dict(start_time='w', t_delay='k', t_update='c', t_delay2='k', t_choice_made='y')
+        all_trials = self.aggregator.select_group_aligned_data(filter_dict=dict(update_type=['non_update', 'switch', 'stay'],
+                                                                                turn_type=[1, 2], correct=[1]))
+        x_pos, y_pos = [], []
+        for _, d in all_trials.groupby('trial_id'):
+            event_times = (d[list(event_labels.keys())].iloc[0, :] - d['t_update'].iloc[0]).to_dict()
+            start_ind = np.searchsorted(d['behavior_timestamps'].to_numpy()[0], event_times['start_time'] + 3) # when start running
+            stop_ind = np.searchsorted(d['behavior_timestamps'].to_numpy()[0], event_times['t_choice_made'])
+            x_pos.append(d['x_position'].values[0][start_ind:stop_ind])
+            y_pos.append(d['y_position'].values[0][start_ind:stop_ind])
+
         plot_group_dict = {k: v[0] for k, v in self.plot_groups.items()}
         plot_group_dict['update_type'] = ['switch']
         data = self.aggregator.select_group_aligned_data(filter_dict=plot_group_dict)
@@ -57,7 +70,8 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         n_units = data.dropna(subset='place_field_peak_ind', axis='rows').groupby('region')['unit_id'].nunique()
         CA1_ratio = 10 * n_units['CA1'] / n_units['PFC']
 
-        ax = fig.subplots(7, 1, sharex='col', height_ratios=[3, 3, 1, 3, 3, CA1_ratio, 10])
+        # make plot
+        ax = fig.subplots(7, 2, sharex='col', height_ratios=[3, 3, 1, 3, 3, CA1_ratio, 10], width_ratios=[6, 1])
         times = data['new_times'].to_numpy()[0]  # for full sampled data
         bin_times = np.linspace(times[0], times[-1], 100 * self.align_window)  # for spiking rasters
         feat_raw = data['feature'].to_numpy()[0]
@@ -70,20 +84,35 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         # plot view angle
         view_angle = np.rad2deg(data['view_angle'].to_numpy()[0])
         view_angle_limits = (-np.max(np.abs(view_angle)), np.max(np.abs(view_angle)))
-        ax[0].plot(data['behavior_timestamps'].to_numpy()[0], np.rad2deg(data['view_angle'].to_numpy()[0]),
+        ax[0][0].plot(data['behavior_timestamps'].to_numpy()[0], np.rad2deg(data['view_angle'].to_numpy()[0]),
                    color='k', linewidth=1, label='view angle')
-        ax[0].set(ylabel='degrees', ylim=view_angle_limits)
+        ax[0][0].set(ylabel='degrees', ylim=view_angle_limits)
 
         # plot speed
         speed_threshold = 1000
         speed_total = abs(data['translational_velocity'].values[0]) + abs(data['rotational_velocity'].values[0])
-        ax[1].plot(times, speed_total, color='k', label='movement')
-        ax[1].set(ylabel='roll + pitch (au)')
-        ax[1].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
+        ax[1][0].plot(times, speed_total, color='k', label='movement')
+        ax[1][0].set(ylabel='roll + pitch (au)')
+        ax[1][0].fill_between(times, speed_threshold, speed_total, where=(speed_total > speed_threshold),
                            color='k', alpha=0.2)
         # plot licks
-        ax[2].plot(times, licks, color='k', linewidth=1, label='licks')
-        ax[2].set(ylabel='voltage')
+        ax[2][0].plot(times, licks, color='k', linewidth=1, label='licks')
+        ax[2][0].set(ylabel='voltage')
+
+        # plot 2D position tracing
+        event_times = (data[list(event_labels.keys())].iloc[0, :] - data['t_update'].iloc[0]).to_dict()
+        start_ind = np.searchsorted(data['behavior_timestamps'].to_numpy()[0], event_times['start_time'] + 3)
+        stop_ind = np.searchsorted(data['behavior_timestamps'].to_numpy()[0], event_times['t_choice_made'])
+        x_position = data['x_position'].values[0][start_ind:stop_ind]
+        y_position = data['y_position'].values[0][start_ind:stop_ind]
+        for x, y in zip(x_pos, y_pos):
+            ax[5][1].plot(x, y, alpha=0.1, linewidth=0.5, color='k')
+        ax[5][1] = colorline(x_position, y_position, cmap='rocket', ax=ax[5][1], linewidth=2)
+        ax[5][1].set(xlim=self.virtual_track.get_limits('x_position'),
+                     ylim=self.virtual_track.get_limits('y_position'))
+        im = ax[4][1].imshow([[0, 1]], cmap='rocket')
+        ax[4][1].set_visible(False)
+        plt.colorbar(im, ax=ax[4][1], pad=0.01, fraction=0.046, shrink=0.5, aspect=12,)
 
         # plot MUA and single units
         for r_name, r_data in data.groupby('region'):
@@ -96,8 +125,8 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                         .sort_values('place_field_peak_ind', na_position='first'))
 
             # plot LFP
-            ax[row_ind + 3].plot(times, r_data[f'lfp_{r_name}'].to_numpy()[0], color='k', label='lfp')
-            ax[row_ind + 3].set(ylabel=f'{r_name} lfp', ylim=(-330, 330))
+            ax[row_ind + 3][0].plot(times, r_data[f'lfp_{r_name}'].to_numpy()[0], color='k', label='lfp')
+            ax[row_ind + 3][0].set(ylabel=f'{r_name} lfp', ylim=(-330, 330))
 
             # plot single units
             fr = np.array(
@@ -105,37 +134,32 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
             n_colors_extra = int(np.ceil(0.05 * np.shape(fr)[0]))  # add extra bc cut darkest/lightest
             colors = sns.color_palette('rocket', n_colors=np.shape(fr)[0] + n_colors_extra * 2)
             colors = colors[n_colors_extra:-n_colors_extra]
-            show_psth_raster(gen_data['spikes'].to_list(), ax=ax[row_ind + 5], start=times[0],
+            show_psth_raster(gen_data['spikes'].to_list(), ax=ax[row_ind + 5][0], start=times[0],
                              end=times[-1],
                              group_inds=np.arange(np.shape(fr)[0]),
                              colors=colors,
                              show_legend=False,
                              linewidths=0.5)
-            ax[row_ind + 5].set(ylabel=f'{r_name} units', xlabel='')
+            ax[row_ind + 5][0].set(ylabel=f'{r_name} units', xlabel='')
 
             # plot forward position
             position = (feat - np.min(feat)) / (pos_limits['arm_max'] - pos_limits['home_arm_min'])
             position = position / np.max(position) * (np.shape(fr)[0] - 1)  # scale for the number of units
-            ax[row_ind + 5].plot(r_data['times'].to_numpy()[0], position,
+            ax[row_ind + 5][0].plot(r_data['times'].to_numpy()[0], position,
                                  color='k', linewidth=3, alpha=0.25, label='position')
 
             # plot lines for cues
-            event_labels = dict(start_time='start', t_delay='delay', t_update='update', t_delay2='delay',
-                                t_choice_made='reward', stop_time='stop')
-            colors = dict(start_time='w', t_delay='k', t_update='c', t_delay2='k', t_choice_made='y')
-            event_times = (data[list(event_labels.keys())].iloc[0, :] - data['t_update'].iloc[0]).to_dict()
-
             if plot_group_dict['update_type'][0] == 'non_update':
                 colors.update(t_update='k')
             for a in ax:
-                a = add_task_phase_lines(a, cue_locations=event_times, label_dict=event_labels, text_brackets=False,
+                a[0] = add_task_phase_lines(a[0], cue_locations=event_times, label_dict=event_labels, text_brackets=False,
                                          vline_kwargs=dict(color='#c6c6c6', alpha=0.5, linewidth=2, zorder=0))
 
             # set limits based on task event times (add 3 to start so when animal can actually start running)
             xlim_lower = np.max([event_times['start_time'] + 3, -self.align_window])
             xlim_upper = np.min([event_times['t_choice_made'], self.align_window])
-            [a.set_xlim(xlim_lower, xlim_upper) for a in ax]  # set lim
-            [a.legend(loc='upper right') for a in ax]
+            [a[0].set_xlim(xlim_lower, xlim_upper) for a in ax]  # set lim
+            [a[0].legend(loc='upper right') for a in ax]
             fig.supxlabel('Time around update cue (s)')
 
         return fig
@@ -408,7 +432,12 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                     true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
                     bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
                               for b in r_data['bound_values'].unique()]
-                    bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+                    if gen_data['feature_name'].values[0] == 'choice':  # if bounds are on ends of track, make home between
+                        bounds = [(bounds[0][1], bounds[1][0]), *bounds]
+                        ylabel = 'p(new choice)'
+                    else:
+                        bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+                        ylabel = 'fraction of track'
 
                     im_times = (decoding_times[0] - np.diff(decoding_times)[0] / 2,
                                 decoding_times[-1] + np.diff(decoding_times)[0] / 2)
@@ -436,7 +465,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                     ax[row_ind + 6].plot(decoding_times, true_feat,
                                          color=self.colors[f'incorrect'],
                                          linestyle='dotted', linewidth=1.5, alpha=0.25, label='actual position')
-                    ax[row_ind + 6].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel='fraction of track',
+                    ax[row_ind + 6].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
                                         xlim=(decoding_times[0], decoding_times[-1]), xlabel='time around update (s)')
                     ax[row_ind + 6].legend(loc='lower right', labelcolor='linecolor')
 
