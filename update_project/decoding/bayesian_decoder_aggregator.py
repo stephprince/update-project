@@ -12,8 +12,7 @@ from sklearn.model_selection import LeaveOneOut, RandomizedSearchCV, cross_val_s
 from sklearn.preprocessing import StandardScaler, OrdinalEncoder
 from sklearn import svm
 from sklearn.utils import resample
-from sklearn.utils.fixes import loguniform
-from scipy.stats import sem, pearsonr, uniform
+from scipy.stats import sem, pearsonr, uniform, loguniform
 from scipy import signal
 from statsmodels.stats.multitest import fdrcorrection
 from tqdm import tqdm
@@ -929,7 +928,7 @@ class BayesianDecoderAggregator:
 
         # preprocess the data - balance classes and scale
         prediction_outputs = []
-        data_for_prediction = data_for_prediction.query('pre_or_post == "post"')
+        # data_for_prediction = data_for_prediction.query('pre_or_post == "post"')
         for name, data in data_for_prediction.groupby(prediction_groups): # print (name), filter data_for prediction, then rerun here
             unbalanced_data = dict()
             for var in input_variables:
@@ -1025,7 +1024,7 @@ class BayesianDecoderAggregator:
         return sig_bins_df
 
     @staticmethod
-    def get_residuals(trial_data, prob_value='prob_sum'):
+    def get_residuals(trial_data, prob_value='prob_sum', by_session=False):
         residual_data = (trial_data
                          .dropna(subset=[prob_value, 'choice', 'rotational_velocity', 'translational_velocity'], axis=0)
                          .sort_values(by=['choice', 'update_type', 'session_id', 'trial_id']))
@@ -1034,19 +1033,38 @@ class BayesianDecoderAggregator:
                                            initial_stay=residual_data.query('choice == "initial_stay"')[
                                                prob_value].to_numpy(),
                                            rotation=switch_data['rotational_velocity'].to_numpy(),
-                                           translation=switch_data['translational_velocity'].to_numpy(), )
+                                           translation=switch_data['translational_velocity'].to_numpy(),
+                                           session_id=switch_data['session_id'].to_numpy())
 
         # fit GLM and get residuals
-        residuals = []
+        residuals, r_squared, sessions, choices = [], [], [], []
         for choice in residual_data['choice'].unique():
-            y = input_data[choice]  # changed from choice
-            x = input_data[['rotation', 'translation']]
-            x = sm.add_constant(x)
-            poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
-            glm_results = poisson_model.fit()
-            # print(glm_results.summary())
-            residuals.append(glm_results.resid_pearson)
+            if by_session:
+                for sess, i_data in input_data.groupby('session_id'):
+                    y = i_data[choice]  # changed from choice
+                    x = i_data[['rotation', 'translation']]
+                    x = sm.add_constant(x)
+                    poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
+                    glm_results = poisson_model.fit()
+                    # print(glm_results.summary())
+                    r_squared.append(glm_results.pseudo_rsquared())
+                    sessions.append(sess)
+                    choices.append(choice)
+                    residuals.append(glm_results.resid_pearson)
+            else:
+                y = input_data[choice]  # changed from choice
+                x = input_data[['rotation', 'translation']]
+                x = sm.add_constant(x)
+                poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
+                glm_results = poisson_model.fit()
+                # print(glm_results.summary())
+                residuals.append(glm_results.resid_pearson)
+
+        # add to output data structure
         residual_data['resid'] = pd.concat(residuals).to_numpy()
+        if by_session:
+            r_squared_vals = pd.DataFrame(dict(session_id=sessions, choice=choices, r_squared=r_squared))
+            residual_data = residual_data.merge(r_squared_vals, on=['session_id', 'choice'], validate='many_to_one')
 
         return residual_data
 
