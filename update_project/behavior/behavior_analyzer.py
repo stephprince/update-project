@@ -77,8 +77,7 @@ class BehaviorAnalyzer(BaseAnalysisClass):
 
     def _get_proportion_correct(self):
         proportion_correct = []
-        groups = self.trials.groupby(['update_type'])
-        for name, group_data in groups:
+        for name, group_data in self.trials.groupby('update_type'):
             data = group_data.reset_index(drop=True)  # TODO - determine if I want to have min bin length to use data
             rolling = data['correct'].rolling(self.trial_window, min_periods=self.trial_window).mean()
             binned = data['correct'].groupby(data['correct'].index // self.trial_window).mean()

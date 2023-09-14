@@ -268,10 +268,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
-        trajectory_df = trajectory_df.query(f'update_type in {update_type}')
-        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
-                                                                         'switch_update': 'switch',
-                                                                         'stay_update': 'stay'})
+        trajectory_df = (trajectory_df
+                         .query(f'update_type in {update_type}')
+                         .assign(update_type=lambda x: x['update_type'].map({'non_update': 'delay only',
+                                                                   'switch_update': 'switch',
+                                                                   'stay_update': 'stay'})))
 
         ax = sfig.subplots(nrows=1, ncols=1)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
