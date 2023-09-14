@@ -1,17 +1,11 @@
 import numpy as np
 import pandas as pd
-import pynapple as nap
 import warnings
 
-from bisect import bisect, bisect_left
 from pathlib import Path
 from pynwb import NWBFile
-from sklearn.model_selection import train_test_split
 
 from update_project.general.results_io import ResultsIO
-from update_project.general.virtual_track import UpdateTrack
-from update_project.general.lfp import get_theta
-from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
 from update_project.base_analysis_class import BaseAnalysisClass
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 class SessionLoader:
     def __init__(self, animals=None, base_path=None, csv_filename=None, dates_included=None, dates_excluded=None,
-                 behavior_only=False):
+                 behavior_only=False, demo=False):
         self.base_path = base_path or Path('Y:/singer/NWBData/UpdateTask/')  # if no value given, use default path
         self.csv_filename = csv_filename or 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv'
 
@@ -13,6 +13,10 @@ class SessionLoader:
         if self.behavior_only:
             behavior_spreadsheet_filename = 'Y:/singer/Steph/Code/update-project/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv'
             self.behavior_csv_filename = behavior_spreadsheet_filename
+
+        if demo:
+            self.base_path = Path(__file__).parent.parent.parent / 'data'
+            self.csv_filename = Path(__file__).parent.parent.parent / 'docs' / 'metadata-summaries' / 'VRUpdateTaskEphysSummary.csv'
 
         self.animals = animals or [17, 20, 25, 28, 29, 33, 34]
         self.dates_included = dates_included or []

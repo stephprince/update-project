@@ -44,6 +44,24 @@ class UpdateTaskFigureGenerator:
         self.plot_supp_figure_all_trials()  # supp figure 4 - HPC position coding - all trial types supplement
         self.plot_supp_figure_lateral_position()  # supp figure 5 - HPC/PFC lateral position coding supplement
 
+    def plot_demo_figure(self, session='S25_210913'):
+        behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
+
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1.1, 2.5])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[2.25, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[2.25, 1])
+
+        # plot data
+        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Task schematic with example trial types')
+        sfigs_row0[1] = behavior_visualizer.plot_performance(sfigs_row0[1], tags='demo_prop_correct')  # performance
+        sfigs_row1[0] = behavior_visualizer.plot_trajectories_by_position(sfigs_row1[0], example_session=session)  # example  trajectories
+        sfigs_row1[1] = behavior_visualizer.plot_trajectories_by_event(sfigs_row1[1])  # average trajectories
+
+        # figure saving
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'demo_figure', tight_layout=False, results_type='manuscript')
+
     def run_analysis_pipeline(self, analysis_to_run, analysis_kwargs=dict(), visualization_kwargs=dict(),
                               session_names=None, overwrite=False):
         print(f'Running {analysis_to_run} analysis interface')
@@ -148,6 +166,22 @@ class UpdateTaskFigureGenerator:
         self.results_io.save_fig(fig=fig, filename=f'figure_2', tight_layout=False, results_type='manuscript')
 
         if with_supplement:
+            ##### supp figure - local and initial cue quantification
+            fig = plt.figure(constrained_layout=True, figsize=(6.5, 6))
+            sfigs = fig.subfigures(nrows=2, ncols=1, height_ratios=[1, 1])
+            sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=3, width_ratios=[1, 1, 1])
+            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+
+            sfigs_row0[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row0[0], update_type='switch')
+            sfigs_row0[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row0[1], update_type='non_update')
+            sfigs_row1[0] = hpc_visualizer.plot_goal_coding(sfigs_row1[0], tags='fig2_CA1_position',
+                                                            other_zones=['local', 'central', 'original'])
+            sfigs_row1[1] = hpc_visualizer.plot_goal_coding_stats(sfigs_row1[1], tags='fig2_CA1_position',
+                                                                  other_zones=['local', 'central', 'original'])
+
+            self.add_panel_labels(sfigs)
+            self.results_io.save_fig(fig=fig, filename=f'figure_local_initial', tight_layout=False, results_type='manuscript')
+
             ##### supp figure 2
             n_sfig = 2
             hpc_visualizer_long_window = self.run_analysis_pipeline(analysis_to_run='Decoder',
@@ -204,7 +238,7 @@ class UpdateTaskFigureGenerator:
             ##### supp figure chance (won't save but just use to look at prob over chance stats
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=1, ncols=1, width_ratios=[1], height_ratios=[1])
-            sfigs = hpc_visualizer.plot_goal_coding_stats(sfigs, prob_value='prob_over_chance', include_central=True,
+            sfigs = hpc_visualizer.plot_goal_coding_stats(sfigs, prob_value='prob_over_chance', other_zones=['central'],
                                                           tags='sfigchance_CA1_position')
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_chance_hpc', tight_layout=False,
                                      results_type='manuscript')
@@ -230,8 +264,10 @@ class UpdateTaskFigureGenerator:
                                                                time=['pre', 'post'])
         sfigs_row1[1] = visualizer.plot_theta_phase_modulation(sfigs_row1[1], update_type=['switch'],
                                                                time=['pre', 'post'])
+        sfigs_row1[2] = visualizer.plot_theta_phase_stats(sfigs_row1[2], type='pre_vs_post', update_type=['switch'],
+                                                          tags='fig3_CA1_theta_pre_vs_post', divider='half')
         sfigs_row1[2] = visualizer.plot_theta_phase_stats(sfigs_row1[2], type='modulation', update_type=['switch'],
-                                                          tags='fig3_CA1_theta', divider='half')
+                                                          tags='fig3_CA1_theta_trial_types', divider='half')
         sfigs_row1[3] = visualizer.plot_theta_phase_stats(sfigs_row1[3], type='phase_modulation',
                                                           update_type=['switch'],
                                                           tags='fig3_CA1_theta_phase_mod', divider='half')
@@ -240,15 +276,18 @@ class UpdateTaskFigureGenerator:
 
         if with_supplement:
             n_sfig = 5
-            fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-            sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1.5])
+            fig = plt.figure(constrained_layout=True, figsize=(6.5, 4))
+            sfigs = fig.subfigures(nrows=1, ncols=4, width_ratios=[1, 1, 1, 2])
 
-            sfigs[0] = visualizer.plot_theta_phase_stats(sfigs[0], type='modulation', tags=f'sfig{n_sfig}_CA1_theta',
-                                                         divider='half')
+            sfigs[0] = visualizer.plot_theta_phase_modulation(sfigs[0], update_type=['non_update'],
+                                                              time=['pre', 'post'])
             sfigs[1] = visualizer.plot_theta_phase_modulation(sfigs[1], update_type=['non_update'],
                                                               time=['pre', 'post'])
-            sfigs[2] = visualizer.plot_theta_phase_stats(sfigs[2], type='pre_vs_post', divider='half',
-                                                         update_type=['non_update'], tags=f'sfig{n_sfig}_CA1_theta')
+            sfigs[2] = visualizer.plot_theta_phase_stats(sfigs[2], type='modulation', update_type=['non_update'],
+                                                              tags=f'sfig{n_sfig}_CA1_theta', divider='half')
+            sfigs[3] = visualizer.plot_theta_phase_stats(sfigs[3], type='phase_modulation',
+                                                              update_type=['non_update'], ylim=(0.11, 0.15),
+                                                              tags=f'sfig{n_sfig}_CA1_theta_phase_mod', divider='half')
 
             self.add_panel_labels(sfigs)
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False,
@@ -470,9 +509,10 @@ class UpdateTaskFigureGenerator:
             sfigs = fig.subfigures(nrows=2, ncols=1, width_ratios=[1], height_ratios=[1, 4])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
 
-            sfigs_row0[0] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[0], update_type=['stay'], tags=f'sfig{n_sfig}_hpc')
-            sfigs_row0[1] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[1], update_type=['stay'], tags=f'sfig{n_sfig}_pfc')
-            sfigs[1] = hpc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs[1], plot_full_breakdown=True)
+            sfigs_row0[0] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[0], update_type=['stay'],)
+            sfigs_row0[1] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[1], update_type=['stay'],)
+            sfigs[1] = hpc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs[1], plot_full_breakdown=True,
+                                                                                   tags=f'sfig{n_sfig}')
 
             # figure saving
             self.add_panel_labels(sfigs)

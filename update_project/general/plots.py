@@ -143,7 +143,7 @@ def get_color_theme():
 
     color_theme_dict['phase_dividers'] = '#ececec'
 
-    for key in ['control', 'nan', 'home', 'central', 'non_update', 'non update', 'all', 'delay only', 'correct']:
+    for key in ['control', 'nan', 'home', 'central', 'non_update', 'non update', 'all', 'delay only', 'correct', 'local']:
         color_theme_dict[key] = '#303030'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_light'] = '#c0c0c0'  # black - 0 in degrees, 0 saturation, 20 light
         color_theme_dict[f'{key}_medium'] = '#898989'  # black - 0 in degrees, 0 saturation, 20 light
@@ -151,6 +151,8 @@ def get_color_theme():
         color_theme_dict[f'{key}_cmap_r'] = sns.color_palette('blend:#000000,#ffffff', as_cmap=True)
         color_theme_dict[f'{key}_quartiles'] = sns.color_palette('blend:#c0c0c0,#303030', 4)  # increasing grey scales
         color_theme_dict[f'{key}_cmap_light_to_dark'] = sns.color_palette('blend:#c0c0c0,#303030', as_cmap=True)  # (40 to 80 light)
+    for key in ['original']:
+        color_theme_dict[key] = '#2594f6'  # light blue - 250 in degrees, 95 saturation, 60 light
     for key in ['switch_trials', 'switch']:
         color_theme_dict[key] = '#785cf7'  # purple - 270 in degrees, 95 saturation, 50 light
         color_theme_dict[f'{key}_light'] = '#c7c0fc'  # purple - 270 in degrees, 95 saturation, 80 light
