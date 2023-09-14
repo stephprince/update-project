@@ -2,8 +2,23 @@
 
 ## overview
 
-The goal of this project is to look at neural activity from hippocampal CA1 and medial prefrontal cortex when mice
- have to update their trajectories in response to new information. This project is currently in development.
+### summary
+This repository contains the custom code and analysis pipelines to generate the results in the manuscript Prince et al., "New information triggers prospective codes to adapt for flexible navigation."
+
+### abstract
+Navigating a dynamic world requires rapidly updating choices by integrating past experiences with new information. In hippocampus and prefrontal cortex, neural activity representing future goals is theorized to support planning. However, it remains unknown how prospective goal representations incorporate new, pivotal information. Accordingly, we designed a novel task that precisely introduces new information using virtual reality, and we recorded neural activity as mice flexibly adapted their planned destinations. We found that new information triggered increased hippocampal prospective representations of both possible goals; while in prefrontal cortex, new information caused prospective representations of choices to rapidly shift to the new choice. When mice did not flexibly adapt, prefrontal choice codes failed to switch, despite relatively intact hippocampal goal representations. Prospective code updating depended on the commitment to the initial choice and degree of adaptation needed. Thus, we show how prospective codes update with new information to flexibly adapt ongoing navigational plans.
+
+## system requirements
+
+### hardware requirements
+This package requires only a standard computer with enough RAM to support the in-memory operations. These analyses were primarily performed on a computer with the following specs:
+
+- RAM: 256 GB
+- CPU: 18 cores @ 3.00 GHz
+
+### software requirements
+
+The code was developed and tested on a Windows 10 system. Dependencies are detailed in the package file. Analyses were performed with Python >= 3.9 and R >= 4.1.3.
 
 ## installation
 
@@ -41,7 +56,7 @@ python run_all_figures.py
 ```
 
 All figures will save in the local `update-project/results/manuscript-figures` folder
-(Note: the scripts assume all raw data is stored on the internal server at `/singer/NWBData/UpdateTask`,
+(Note: the scripts assume all raw data is stored on an internal server at `/singer/NWBData/UpdateTask`,
 future examples will include instructions for data deposited online).
 
 If you would like to run any of the modules individually, 
@@ -49,29 +64,3 @@ or generate figures not included in the final version of the paper,
 each analysis stream has its own submodule.
 (e.g. `run_decoding.py` found in the update_project/decoding folder)
 
-## project details
-These paths describe the location of code, data, and materials within the Singer lab and is mainly relevant for
-internal use.
-Future examples will include instructions for data deposited online.
-
-- **analysis code and results**:  `/singer/Steph/Code/update-project` (this repository)
-    - **update-project/** -  contains python code
-    - **pyproject.toml** -  contains package info and project requirements
-    - **tests/** - contains tests for code
-    - **results/** -  contains relevant output figures and intermediary data structures, not stored on github
-    - **docs/** - contains relevant documentation and metadata files
-      - ephys recording summary: `/docs/metadata-summaries/VRUpdateTaskEphysSummary.csv`
-      - behavior summary: `/docs/metadata-summaries/VRUpdateTaskBehaviorSummary.csv`
-      - this folder also contains notes on things to consider when analyzing the data
-    - **scripts/** - contains early test scripts for establishing some parameters and verifying results
-- **NWB data**: `/singer/NWBData/UpdateTask`, `.nwb` main data files compiling several of the data streams below into the NeurodataWithoutBorders format
-- **raw data**: `/singer/RawData/UpdateTask`, `.rec` files acquired from SpikeGadgets ephys acquisition system
-- **processed data**: `/singer/ProcessedData/UpdateTask`, `.mat` files from custom preprocessing/spike sorting pipeline
-- **imaging data**: `/singer/HistologyImages/Steph/UpdateTask`, `.czi` files acquired from Zeiss microscope
-- **behavioral data**: `/singer/VirmenLogs/UpdateTask`, `.mat` files acquired from ViRMEn behavioral software
-- **camera data**: `/singer/CameraData/UpdateTask`, `.mp4` files acquired from Basler camera
-- **brain tissue slides**: -20 fridge in box labelled "Steph Prince - update project"
-
-## related papers
-
-preprint coming soon...
