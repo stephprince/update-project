@@ -135,14 +135,13 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_goal_coding(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
                          ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update'],
-                         correct_type=[1, 0], use_residuals=False):
+                         correct_type=[1, 0], use_residuals=False, other_zones=None):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         plot_groups.update(update_type=update_type)
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
-                                                                       prob_value=prob_value)
-        sig_bins_data = self.aggregator.calc_significant_bins(self.aggregator.group_aligned_df, plot_groups, tags=tags)
+                                                                       prob_value=prob_value, other_zones=other_zones)
         sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
         trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
         trial_types = update_type if comparison == 'update_type' else correct_type
@@ -188,6 +187,30 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                                           nan_policy='omit'),
                                                     color=self.colors['initial'],
                                                     alpha=0.2)
+                    if other_zones:
+                        original_mat = trial_mat.query('choice == "original"').to_numpy()
+                        central_mat = trial_mat.query('choice == "central"').to_numpy()
+                        local_mat = trial_mat.query('choice == "local"').to_numpy()
+                        ax[row_id][col_id].plot(time_bins, np.nanmean(central_mat, axis=0), color=self.colors['central'], linestyle='dashed')
+                        ax[row_id][col_id].plot(time_bins, np.nanmean(original_mat, axis=0), color=self.colors['original'])
+                        ax[row_id][col_id].plot(time_bins, np.nanmean(local_mat, axis=0), color=self.colors['local'])
+                        ax[row_id][col_id].fill_between(time_bins,
+                                                        np.nanmean(original_mat, axis=0) + sem(original_mat, nan_policy='omit'),
+                                                        np.nanmean(original_mat, axis=0) - sem(original_mat, nan_policy='omit'),
+                                                        color=self.colors['original'], alpha=0.2)
+                        ax[row_id][col_id].fill_between(time_bins, np.nanmean(central_mat, axis=0) + sem(central_mat,
+                                                                                                         nan_policy='omit'),
+                                                        np.nanmean(central_mat, axis=0) - sem(central_mat,
+                                                                                              nan_policy='omit'),
+                                                        color=self.colors['central'],
+                                                        alpha=0.2)
+                        ax[row_id][col_id].fill_between(time_bins, np.nanmean(local_mat, axis=0) + sem(local_mat,
+                                                                                                         nan_policy='omit'),
+                                                        np.nanmean(local_mat, axis=0) - sem(local_mat,
+                                                                                              nan_policy='omit'),
+                                                        color=self.colors['central'],
+                                                        alpha=0.2)
+
                     ax[row_id][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
                     if ylim:
                         ax[row_id][col_id].set(ylim=ylim)
@@ -239,19 +262,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         # add stats bars above each plot
         ylims = ax[row_id][col_id].get_ylim()
-        if not heatmap and not groups:
-            for comp, stats_data in sig_bins_data.groupby(comparison):
-                col_id = np.argwhere(np.array(list(trial_types)) == comp)[0][0]
-                row_id = 0
-
-                heights = (ylims[0] + np.diff(ylims)[0] * 0.02, ylims[0] + np.diff(ylims)[0] * 0.04)
-                xlocs_initial = stats_data.query('pair == "initial" & fdr == True')['times']
-                xlocs_new = stats_data.query('pair == "initial" & fdr == True')['times']
-                ax[row_id][col_id].scatter(xlocs_initial, [heights[0]] * len(xlocs_initial),
-                                           color=self.colors['initial'], marker='s')
-                ax[row_id][col_id].scatter(xlocs_new, [heights[1]] * len(xlocs_new), color=self.colors['new'],
-                                           marker='s')
-
         sfig.supylabel('prob. density', fontsize=10)
         sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
 
@@ -352,12 +362,12 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         return sfig
 
     def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
-                               time_window=(0, 1.5), use_zscores=False, include_central=False, stripplot=False,
+                               time_window=(0, 1.5), use_zscores=False, other_zones=dict(), stripplot=False,
                                update_type=['switch', 'non_update'], use_residuals=False, ylim=None):
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
-        choice_mapping = {'initial_stay': 'initial', 'switch': 'new'}
-        if include_central:
-            choice_mapping['central'] = 'local'
+        choice_mapping = {z: z for z in other_zones}
+        choice_mapping['initial_stay'] = 'initial'
+        choice_mapping['switch'] = 'new'
 
         # get data
         plot_groups = self.plot_group_comparisons_full[comparison]
@@ -366,7 +376,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         label_map = {k: label_map[k] for k in plot_groups[comparison]}
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
-                                                                       prob_value=prob_value, include_central=include_central)
+                                                                       prob_value=prob_value, other_zones=other_zones)
         trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
         if use_residuals:
             trial_data = self.aggregator.get_residuals(trial_data, by_session=True)
@@ -558,11 +568,17 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, scale=1.5, palette=palette)
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, scale=0.75, palette=['w'] * len(order),
                                                    errorbar=None)
+                # arbitrary test for descriptive stats
+                stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                              approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+                stats.run(data, dependent_vars=[dependent_var], group_vars=[f'{metric}_{grouping}'],
+                          pairs=[[c] for c in list(itertools.combinations(order, r=2))],
+                          filename=f'commitment_stats_{metric}_{tags}_{grouping}_{var}')
 
                 stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                               approaches=['traditional'], tests=['spearman'], results_type='manuscript')
                 stats.run(data, dependent_vars=[dependent_var], group_vars=[f'{metric}_at_0'], pairs=None,
-                          filename=f'commitment_stats_{metric}_{tags}_{grouping}')
+                          filename=f'commitment_stats_{metric}_{tags}_{grouping}_correlation_{var}')
 
                 stats_data = stats.stats_df.query(f'approach == "traditional" & test == "spearman"'
                                                   f'& variable == "{dependent_var}"')
@@ -594,10 +610,17 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                     [l.set_alpha(0.25) for l in ax[row_id][col_id].lines]
                     ax[row_id][col_id] = sns.pointplot(data, x=f'{metric}_{grouping}', y=dependent_var,
                                                        order=order, scale=1.5, palette=palette, ax=ax[row_id][col_id], )
+                    # arbitrary test for descriptive stats
+                    stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                                  approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+                    stats.run(data, dependent_vars=[dependent_var], group_vars=[f'{metric}_{grouping}'],
+                              pairs=[[c] for c in list(itertools.combinations(order, r=2))],
+                              filename=f'commitment_stats_{comp}_{metric}_{tags}_{grouping}_{var}')
+
                     stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                                   approaches=['mixed_effects'], tests=['anova'], results_type='manuscript')
                     stats.run(data, dependent_vars=[dependent_var], group_vars=[f'{metric}_{grouping}'], pairs=None,
-                              filename=f'commitment_stats_pos_vs_neg_{metric}_{tags}_{grouping}')
+                              filename=f'commitment_stats_pos_vs_neg_{comp}_{metric}_{tags}_{grouping}_{var}')
                     stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "anova"'
                                                       f'& variable == "{dependent_var}"')
                     pvalues = np.round(stats_data['p_val'].to_numpy(), 4)
@@ -1788,7 +1811,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             self.results_io.save_fig(fig=fig, axes=axes, filename=f'compare_{comp}_theta_phase_hist',
                                      additional_tags=tags)
 
-    def plot_theta_phase_stats(self, param_data, plot_groups=None, tags='', update_type=['switch', 'non_update']):
+    def plot_theta_phase_info(self, param_data, plot_groups=None, tags='', update_type=['switch', 'non_update']):
         plot_group_dict = {k: [i[0] for i in v] if k != 'turn_type' else v[0] for k, v in plot_groups.items()}
         plot_group_dict.update(time_label=['t_update'])
         theta_data = self.aggregator.calc_theta_phase_data(param_data, plot_group_dict, ret_by_trial=True)
@@ -2074,7 +2097,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         return sfig
 
     def plot_theta_phase_stats(self, sfig, comparison='update_type', prob_value='prob_sum', tags='', type='modulation',
-                               divider='half', update_type=None):
+                               divider='half', update_type=None, ylim=None):
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         update_type = update_type or ['switch', 'stay', 'non_update']  # set to defaults
@@ -2082,6 +2105,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                            ret_by_trial=True)
         cats = ['-2.3565', '-0.7855', '0.7855', '2.3565'] if divider == 'quarter' else ['-1.571', '1.571']
         arm_cats = ['initial', 'new', 'central']
+        ylim = ylim or (0.1, 0.18)  # set to default
 
         modulation = (theta_data
                       .query(f'bin_name == "{divider}" & update_type in {update_type}')
@@ -2103,8 +2127,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         ax = sfig.subplots(nrows=1, ncols=len(update_type) * col_dict[type], sharey='row', squeeze=False)
         row_id = 0
         if type == 'modulation':
+            col_id = 0
             for comp, data in post_modulation.groupby(comparison):
-                col_id = np.argwhere(np.array(list(label_map.keys())) == comp)[0][0]
                 common_kwargs = dict(data=data, x='phase_mid', y='prob_value', hue='choice', ax=ax[row_id][col_id],
                                      hue_order=arm_cats, errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
@@ -2129,6 +2153,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                  .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
                  .set_pvalues(pvalues=pvalues)
                  .annotate(line_offset=0.1, line_offset_to_group=0.025))
+                col_id += 1
             rainbow_text(0.01, 0.9, arm_cats, colors, ax=ax[row_id][0], size=8)
         elif type == 'pre_vs_post':
             # plot pre vs. post comparisons and between trial types
@@ -2163,9 +2188,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                  .set_pvalues(pvalues=pvalues)
                  .annotate(line_offset=0.1, line_offset_to_group=0.025))
             rainbow_text(0.01, 0.9, arm_cats, colors, ax=ax[row_id][0], size=8)
-            ax[row_id][0].set(ylim=(0.1, 0.18))
+            ax[row_id][0].set(ylim=ylim)
         elif type == 'phase_modulation':
-            # pairs = [((c, p[0]), (c, p[1])) for p in phase_combos for c in ['initial', 'new']]
             combos = list(itertools.combinations(cats, r=2))
             pairs = [((c[0],), (c[1],)) for c in combos]
             for comp, data in post_modulation.groupby('choice'):
