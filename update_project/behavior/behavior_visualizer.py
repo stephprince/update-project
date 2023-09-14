@@ -48,25 +48,29 @@ class BehaviorVisualizer(BaseVisualizationClass):
         temp_df = (self.group_df[['animal', 'session_id', 'proportion_correct']]
                    .explode('proportion_correct')
                    .reset_index(drop=True))
+        update_type_dict = {'non_update': 'delay only', 'switch_update': 'switch', 'stay_update': 'stay'}
+        pairs = [[[v]] for k, v in update_type_dict.items() if k in update_type]
 
         df_by_update_type = pd.concat([temp_df[['animal', 'session_id']],
                                        pd.DataFrame(list(temp_df['proportion_correct']))], axis=1)
         df_by_bin = pd.DataFrame(df_by_update_type
                                  .explode('prop_correct')
                                  .query(f'type == "rolling" & update_type in {update_type}')  # rolling
-                                 .assign(update_type=lambda x: x.update_type.map({'non_update': 'delay only',
-                                                                                  'switch_update': 'switch',
-                                                                                  'stay_update': 'stay'}))
-                                 .rename(columns={'prop_correct': 'proportion correct', 'update_type': 'trial type'})
+                                 .assign(update_type=lambda x: x.update_type.map(update_type_dict))
+                                 .rename(columns={'prop_correct': 'proportion correct'})
                                  .reset_index(drop=True)
                                  .to_dict())  # convert to dict and back bc violin plot has object format err otherwise
 
         ax = sfig.subplots(nrows=1, ncols=1)
-        sns.boxplot(data=df_by_bin, x='trial type', y='proportion correct', ax=ax, width=0.5,
+        sns.boxplot(data=df_by_bin, x='update_type', y='proportion correct', ax=ax, width=0.5,
                     palette=self.colors['trials'], medianprops={'color': 'white'}, showfliers=False)
         clean_box_plot(ax)
         ax.axhline(0.5, linestyle='dashed', color=self.colors['nan'])
         ax.set(title='Task performance', xlabel=None, ylim=(0, 1))
+        stats = Stats(levels=['animal', 'session_id'], units='windows', results_io=self.results_io,
+                      approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+        stats.run(df_by_bin, dependent_vars=['proportion correct'], group_vars=['update_type'],
+                  filename=f'prop_correct_vs_chance_by_window{tags}', pairs=pairs)
 
         sess_averages = (df_by_update_type
                          .explode('prop_correct')
@@ -138,10 +142,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
         return sfig
 
     def plot_trajectories_by_position(self, sfig, var='view_angle', num_trials=20, update_type=['switch', 'delay only'],
-                                      example_animal=25, example_session='S25_210913'):
+                                      example_session='S25_210913'):
         """plot trajectories for manuscript figure"""
 
         # get data for example trial
+        example_animal = example_session.split('_')[0].strip('S')
         temp_df = (self.group_df[['animal', 'session_id', 'trajectories']]
                    .query(f'animal == {example_animal} & session_id == "{example_session}"')
                    .explode('trajectories')
