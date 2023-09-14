@@ -1,10 +1,10 @@
 # Prince paper context - based on seaborn style sheets
 figure.figsize: 11, 8.5
 figure.facecolor: white
-figure.titlesize: 18
+figure.titlesize: 14
 
 axes.labelsize: 10
-axes.titlesize: 12
+axes.titlesize: 11
 axes.linewidth: 1
 axes.facecolor: white
 axes.labelpad: 3

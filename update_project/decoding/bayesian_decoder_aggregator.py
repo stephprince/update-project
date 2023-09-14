@@ -12,8 +12,7 @@ from sklearn.model_selection import LeaveOneOut, RandomizedSearchCV, cross_val_s
 from sklearn.preprocessing import StandardScaler, OrdinalEncoder
 from sklearn import svm
 from sklearn.utils import resample
-from sklearn.utils.fixes import loguniform
-from scipy.stats import sem, pearsonr, uniform
+from scipy.stats import sem, pearsonr, uniform, loguniform
 from scipy import signal
 from statsmodels.stats.multitest import fdrcorrection
 from tqdm import tqdm
@@ -378,22 +377,33 @@ class BayesianDecoderAggregator:
 
         return bin_inds
 
-    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False, include_central=False):
+    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False, other_zones=None):
         if np.size(aligned_data) and aligned_data is not None:
             # get bounds to use to quantify choices
             bins = param_data['bins'].values[0]
             virtual_track = param_data['virtual_track'].values[0]
             bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
-            if include_central:
-                bounds['home'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
-                choice_mapping = dict(left='initial_stay', right='switch', home='central')
-            else:
-                choice_mapping = dict(left='initial_stay', right='switch')
+            other_zones_dict = dict()
+            if other_zones:
+                if 'central' in other_zones:
+                    bounds['home'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
+                    other_zones_dict['home'] = 'central'
+                if 'original' in other_zones:
+                    bounds['original'] = (virtual_track.cue_start_locations['y_position']['initial cue'],
+                                         virtual_track.cue_end_locations['y_position']['initial cue'])
+                    other_zones_dict['original'] = 'original'
+                if 'local' in other_zones:
+                    bounds['local'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
+                    other_zones_dict['local'] = 'local'
+
+            choice_mapping = dict(left='initial_stay', right='switch', **other_zones_dict)
 
             if isinstance(aligned_data, dict):
                 prob_map = aligned_data['probability']
             else:
                 prob_map = np.stack(aligned_data['probability'])
+                local_position_map = np.stack(aligned_data['feature'])
+                bin_map = np.searchsorted(bins, local_position_map)
             prob_choice = dict()
             num_bins = dict()
             bin_inds = self.adjust_bound_bins(bins, bounds)
@@ -401,8 +411,15 @@ class BayesianDecoderAggregator:
             output_list = []
             for bound_name, bound_values in bounds.items():  # loop through left/right bounds
                 threshold = 0.1  # total probability density to call a left/right choice
-                integrated_prob = np.sum(prob_map[:, bin_inds[f'{bound_name}_start']:bin_inds[f'{bound_name}_stop'], :],
-                                            axis=1)  # (trials, feature bins, window)
+                if bound_name == 'local':
+                    integrated_prob = []
+                    for prob, bi in zip(prob_map, bin_map):
+                        local_probs = np.array([np.sum(prob[b - 3: b + 3, i]) for i, b in enumerate(bi)])
+                        integrated_prob.append(local_probs)
+                    integrated_prob = np.array(integrated_prob)
+                else:
+                    integrated_prob = np.sum(prob_map[:, bin_inds[f'{bound_name}_start']:bin_inds[f'{bound_name}_stop'], :],
+                                                axis=1)  # (trials, feature bins, window)
                 num_bins[bound_name] = len(prob_map[0, bin_inds[f'{bound_name}_start']:bin_inds[f'{bound_name}_stop'], 0])
                 prob_over_chance = integrated_prob * len(bins) / num_bins[
                     bound_name]  # integrated prob * bins / goal bins
@@ -421,7 +438,8 @@ class BayesianDecoderAggregator:
                     bound_quantification.update(dict(choice=bound_name, trial_index=aligned_data.index.to_numpy()))
                     output_list.append(bound_quantification)
 
-            assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
+            if 'original' not in num_bins:
+                assert len(np.unique(list(num_bins.values()))) == 1, 'Number of bins for different bounds are not equal'
 
             if ret_df:
                 list_df = pd.DataFrame(output_list)[['trial_index', 'prob_sum', 'prob_over_chance', 'bound_values',
@@ -520,16 +538,16 @@ class BayesianDecoderAggregator:
                                 'corr_coeff_sliding', 'lags_sliding', 'times_sliding'])
 
     def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3,
-                                       time_window=(0, 2.5), include_central=False):
+                                       time_window=(0, 2.5), other_zones=None):
         # get data for z-scoring (all trial types but only times around update)
         group_aligned_data = self.select_group_aligned_data(param_data, dict(time_label=['t_update']), ret_df=True)
-        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, include_central=include_central)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, other_zones=other_zones)
         zscore_mean = np.nanmean(np.stack(quant_df[prob_value]))
         zscore_std = np.nanstd(np.stack(quant_df[prob_value]))
 
         # get data for quantification
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
-        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, include_central=include_central)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, other_zones=other_zones)
 
         if np.size(quant_df) and quant_df is not None:
             # get diff from baseline
@@ -929,7 +947,7 @@ class BayesianDecoderAggregator:
 
         # preprocess the data - balance classes and scale
         prediction_outputs = []
-        data_for_prediction = data_for_prediction.query('pre_or_post == "post"')
+        # data_for_prediction = data_for_prediction.query('pre_or_post == "post"')
         for name, data in data_for_prediction.groupby(prediction_groups): # print (name), filter data_for prediction, then rerun here
             unbalanced_data = dict()
             for var in input_variables:
@@ -1025,7 +1043,7 @@ class BayesianDecoderAggregator:
         return sig_bins_df
 
     @staticmethod
-    def get_residuals(trial_data, prob_value='prob_sum'):
+    def get_residuals(trial_data, prob_value='prob_sum', by_session=False):
         residual_data = (trial_data
                          .dropna(subset=[prob_value, 'choice', 'rotational_velocity', 'translational_velocity'], axis=0)
                          .sort_values(by=['choice', 'update_type', 'session_id', 'trial_id']))
@@ -1034,19 +1052,38 @@ class BayesianDecoderAggregator:
                                            initial_stay=residual_data.query('choice == "initial_stay"')[
                                                prob_value].to_numpy(),
                                            rotation=switch_data['rotational_velocity'].to_numpy(),
-                                           translation=switch_data['translational_velocity'].to_numpy(), )
+                                           translation=switch_data['translational_velocity'].to_numpy(),
+                                           session_id=switch_data['session_id'].to_numpy())
 
         # fit GLM and get residuals
-        residuals = []
+        residuals, r_squared, sessions, choices = [], [], [], []
         for choice in residual_data['choice'].unique():
-            y = input_data[choice]  # changed from choice
-            x = input_data[['rotation', 'translation']]
-            x = sm.add_constant(x)
-            poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
-            glm_results = poisson_model.fit()
-            # print(glm_results.summary())
-            residuals.append(glm_results.resid_pearson)
+            if by_session:
+                for sess, i_data in input_data.groupby('session_id'):
+                    y = i_data[choice]  # changed from choice
+                    x = i_data[['rotation', 'translation']]
+                    x = sm.add_constant(x)
+                    poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
+                    glm_results = poisson_model.fit()
+                    # print(glm_results.summary())
+                    r_squared.append(glm_results.pseudo_rsquared())
+                    sessions.append(sess)
+                    choices.append(choice)
+                    residuals.append(glm_results.resid_pearson)
+            else:
+                y = input_data[choice]  # changed from choice
+                x = input_data[['rotation', 'translation']]
+                x = sm.add_constant(x)
+                poisson_model = sm.GLM(y, x, family=sm.families.Poisson())
+                glm_results = poisson_model.fit()
+                # print(glm_results.summary())
+                residuals.append(glm_results.resid_pearson)
+
+        # add to output data structure
         residual_data['resid'] = pd.concat(residuals).to_numpy()
+        if by_session:
+            r_squared_vals = pd.DataFrame(dict(session_id=sessions, choice=choices, r_squared=r_squared))
+            residual_data = residual_data.merge(r_squared_vals, on=['session_id', 'choice'], validate='many_to_one')
 
         return residual_data
 
