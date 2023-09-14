@@ -46,7 +46,7 @@ conda install -c conda-forge r r-base r-lmertest r-emmeans rpy2
 ```
 After running these commands, edit your local environment variables so `R_HOME = /path/to/Anaconda3/envs/update-project/lib/R`
 (Note: if you are using another package manager like pip/poetry, you will have to setup a local R installation and edit 
-your local environment variables to point towards that path before installing rpy2). 
+your local environment variables to point towards that path before installing rpy2). The installation steps typically take less than 20 min.
 
 ## how to use
 To generate figures for the manuscript, run the main script `run_all_figures.py` in the terminal or your IDE.
