@@ -60,7 +60,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                                                   'train_df', 'test_df', 'test_delay_only_df', 'test_update_only_df',
                                                                   'model', 'model_test', 'model_delay_only', 'model_update_only',
                                                                   'bins', 'decoded_values', 'decoded_probs',
-                                                                  'theta', 'velocity', 'commitment'],
+                                                                  'theta', 'velocity', 'commitment'],#add prev_trial here?
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
@@ -69,7 +69,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                            format='npz'))
 
         # setup data
-        self.feature_names = features
+        self.feature_names = features#features and feature name is what we are decoding
         self.trials = get_trials_dataframe(nwbfile, with_pseudoupdate=True)
         self.units = nwbfile.units.to_dataframe()
         self.data = self._setup_data(nwbfile)

@@ -8,6 +8,7 @@ from update_project.behavior.behavior_visualizer import BehaviorVisualizer
 from update_project.choice.choice_analyzer import ChoiceAnalyzer
 from update_project.choice.choice_visualizer import ChoiceVisualizer
 from update_project.decoding.bayesian_decoder_analyzer import BayesianDecoderAnalyzer
+from update_project.decoding.bayesian_decoder_analyzer_cv import BayesianDecoderAnalyzerCV
 from update_project.example_trials.example_trial_analyzer import ExampleTrialAnalyzer
 from update_project.decoding.bayesian_decoder_visualizer import BayesianDecoderVisualizer
 from update_project.single_units.single_unit_analyzer import SingleUnitAnalyzer
@@ -24,11 +25,13 @@ class UpdateTaskFigureGenerator:
         self.analysis_classes = dict(Behavior=BehaviorAnalyzer,
                                      Choice=ChoiceAnalyzer,
                                      Decoder=BayesianDecoderAnalyzer,
+                                     DecoderCV=BayesianDecoderAnalyzerCV,
                                      SingleUnits=SingleUnitAnalyzer,
                                      Examples=ExampleTrialAnalyzer)
         self.visualization_classes = dict(Behavior=BehaviorVisualizer,
                                           Choice=ChoiceVisualizer,
                                           Decoder=BayesianDecoderVisualizer,
+                                          DecoderCV=BayesianDecoderVisualizer,
                                           SingleUnits=SingleUnitVisualizer,
                                           Examples=ExampleTrialVisualizer)
 
@@ -69,22 +72,40 @@ class UpdateTaskFigureGenerator:
         session_names = session_names or self.sessions.load_session_names()
         analysis_interface = self.analysis_classes[analysis_to_run]
         visualization_interface = self.visualization_classes[analysis_to_run]
+        regions = analysis_kwargs.get('params', {}).get('region', [])
 
         group_data = []
         for name in session_names:
             # load nwb file
             io = NWBHDF5IO(self.sessions.get_session_path(name), 'r')
             nwbfile = io.read()
+            if len(regions) > 1:
+                for region in regions:# Loop through each region specified in the analysis_kwargs
+                    region_specific_kwargs = analysis_kwargs.copy()  # Copy the existing kwargs
+                    # Update the params dictionary to include the specific regions
+                    region_specific_kwargs['params'] = {
+                        'region': [region]  # Replace with the desired regions
+                    }
 
-            # run analysis
-            analyzer = analysis_interface(nwbfile=nwbfile,
-                                          session_id=self.sessions.get_session_id(name),
-                                          **analysis_kwargs)
-            analyzer.run_analysis(overwrite=overwrite)
-            session_data = dict(session_id=self.sessions.get_session_id(name),
-                                animal=self.sessions.get_animal_id(name),
-                                analyzer=analyzer)
-            group_data.append(session_data)
+                    # run analysis
+                    analyzer = analysis_interface(nwbfile=nwbfile,
+                                                session_id=self.sessions.get_session_id(name),
+                                                **region_specific_kwargs)
+                    analyzer.run_analysis(overwrite=overwrite)
+                    session_data = dict(session_id=self.sessions.get_session_id(name),
+                                        animal=self.sessions.get_animal_id(name),
+                                        analyzer=analyzer)
+                    group_data.append(session_data)
+            else:
+                # run analysis
+                analyzer = analysis_interface(nwbfile=nwbfile,
+                                              session_id=self.sessions.get_session_id(name),
+                                              **analysis_kwargs)
+                analyzer.run_analysis(overwrite=overwrite)
+                session_data = dict(session_id=self.sessions.get_session_id(name),
+                                    animal=self.sessions.get_animal_id(name),
+                                    analyzer=analyzer)
+                group_data.append(session_data)
 
         visualizer = visualization_interface(group_data,
                                              **visualization_kwargs)
@@ -103,15 +124,15 @@ class UpdateTaskFigureGenerator:
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[2.25, 1])
 
         # plot data
-        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Task schematic with example trial types')
-        sfigs_row0[1] = behavior_visualizer.plot_performance(sfigs_row0[1], tags='fig1_prop_correct')  # performance
-        sfigs_row1[0] = behavior_visualizer.plot_trajectories_by_position(sfigs_row1[0])  # example  trajectories
-        sfigs_row1[1] = behavior_visualizer.plot_trajectories_by_event(sfigs_row1[1])  # average trajectories
-        sfigs[2] = example_visualizer.plot_behavior_trial(sfigs[2], trial_id=175)  # or example 155
+        #sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Task schematic with example trial types')
+        sfigs_row0[1] = behavior_visualizer.plot_performance(sfigs_row0[1], tags='fig1_prop_correct', update_type=['switch_update', 'non_update','stay_update'])  # performance
+        #sfigs_row1[0] = behavior_visualizer.plot_trajectories_by_position(sfigs_row1[0])  # example  trajectories
+        #sfigs_row1[1] = behavior_visualizer.plot_trajectories_by_event(sfigs_row1[1])  # average trajectories
+        #sfigs[2] = example_visualizer.plot_behavior_trial(sfigs[2], trial_id=175)  # or example 155
 
         # figure saving
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'figure_1', tight_layout=False, results_type='manuscript')
+        self.results_io.save_fig(fig=fig, filename=f'figure_1b', tight_layout=False, results_type='response')
 
         if with_supplement:
             # figure structure
@@ -164,7 +185,7 @@ class UpdateTaskFigureGenerator:
         sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], ylim=(0.05, 0.1625), tags='fig2_PFC_position')
 
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'figure_2', tight_layout=False, results_type='manuscript')
+        self.results_io.save_fig(fig=fig, filename=f'figure_2', tight_layout=False, results_type='response')
 
         if with_supplement:
             ##### supp figure - local and initial cue quantification
@@ -295,18 +316,18 @@ class UpdateTaskFigureGenerator:
                                      results_type='manuscript')
 
     def plot_figure_4(self, with_supplement=True):
-        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-                                                analysis_kwargs=dict(features=['choice'],
-                                                                     params=dict(region=['PFC'])),
-                                                overwrite=self.overwrite)
-        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-                                                    analysis_kwargs=dict(features=['choice'],
-                                                                         params=dict(region=['CA1'])),
-                                                    overwrite=self.overwrite)
+        # pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                         analysis_kwargs=dict(features=['choice'],
+        #                                                              params=dict(region=['PFC'])),
+        #                                         overwrite=self.overwrite)
+        # hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                             analysis_kwargs=dict(features=['choice'],
+        #                                                                  params=dict(region=['CA1'])),
+        #                                             overwrite=self.overwrite)
         choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Choice', overwrite=False)  # don't overwrite
-        example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=False,
-                                                        session_names=[('S', 29, 211118)],
-                                                        analysis_kwargs=dict(feature='choice'))
+        # example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=False,
+        #                                                 session_names=[('S', 29, 211118)],
+        #                                                 analysis_kwargs=dict(feature='choice'))
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
@@ -317,25 +338,25 @@ class UpdateTaskFigureGenerator:
         sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=3, width_ratios=[1, 4, 2])
         sfigs_row4 = sfigs[4].subfigures(nrows=1, ncols=4, width_ratios=[1, 2, 2, 2])
 
-        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
+        #sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
         sfigs_row0[1] = choice_visualizer.plot_choice_commitment(sfigs_row0[1])  # TODO - check which trial types included
-        sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Recording setup + choice schematic')
-        sfigs_row1[1] = example_visualizer.plot_decoding_trial(sfigs_row1[1], region='PFC')
-        sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Choice schematic')
-        sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], feat='choice')
-        sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice', update_type='non_update')
-        sfigs_row2[3] = self.plot_placeholder(sfigs_row2[3], text='')
-        sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='Trial schematic')
-        sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.06, 0.25), with_velocity=True, tags='fig4_PFC_choice',)
-        sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], tags='fig4_PFC_choice',)
+        # sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Recording setup + choice schematic')
+        # sfigs_row1[1] = example_visualizer.plot_decoding_trial(sfigs_row1[1], region='PFC')
+        # sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Choice schematic')
+        # sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], feat='choice')
+        # sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice', update_type='non_update')
+        # sfigs_row2[3] = self.plot_placeholder(sfigs_row2[3], text='')
+        # sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='Trial schematic')
+        # sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.06, 0.25), with_velocity=True, tags='fig4_PFC_choice',)
+        # sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], tags='fig4_PFC_choice',)
 
-        sfigs_row4[0] = self.plot_placeholder(sfigs_row4[0], text='CA1 schematic')
-        sfigs_row4[1] = hpc_visualizer.plot_goal_coding(sfigs_row4[1], ylim=(0.06, 0.25), tags='fig4_CA1_choice',
-                                                        update_type=['switch'])
-        sfigs_row4[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row4[2], tags='fig4_CA1_choice',
-                                                              time_window=(0, 2))
+        # sfigs_row4[0] = self.plot_placeholder(sfigs_row4[0], text='CA1 schematic')
+        # sfigs_row4[1] = hpc_visualizer.plot_goal_coding(sfigs_row4[1], ylim=(0.06, 0.25), tags='fig4_CA1_choice',
+        #                                                 update_type=['switch'])
+        # sfigs_row4[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row4[2], tags='fig4_CA1_choice',
+        #                                                       time_window=(0, 2))
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'figure_4', tight_layout=False, results_type='manuscript')
+        self.results_io.save_fig(fig=fig, filename=f'figure_4_DC_2', tight_layout=False, results_type='response')
 
         if with_supplement:
             ##### supp figure 6
@@ -564,33 +585,372 @@ class UpdateTaskFigureGenerator:
                                                               #time_window=(0, 2))
 
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='response')
 
+    def plot_figure_b(self):#Danielle add for making the long windowed heatmap with iti nan
+        #n_sfig = 2
+        # hpc_visualizer_long_window = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                                         analysis_kwargs=dict(features=['y_position'],
+        #                                                                              params=dict(region=['CA1'])),
+        #                                                         visualization_kwargs=dict(window=10),
+        #                                                         overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)#i think needed for the stats part
+
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+
+        # plot data
+        #sfigs[0] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[0], update_type='switch', time_label='start_time')#, time_label='start_time', prev_turn='same'
+        #sfigs[1] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[1], update_type='switch', time_label='start_time', prev_turn='diff')#,start_nan=True)
+        #sfigs_row0[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row0[0], ylim=(0.0, 0.1625),
+        #                                                            time_label = ['start_time'], tags='figb_whole_start_t6')#, half='front')
+        # sfigs_row0[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row0[1], ylim=(0.0, 0.1625),
+        #                                                            time_label = ['t_update'], tags='figb_whole_update_t6')#, half='front')
+        # sfigs_row1[0] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row1[0], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+        #                                                             time_label = ['start_time', 't_update'], tags='figb_q_back_t6', half='rearhalf', title='back')
+        # sfigs_row1[1] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row1[1], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+        #                                                             time_label = ['start_time', 't_update'], tags='figb_q_whole_t6', title='whole')
+        # sfigs_row0[1] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[1], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+        #                                                             time_label = ['start_time', 't_update'], tags='figb_q_backbin_t9', half='backbin', title='back')
+        sfigs_row1[0] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row1[0], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+                                                                    time_label = ['start_time', 't_update'], tags='figb_q_front_t9', half='front', title='front')
+        # #, half='front'
+        # sfigs_row2[1] = hpc_visualizer.plot_goal_coding(sfigs_row2[1], tags=f'sfigb_CA1_choice',
+        #                                                 time_label=['start_time'])
+        sfigs_row1[1] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row1[1], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+                                                                    time_label = ['start_time', 't_update'], tags='figb_q_back2_t9', half='rearhalf', title='back')
+        sfigs_row0[0] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[0], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+                                                                   time_label = ['start_time', 't_update'], tags='startq_CA1_all_t9')
+        #sfigs_row2[1] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row2[1], ylim=(0.05, 0.1625), comparison='time_label', update_type='switch', 
+        #                                                            time_label = ['start_time', 't_update'], prev_turn='same', tags='fig2_CA1_position', half='rearhalf')
+        
+        self.results_io.save_fig(fig=fig, filename=f'sf_b_collapse_t9', tight_layout=False, results_type='response') 
+        
+    def plot_figure_c(self):#Danielle adding to compare stay vs delay only represenations with smaller timewindow
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+        sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        
+        sfigs_row0[1] = hpc_visualizer.plot_goal_coding_stats(sfigs[1], tags='figc_HPC_pos_stats_0-05',
+                                                              update_type=['stay', 'switch', 'non_update'],
+                                                              time_window=(0, 0.5))
+        
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_c', tight_layout=False, results_type='response') 
+        
+    def plot_figure_d(self):#compare correct incorrect on delay only trials
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['choice'],
+                                                                         params=dict(region=['PFC'])),
+                                                    overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
+        
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+        sfigs = fig.subfigures(nrows=3, ncols=2, width_ratios=[1.25, 1], height_ratios=[1, 1, 1])
+
+        sfigs[0][0] = hpc_visualizer.plot_goal_coding(sfigs[0][0], comparison='correct', use_residuals=True, use_delay=True,
+                                                      tags='fig6_HPC_choice_accuracy')#use_delay=True, update_type=['non_update'],
+        sfigs[0][1] = hpc_visualizer.plot_goal_coding_stats(sfigs[0][1], comparison='correct', title='hippocampal', use_delay=True,
+                                                            tags='fig6_HPC_position_accuracy', use_residuals=True)#use_delay=True, update_type=['non_update'],
+        sfigs[1][0] = pfc_visualizer.plot_goal_coding(sfigs[1][0], comparison='correct', use_residuals=True, use_delay=True,
+                                                      tags='fig6_PFC_position_accuracy')#use_delay=True, update_type=['non_update'],
+        sfigs[1][1] = pfc_visualizer.plot_goal_coding_stats(sfigs[1][1], comparison='correct', title='prefrontal', use_delay=True,
+                                                            tags='fig6_PFC_choice_accuracy', use_residuals=True)#use_delay=True, update_type=['non_update'],
+        #sfigs[2][0] = hpc_visualizer.plot_goal_coding_prediction(sfigs[2][0], comparison='all_update',
+        #                                                         tags="('CA1',)_y_position_50_0.2")
+        #sfigs[2][1] = pfc_visualizer.plot_goal_coding_prediction(sfigs[2][1], comparison='all_update',
+        #                                                         tags="('PFC',)_choice_50_0.2")
+
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_d', tight_layout=False, results_type='response')
+    
+    
+    def plot_figure_e(self):
+        # hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                             analysis_kwargs=dict(features=['y_position'],
+        #                                                                  params=dict(region=['CA1'])),
+        #                                             overwrite=self.overwrite)
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['PFC'])),
+                                                    overwrite=self.overwrite)
+        # example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
+        #                                                 session_names=[('S', 25, 210910)]) # ('S', 29, 211118)
+        ##### supp figure 4
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        #sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+
+         # plot data
+        sfigs_row1[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row1[1], time_window=(0, 1), tags='PFC_position_0-1')# pulled upper lim from HPC plot
+        sfigs_row1[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row1[0], time_window=(0, 0.5), tags='PFC_position_0-.5')# pulled upper lim from HPC plot
+        sfigs_row2[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[0], time_window=(0.5, 1), tags='PFC_position_.5-1')# pulled upper lim from HPC plot
+        #sfigs_row3[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[0], time_window=(0, 0.5), tags='sfig_PFC_position')
+
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_e2', tight_layout=False, results_type='response')
+        
+    def plot_figure_f(self, with_supplement=True):#plotting the distribution of trials normalized
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        # pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                             analysis_kwargs=dict(features=['y_position'],
+        #                                                                  params=dict(region=['PFC'])),
+        #                                             overwrite=self.overwrite)
+        #example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
+        #                                                session_names=[('S', 29, 211118)]) # ('S', 29, 211118)
+        #example_visualizer2 = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
+        #                                                session_names=[('S', 29, 211118)]) # ('S', 29, 211118)
+        # example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
+        #                                                 session_names=[('S', 33, 220421)]) # ('S', 29, 211118)
+
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row1 = sfigs[1]#.subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
+        #sfigs_row2 = sfigs[2]#.subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
+        sfigs_row3 = sfigs[2].subfigures(nrows=1, ncols=3, width_ratios=[2, 2, 1])
+        
+        
+        #sfigs_row0 = example_visualizer.plot_decoding_trial(sfigs_row0, region='CA1', trial_id=156) #trial 155, alternating, mostly initial. A likes as ex.
+        #sfigs_row0 = example_visualizer.plot_decoding_trial(sfigs_row0, region='CA1', trial_id=216) #need to figure out trials, up to 148
+        #sfigs_row1 = example_visualizer.plot_decoding_trial(sfigs_row1, region='CA1', trial_id=181) #154, 207, 231, 168
+        
+        sfigs_row3[0] = hpc_visualizer.plot_goal_coding_indtrials(sfigs_row3[0], tags='indtrials_bins_9', update_type = ['switch'])#ylim=(0.0325, 0.18),
+        sfigs_row3[1] = hpc_visualizer.plot_goal_coding_indtrials(sfigs_row3[1], tags='indtrials_ave_9',ave_bins=True, update_type = ['switch'])
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'sf_f_test9', tight_layout=False, results_type='response')
+        
+    def plot_figure_g(self):
+                ##### figure g normalizing 7.c based on 
+                
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['choice'],
+                                                                         params=dict(region=['PFC'])),
+                                                    overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6))
+        sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+
+        #sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Choice commitment schematic')
+        #sfigs_row0[1] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[1], update_type=['switch'],
+        #                                                              behavior_only=True)
+
+        sfigs_row1[0] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[0], update_type=['switch'], normalize=True)
+        sfigs_row2[0] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs_row2[0], update_type=['switch'], normalize=True)
+
+        sfigs_row1[1] = hpc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs_row1[1],
+                                                                                    update_type=['switch'], normalize=True,
+                                                                                    tags='fig7_CA1_commitment')
+        sfigs_row2[1] = pfc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs_row2[1],
+                                                                                    update_type=['switch'], normalize=True,
+                                                                                    tags='fig7_PFC_commitment')
+
+        # figure saving
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'figure_g2', tight_layout=False, results_type='response')
+        
+    def plot_figure_h(self):#for comparing non-local representations
+        #n_sfig = 2
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)#i think needed for the stats part
+
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+
+        # sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0], update_type='switch')
+        # sfigs_row1[1] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], update_type='non_update')
+        sfigs_row0[1] = hpc_visualizer.plot_goal_coding(sfigs_row0[1], ylim=(0.0325, 0.18), tags='figsh_CA1_position_t4')
+        sfigs_row2[1] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[1], ylim=(0.05, 0.1625), tags='figh_CA1_position_t5', other_zones=['central'], prospective_reps=True)
+        sfigs_row2[0] = hpc_visualizer.plot_nonlocal_coding_stats(sfigs_row2[0], ylim=(0.05, 0.1625), tags='fig2_CA1_position_t7', other_zones=['central'], prospective_reps=True)
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_h4_test7', tight_layout=False, results_type='response') 
+        
+    def plot_figure_i(self):#for comparing location coding across regions please work
+        location_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                     analysis_kwargs=dict(features=['y_position'],
+                                                                          params=dict(region=['CA1','PFC'])),
+                                                     visualization_kwargs=dict(window=10),
+                                                     overwrite=self.overwrite)
+        choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                       analysis_kwargs=dict(features=['choice'],
+                                                                            params=dict(region=['CA1','PFC'])),
+                                                       visualization_kwargs=dict(window=10),
+                                                       overwrite=self.overwrite)
+        
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1,1,1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        
+        #sfigs_row0[0] = choice_visualizer.plot_goal_coding_stats_regionchoice(sfigs_row0[0], comparison='region', ylim=(0.05, 0.1625), 
+        #                                                         update_type=['non_update'], tags='figi_regions_chioce')#prob_value='error',)
+        #sfigs_row2[0] = location_visualizer.plot_goal_coding_stats(sfigs_row0[1], time_window=(0, 1), tags='sfig_PFC_position')
+        # sfigs_row0[1] = choice_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[1], update_type=['non_update'],comparison='region',prob_value='prob_sum', title='', tags='',
+        #                                                                  time_window=(-2, 0), use_zscores=False, other_zones=dict(), stripplot=False,use_residuals=False, 
+        #                                                                     use_delay=False, ylim=None,time_label=['t_update'], prev_turn=None, half=None)
+        #sfigs_row0[1] = location_visualizer.plot_region_error_distribution(sfigs_row0[1], update_type='non_update', error_meaure='decoding_error', prob_value='prob_sum', feat='position')
+        #sfigs_row0[0] = choice_visualizer.plot_region_error_distribution(sfigs_row0[0],update_type='non_update',error_meaure='decoding_error', prob_value='prob_sum', feat='choice')
+        sfigs[1] = location_visualizer.plot_decoding_output_heatmap(sfigs[1], update_type='non_update', time_label='t_update')#, time_label='start_time'
+        #
+        self.results_io.save_fig(fig=fig, filename=f'supp_figurei_chogoalall', tight_layout=False, results_type='response') 
+        
+        
+    def plot_figure_j(self):#Danielle add for making all of the remaining heatmaps with inital and new flipped
+        #n_sfig = 2
+        hpc_visualizer_long_window = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                                analysis_kwargs=dict(features=['y_position'],
+                                                                                     params=dict(region=['CA1'])),
+                                                                visualization_kwargs=dict(window=10),
+                                                                overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)#i think needed for the stats part
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['PFC'])),
+                                                    overwrite=self.overwrite)#i think needed for the stats part
+
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        #sfigs_row0 = sfigs[0]#.subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+
+        # plot data
+        sfigs[0] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[0], update_type='switch', time_label='start_time')#, prev_turn='same'
+        #sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0], update_type='non_update', time_label='t_update')#,start_nan=True), prev_turn='diff'
+        #sfigs_row1[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1], update_type='non_update', time_label='t_update')
+        #sfigs_row2[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row2[0], update_type='switch', time_label='t_update')#,start_nan=True), prev_turn='diff'
+        #sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], update_type='switch', time_label='t_update')
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_heatmaps4', tight_layout=False, results_type='response')
+        
+        
+    def plot_figure_k(self):#Danielle adding to compare stay vs delay hpc choice and switch vs delay pfc choice prior to update cue (-1.5-0)
+        # hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                             analysis_kwargs=dict(features=['choice'],
+        #                                                                  params=dict(region=['CA1'])),
+        #                                             overwrite=self.overwrite)
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['choice'],
+                                                                         params=dict(region=['PFC'])),
+                                                    overwrite=self.overwrite)
+        
+        # figure structure
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+        sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        
+        # sfigs_row0[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row0[0], tags='sf_HPC_cho_1.5_025sb4qt6',
+        #                                                       update_type=['switch', 'stay', 'non_update'],
+        #                                                       time_window=(-1.5, -0.25))
+        # sfigs_row0[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row0[1], tags='sf_PFC_cho_1.5_025sb4qt6',
+        #                                                       update_type=['switch', 'stay', 'non_update'],
+        #                                                       time_window=(-1.5, -0.25))
+        
+        # sfigs_row1[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row1[0], tags='sf_HPC_cho_1.5_05_t9',
+        #                                                       update_type=['switch', 'stay', 'non_update'],
+        #                                                       time_window=(-1.5, -0.5), all_trials=False)
+        # sfigs_row1[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row1[1], tags='sf_PFC_cho_1.5_05_Ct9',
+        #                                                       update_type=['switch', 'non_update'],
+        #                                                       time_window=(-1.5, -0.5), all_trials=False)
+        # sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags='sf_HPC_cho_1.5_05_allt9',
+        #                                                       update_type=['switch', 'stay', 'non_update'],
+        #                                                       time_window=(-1.5, -0.5), all_trials=True)
+        sfigs_row2[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[1], tags='sf_PFC_cho_1.5_05_allt9',
+                                                              update_type=['switch', 'non_update'],
+                                                              time_window=(-1.5, -0.5), all_trials=True, subsample=True)
+        
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_k_t9', tight_layout=False, results_type='response')
+
+    def plot_figure_l(self):
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['y_position'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        fig2 = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=1, ncols=1, width_ratios=[1], height_ratios=[1])
+        # sfigs = hpc_visualizer.plot_goal_coding_stats(sfigs, prob_value='prob_over_chance',
+        #                                               tags='sf_l_CA1_position_t2', rebaseline=False)
+        # self.results_io.save_fig(fig=fig, filename=f'supp_figure_chance_hpc_t2_f', tight_layout=True,
+        #                          results_type='response')
+        sfig = fig2.subfigures(nrows=1, ncols=1, width_ratios=[1], height_ratios=[1])
+        sfig = hpc_visualizer.plot_goal_coding_stats(sfig, prob_value='prob_over_chance',
+                                                      tags='sf_l_CA1_position_t3_bl', rebaseline=True)
+        self.results_io.save_fig(fig=fig2, filename=f'supp_figure_chance_hpc_t3_t', tight_layout=True,
+                                 results_type='response')
+        
     def plot_supp_figure_all_trials(self):
         encoder_trials_all = dict(update_type=[1, 2, 3], correct=[0, 1], maze_id=[3, 4])
-        hpc_visualizer_encode_all = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        hpc_visualizer_encode_all = self.run_analysis_pipeline(analysis_to_run='DecoderCV',
                                                                analysis_kwargs=dict(features=['y_position'],
                                                                                     params=dict(region=['CA1'],
                                                                                                 encoder_trial_types=encoder_trials_all,
                                                                                                 decoder_test_size=0.8)),
                                                                overwrite=self.overwrite)
+        hpc_visualizer_long_window_all = self.run_analysis_pipeline(analysis_to_run='DecoderCV',
+                                                                analysis_kwargs=dict(features=['y_position'],
+                                                                                     params=dict(region=['CA1'])),
+                                                                visualization_kwargs=dict(window=10),
+                                                                overwrite=self.overwrite)
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
         sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
-        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[3, 1])
         sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         # plot data
-        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='schematic of using all trials for decoder')
-        sfigs_row0[1] = hpc_visualizer_encode_all.plot_decoding_output_heatmap(sfigs_row0[1])
-        sfigs[1] = hpc_visualizer_encode_all.plot_goal_coding(sfigs[1], tags='sfig4_CA1_position_all')
+        #sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='schematic of using all trials for decoder')
+        #sfigs_row0[0] = hpc_visualizer_long_window_all.plot_decoding_output_heatmap(sfigs_row0[0])
+        #sfigs[1] = hpc_visualizer_encode_all.plot_goal_coding(sfigs[1], tags='sfig4_CA1_position_all')#
         sfigs_row2[0] = hpc_visualizer_encode_all.plot_goal_coding_stats(sfigs_row2[0], tags='sfig4_CA1_position_stats',
                                                                        time_window=(0, 1.5))
+        #
 
         # figure saving
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'supp_figure_4', tight_layout=False, results_type='manuscript')
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_alltrials_stat', tight_layout=False, results_type='response')
 
     def plot_supp_figure_lateral_position(self):
         hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
