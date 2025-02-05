@@ -572,7 +572,7 @@ class BayesianDecoderAggregator:
                 lambda x: x.mid)
             quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
 
-            choice_df = quant_df.pivot(
+            choice_df = quant_df.pivot_table(
                 index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
                 columns=['choice'],
                 values=[prob_value, 'diff_baseline', 'zscore_prob']).reset_index()  # had times here before

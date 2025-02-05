@@ -69,7 +69,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
         # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
 
-    def plot_decoding_output_heatmap(self, sfig, update_type='switch', prob_value='prob_sum', feat='position'):
+    def plot_decoding_output_heatmap(self, sfig, update_type='switch', prob_value='prob_sum', feat='position'):#include something to indicate if removing iti
         # load up data
         plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,

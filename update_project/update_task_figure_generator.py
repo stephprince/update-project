@@ -19,7 +19,7 @@ class UpdateTaskFigureGenerator:
     def __init__(self, sessions, overwrite=False):
         self.sessions = sessions
         self.overwrite = overwrite
-        self.results_io = ResultsIO(creator_file=__file__, folder_name='manuscript_figures')
+        self.results_io = ResultsIO(creator_file=__file__, folder_name='response_figures')
 
         self.analysis_classes = dict(Behavior=BehaviorAnalyzer,
                                      Choice=ChoiceAnalyzer,
@@ -38,6 +38,7 @@ class UpdateTaskFigureGenerator:
         self.plot_figure_3()              # figure 3 - HPC theta modulation
         self.plot_figure_4()              # figure 4 - PFC/HPC choice coding + decoding validation + animal breakdown
         self.plot_figure_5_and_6_and_7()  # figure 5 - HPC + PFC stay + accuracy prediction + choice commitment + supp
+        self.plot_figure_a()
 
     def plot_supplemental_figures(self):
         # rest of supplemental figures are plotted within their corresponding main figure functions to minimize compute
@@ -381,7 +382,7 @@ class UpdateTaskFigureGenerator:
             sfigs_row0[1] = hpc_visualizer.plot_decoding_validation(sfigs_row0[1], tags=f'sfig{n_sfig}_CA1_choice')
             sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])
             sfigs_row1[1] = hpc_visualizer.plot_goal_coding(sfigs_row1[1], tags=f'sfig{n_sfig}_CA1_choice',
-                                                            update_type=['switch', 'non_update'])
+                                                            update_type=['switch', 'non_update'])#sf8c
             sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags=f'sfig{n_sfig}_CA1_choice',
                                                                   time_window=(0, 2))
 
@@ -531,6 +532,39 @@ class UpdateTaskFigureGenerator:
 
             # figure saving
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_pre_correct', tight_layout=False, results_type='manuscript')
+            
+    #actual plotting for the hpc choice figure
+    def plot_figure_a(self):#renaming to plot_figure_a so not accidentally calling Steph's og version
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                analysis_kwargs=dict(features=['choice'],
+                                                                     params=dict(region=['PFC'])),
+                                                overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['choice'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
+        choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Choice', overwrite=False)  # don't overwrite
+        example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=False,
+                                                        session_names=[('S', 29, 211118)],
+                                                        analysis_kwargs=dict(feature='choice'))
+        ##### supp figure 8
+        n_sfig = 11#making sure not overwriting any figures steph made
+        fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+        sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
+        sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+        sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+        sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+        # plot data
+        #sfigs_row0[0] = hpc_visualizer.plot_tuning_curves(sfigs_row0[0], title='hippocampal choice')
+        #sfigs_row0[1] = hpc_visualizer.plot_decoding_validation(sfigs_row0[1], tags=f'sfig{n_sfig}_CA1_choice')
+        #sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])
+        sfigs_row1[1] = hpc_visualizer.plot_goal_coding(sfigs_row1[1], tags=f'sfig{n_sfig}_CA1_choice',
+                                                        update_type=['stay',  'non_update'])#update_type=['switch', 'non_update']
+        #sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags=f'sfig{n_sfig}_CA1_choice',
+                                                              #time_window=(0, 2))
+
+        self.add_panel_labels(sfigs)
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
 
     def plot_supp_figure_all_trials(self):
         encoder_trials_all = dict(update_type=[1, 2, 3], correct=[0, 1], maze_id=[3, 4])
