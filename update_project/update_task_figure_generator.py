@@ -112,7 +112,7 @@ class UpdateTaskFigureGenerator:
 
         return visualizer
 
-    def plot_figure_1(self, with_supplement=True):
+    def plot_figure_1(self, with_supplement=True):#DC good as is
         behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
         example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
                                                         session_names=[('S', 29, 211118)])
@@ -132,7 +132,7 @@ class UpdateTaskFigureGenerator:
 
         # figure saving
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'figure_1b', tight_layout=False, results_type='response')
+        self.results_io.save_fig(fig=fig, filename=f'figure_1c', tight_layout=False, results_type='response')#DC go through and make sure all are saving correctly
 
         if with_supplement:
             # figure structure
@@ -204,31 +204,54 @@ class UpdateTaskFigureGenerator:
             self.add_panel_labels(sfigs)
             self.results_io.save_fig(fig=fig, filename=f'figure_local_initial', tight_layout=False, results_type='manuscript')
 
-            ##### supp figure 2
+            ##### supp figure 2#DC need to add panels, maybe subtract too
             n_sfig = 2
             hpc_visualizer_long_window = self.run_analysis_pipeline(analysis_to_run='Decoder',
                                                                     analysis_kwargs=dict(features=['y_position'],
                                                                                          params=dict(region=['CA1'])),
                                                                     visualization_kwargs=dict(window=10),
-                                                                    overwrite=self.overwrite)
+                                                                    overwrite=self.overwrite)#DC not sure if this is needed
 
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
-            sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 2, 2])
+            sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1, 1, 1])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
             sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])#goal bias histograms
+            #final row is all trials included in the encoding model, must currently be run by DC insert script here
 
             # plot data
             sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='probe tract visualization')
             sfigs_row0[1] = self.plot_placeholder(sfigs_row0[1], text='histological images')
             sfigs_row1[0] = hpc_visualizer.plot_tuning_curves(sfigs_row1[0], title='hippocampal position')
             sfigs_row1[1] = hpc_visualizer.plot_decoding_validation(sfigs_row1[1], tags=f'sfig{n_sfig}_CA1_position')
-            sfigs[2] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[2], update_type='switch')
+            sfigs_row2[0] = hpc_visualizer.plot_goal_coding_indtrials(sfigs_row2[0], tags=f'sfig{n_sfig}_goal_bins', update_type = ['switch'])
+            sfigs_row2[1] = hpc_visualizer.plot_goal_coding_indtrials(sfigs_row2[1], tags=f'sfig{n_sfig}_goal_trials',ave_bins=True, update_type = ['switch'])#this visualizer is good
 
             self.add_panel_labels(sfigs)
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
             
-            ##### supp figure 3
+            ##supp figure 3
             n_sfig = 3
+            fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
+            sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1, 1, 1])
+            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+            sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+            
+            #plot data
+            sfigs[0] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[0], update_type='switch', time_label='start_time', prev_turn='same')#DC need to fix window issue
+            sfigs[1] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[1], update_type='switch', time_label='start_time', prev_turn='diff')
+            sfigs_row1[0] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row1[0], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+                                                                    time_label = ['start_time', 't_update'], tags=f'sfig{n_sfig}_cue_front', half='front', title='front')
+            sfigs_row1[1] = hpc_visualizer.plot_goal_coding_stats_nomap(sfigs_row1[1], ylim=(0.0, 0.1625), comparison='time_label', update_type='switch', 
+                                                                    time_label = ['start_time', 't_update'], tags=f'sfig{n_sfig}_cue_back', half='front', title='back')
+            sfigs_row2[1] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[1], ylim=(0.05, 0.1625), tags=f'sfig{n_sfig}_retro_trialtype', other_zones=['central'], prospective_reps=True)
+            sfigs_row2[0] = hpc_visualizer.plot_nonlocal_coding_stats(sfigs_row2[0], ylim=(0.05, 0.1625), tags=f'sfig{n_sfig}_retro_switch', other_zones=['central'], prospective_reps=True)
+            #these visualizers are good
+            self.add_panel_labels(sfigs)
+            self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
+            
+            ##### supp figure 3#now supp figure 4, add new sfig 3. new SF4 is good
+            n_sfig = 4
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
             sfigs[0] = hpc_visualizer.plot_goal_coding(sfigs[0], groups='animal',
@@ -236,23 +259,33 @@ class UpdateTaskFigureGenerator:
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False,
                                      results_type='manuscript')
 
-            ##### supp figure 4
-            n_sfig = 4
+            ##### supp figure 4#now sfig 5, needs additions#DC subset reg properly in analyzer
+            n_sfig = 5
+            location_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                     analysis_kwargs=dict(features=['y_position'],
+                                                                          params=dict(region=['CA1','PFC'], subset_reg=True)),
+                                                     visualization_kwargs=dict(window=10),
+                                                     overwrite=self.overwrite)
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=4, ncols=1, height_ratios=[1, 1, 1, 1])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
-            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
-            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 4])
-            sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+            sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
 
             # plot data
-            sfigs_row0[0] = pfc_visualizer.plot_tuning_curves(sfigs_row0[0], title='prefrontal  position')
-            sfigs_row0[1] = pfc_visualizer.plot_decoding_validation(sfigs_row0[1], tags=f'sfig{n_sfig}_PFC_position')
-            sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='PFC schematic')
-            sfigs_row1[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[1])
-            sfigs_row2[1] = pfc_visualizer.plot_goal_coding(sfigs_row2[1], ylim=(0.0, 0.18825),
+            sfigs_row0[0] = pfc_visualizer.plot_tuning_curves(sfigs_row0[0], title='prefrontal  position')#correct
+            sfigs_row0[1] = pfc_visualizer.plot_decoding_validation(sfigs_row0[1], tags=f'sfig{n_sfig}_PFC_position')#correct
+            #sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='PFC schematic')#not needed
+            sfigs_row1[0] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])#correct, position
+            sfigs_row1[1] = pfc_visualizer.plot_goal_coding(sfigs_row1[1], ylim=(0.0, 0.18825),
                                                             tags=f'sfig{n_sfig}_PFC_position')  # pulled upper lim from HPC plot
-            sfigs_row3[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags=f'sfig{n_sfig}_PFC_position')
+            #sfigs_row3[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[0], tags=f'sfig{n_sfig}_PFC_position')#not needed here
+            sfigs_row2[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags=f'sfig{n_sfig}_PFC_position', time_window=(0,1))
+            sfigs_row3[0] = location_visualizer.plot_region_error_distribution(sfigs_row3[0],update_type='non_update', feat='position')
+            sfigs_row3[1] = location_visualizer.plot_goal_coding_stats_nomap(sfigs_row3[1], update_type=['non_update'],comparison='region',prob_value='prob_sum', title='', tags=f'sfig{n_sfig}_region_choice',
+                                                                         time_window=(-2, 0), use_zscores=False, other_zones=dict(), stripplot=False,use_residuals=False, 
+                                                                            use_delay=False, ylim=None,time_label=['t_update'], prev_turn=None, half=None)
 
             self.add_panel_labels(sfigs)
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
@@ -297,7 +330,7 @@ class UpdateTaskFigureGenerator:
         self.results_io.save_fig(fig=fig, filename=f'figure_3', tight_layout=False, results_type='manuscript')
 
         if with_supplement:
-            n_sfig = 5
+            n_sfig = 6#now sf6, good as is
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 4))
             sfigs = fig.subfigures(nrows=1, ncols=4, width_ratios=[1, 1, 1, 2])
 
@@ -316,18 +349,18 @@ class UpdateTaskFigureGenerator:
                                      results_type='manuscript')
 
     def plot_figure_4(self, with_supplement=True):
-        # pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-        #                                         analysis_kwargs=dict(features=['choice'],
-        #                                                              params=dict(region=['PFC'])),
-        #                                         overwrite=self.overwrite)
-        # hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-        #                                             analysis_kwargs=dict(features=['choice'],
-        #                                                                  params=dict(region=['CA1'])),
-        #                                             overwrite=self.overwrite)
+        pfc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                analysis_kwargs=dict(features=['choice'],
+                                                                     params=dict(region=['PFC'])),
+                                                overwrite=self.overwrite)
+        hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                    analysis_kwargs=dict(features=['choice'],
+                                                                         params=dict(region=['CA1'])),
+                                                    overwrite=self.overwrite)
         choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Choice', overwrite=False)  # don't overwrite
-        # example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=False,
-        #                                                 session_names=[('S', 29, 211118)],
-        #                                                 analysis_kwargs=dict(feature='choice'))
+        example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=False,
+                                                        session_names=[('S', 29, 211118)],
+                                                        analysis_kwargs=dict(feature='choice'))
 
         # figure structure
         fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
@@ -338,29 +371,29 @@ class UpdateTaskFigureGenerator:
         sfigs_row3 = sfigs[3].subfigures(nrows=1, ncols=3, width_ratios=[1, 4, 2])
         sfigs_row4 = sfigs[4].subfigures(nrows=1, ncols=4, width_ratios=[1, 2, 2, 2])
 
-        #sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
+        sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='LSTM network schematic')
         sfigs_row0[1] = choice_visualizer.plot_choice_commitment(sfigs_row0[1])  # TODO - check which trial types included
-        # sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Recording setup + choice schematic')
-        # sfigs_row1[1] = example_visualizer.plot_decoding_trial(sfigs_row1[1], region='PFC')
-        # sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Choice schematic')
-        # sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], feat='choice')
-        # sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice', update_type='non_update')
-        # sfigs_row2[3] = self.plot_placeholder(sfigs_row2[3], text='')
-        # sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='Trial schematic')
-        # sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.06, 0.25), with_velocity=True, tags='fig4_PFC_choice',)
-        # sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], tags='fig4_PFC_choice',)
+        sfigs_row1[0] = self.plot_placeholder(sfigs_row1[0], text='Recording setup + choice schematic')
+        sfigs_row1[1] = example_visualizer.plot_decoding_trial(sfigs_row1[1], region='PFC')
+        sfigs_row2[0] = self.plot_placeholder(sfigs_row2[0], text='Choice schematic')
+        sfigs_row2[1] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[1], feat='choice')
+        sfigs_row2[2] = pfc_visualizer.plot_decoding_output_heatmap(sfigs_row2[2], feat='choice', update_type='non_update')
+        sfigs_row2[3] = self.plot_placeholder(sfigs_row2[3], text='')
+        sfigs_row3[0] = self.plot_placeholder(sfigs_row3[0], text='Trial schematic')
+        sfigs_row3[1] = pfc_visualizer.plot_goal_coding(sfigs_row3[1], ylim=(0.06, 0.25), with_velocity=True, tags='fig4_PFC_choice',)
+        sfigs_row3[2] = pfc_visualizer.plot_goal_coding_stats(sfigs_row3[2], tags='fig4_PFC_choice',)
 
-        # sfigs_row4[0] = self.plot_placeholder(sfigs_row4[0], text='CA1 schematic')
-        # sfigs_row4[1] = hpc_visualizer.plot_goal_coding(sfigs_row4[1], ylim=(0.06, 0.25), tags='fig4_CA1_choice',
-        #                                                 update_type=['switch'])
-        # sfigs_row4[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row4[2], tags='fig4_CA1_choice',
-        #                                                       time_window=(0, 2))
+        sfigs_row4[0] = self.plot_placeholder(sfigs_row4[0], text='CA1 schematic')
+        sfigs_row4[1] = hpc_visualizer.plot_goal_coding(sfigs_row4[1], ylim=(0.06, 0.25), tags='fig4_CA1_choice',
+                                                        update_type=['switch'])
+        sfigs_row4[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row4[2], tags='fig4_CA1_choice',
+                                                              time_window=(0, 2))
         self.add_panel_labels(sfigs)
-        self.results_io.save_fig(fig=fig, filename=f'figure_4_DC_2', tight_layout=False, results_type='response')
+        self.results_io.save_fig(fig=fig, filename=f'figure_4', tight_layout=False, results_type='response')
 
         if with_supplement:
-            ##### supp figure 6
-            n_sfig = 6
+            ##### supp figure 6#now sf7
+            n_sfig = 7
             pfc_visualizer_long_window = self.run_analysis_pipeline(analysis_to_run='Decoder',
                                                                     analysis_kwargs=dict(features=['choice'],
                                                                                          params=dict(region=['PFC'])),
@@ -371,6 +404,7 @@ class UpdateTaskFigureGenerator:
             sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 2])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
             sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1.5])
+            sfigs_col = sfigs_row2[1].subfigures(nrows=2, ncols=1, height_ratios=[1,1])
 
             # plot data
             sfigs_row0[0] = pfc_visualizer.plot_tuning_curves(sfigs_row0[0], title='prefrontal cortex choice')
@@ -378,20 +412,31 @@ class UpdateTaskFigureGenerator:
             sfigs[1] = pfc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[1], feat='choice',
                                                                                update_type='switch')
             sfigs_row2[0] = pfc_visualizer.plot_motor_timing(sfigs_row2[0], tags=f'sfig{n_sfig}_pfc_motor_timing')
+            sfigs_col[0] = pfc_visualizer.plot_goal_coding_stats(sfigs_col[0], tags='sfig7_goalcoding_Correct',
+                                                              update_type=['switch', 'non_update'],
+                                                              time_window=(-1.5, -0.5), all_trials=False)
+            sfigs_col[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_col[1], tags='sfig7_goalcoding_All',
+                                                              update_type=['switch', 'non_update'],
+                                                              time_window=(-1.5, -0.5), all_trials=True)
 
             self.add_panel_labels(sfigs)
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
 
-            ##### supp figure 7
-            n_sfig = 7
+            ##### supp figure 7#now sf8, good as is
+            n_sfig = 8
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=1, ncols=2, width_ratios=[1.5, 1])
             sfigs[0] = pfc_visualizer.plot_goal_coding(sfigs[0], groups='animal', tags=f'sfig{n_sfig}_pfc_by_animal')
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False,
                                      results_type='manuscript')
 
-            ##### supp figure 8
-            n_sfig = 8
+            ##### supp figure 8#now sf9, needs additions potentially#subset_reg needs to be set in analyzer properly
+            n_sfig = 9
+            choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+                                                            analysis_kwargs=dict(features=['choice'],
+                                                                                    params=dict(region=['CA1','PFC'], subset_reg=True)),
+                                                            visualization_kwargs=dict(window=10),
+                                                            overwrite=self.overwrite)
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1, 1, 1])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
@@ -402,10 +447,11 @@ class UpdateTaskFigureGenerator:
             sfigs_row0[0] = hpc_visualizer.plot_tuning_curves(sfigs_row0[0], title='hippocampal choice')
             sfigs_row0[1] = hpc_visualizer.plot_decoding_validation(sfigs_row0[1], tags=f'sfig{n_sfig}_CA1_choice')
             sfigs_row1[0] = hpc_visualizer.plot_decoding_output_heatmap(sfigs_row1[0])
-            sfigs_row1[1] = hpc_visualizer.plot_goal_coding(sfigs_row1[1], tags=f'sfig{n_sfig}_CA1_choice',
-                                                            update_type=['switch', 'non_update'])#sf8c
-            sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags=f'sfig{n_sfig}_CA1_choice',
-                                                                  time_window=(0, 2))
+            sfigs_row2[0] = hpc_visualizer.plot_goal_coding(sfigs_row2[0], tags=f'sfig{n_sfig}_CA1_choice',
+                                                            update_type=['switch', 'non_update','stay'])#sf8c
+            sfigs_row2[1] = choice_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[1], update_type=['non_update'],comparison='region',prob_value='prob_sum', title='', tags='choice_regions',
+                                                                         time_window=(-2, 0), use_zscores=False, other_zones=dict(), stripplot=False,use_residuals=False, 
+                                                                            use_delay=False, ylim=None,time_label=['t_update'], prev_turn=None, half=None)
 
             self.add_panel_labels(sfigs)
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
@@ -486,23 +532,36 @@ class UpdateTaskFigureGenerator:
         sfigs_row0[1] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[1], update_type=['switch'],
                                                                       behavior_only=True)
 
-        sfigs_row1[0] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[0], update_type=['switch'])
-        sfigs_row1[1] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[1], update_type=['switch'])
+        sfigs_row1[0] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[0], update_type=['switch'], normalize=True)
+        sfigs_row1[1] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[1], update_type=['switch'], normalize=True)
 
         sfigs_row2[0] = hpc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs_row2[0],
                                                                                     update_type=['switch'],
-                                                                                    tags='fig7_CA1_commitment')
+                                                                                    tags='fig7_CA1_commitment', normalize=True)
         sfigs_row2[1] = pfc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs_row2[1],
                                                                                     update_type=['switch'],
-                                                                                    tags='fig7_PFC_commitment')
+                                                                                    tags='fig7_PFC_commitment', normalize=True)
 
         # figure saving
         self.add_panel_labels(sfigs)
         self.results_io.save_fig(fig=fig, filename=f'figure_7', tight_layout=False, results_type='manuscript')
 
         if with_supplement:
-            # figures structure 9
-            n_sfig = 9
+            # figures structure 9#now sf11, good as is. need to add new 10, 12, and 13
+            n_sfig = 10
+            fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+            sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 2, 2])
+            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=3, width_ratios=[1, 1, 1])
+            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 2])
+            sfigs_row1[0] = hpc_visualizer.plot_goal_coding(sfigs_row1[0], ylim=(0.0325, 0.18), tags='fig2_CA1_position_switch', update_type=['switch'])
+            sfigs_row1[1] = hpc_visualizer.plot_goal_coding(sfigs_row1[1], ylim=(0.0325, 0.18), tags='fig2_CA1_position_delay', update_type=['non_update'])
+            sfigs_row1[2] = hpc_visualizer.plot_goal_coding(sfigs_row1[2], ylim=(0.0325, 0.18), tags='fig2_CA1_position_stay', update_type=['stay'])
+            sfigs_row2[2] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[2], ylim=(0.05, 0.1625), tags='figs10_CA1_position', update_type=['switch', 'non_update', 'stay'])
+            
+            # figure saving
+            self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
+            
+            n_sfig = 11
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
             sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
@@ -524,9 +583,51 @@ class UpdateTaskFigureGenerator:
 
             # figure saving
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
+            
+            n_sfig = 12#these visualizers are good
+            fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+            sfigs = fig.subfigures(nrows=3, ncols=2, width_ratios=[1.25, 1], height_ratios=[1, 1, 1])
 
-            # figure structure - supp fig 11
-            n_sfig = 10
+            sfigs[0][0] = hpc_visualizer.plot_goal_coding(sfigs[0][0], comparison='correct', use_residuals=True, use_delay=True,
+                                                        tags='figs12_HPC_choice_accuracy')#use_delay=True, update_type=['non_update'],
+            sfigs[0][1] = hpc_visualizer.plot_goal_coding_stats(sfigs[0][1], comparison='correct', title='hippocampal', use_delay=True,
+                                                                tags='figs12_HPC_position_accuracy', use_residuals=True)#use_delay=True, update_type=['non_update'],
+            sfigs[1][0] = pfc_visualizer.plot_goal_coding(sfigs[1][0], comparison='correct', use_residuals=True, use_delay=True,
+                                                          tags='figs12_PFC_position_accuracy')#use_delay=True, update_type=['non_update'],
+            sfigs[1][1] = pfc_visualizer.plot_goal_coding_stats(sfigs[1][1], comparison='correct', title='prefrontal', use_delay=True,
+                                                                tags='figs12_PFC_choice_accuracy', use_residuals=True)
+            # figure saving
+            self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
+            
+            #new sfig13: former fig7. these visualizers are good
+            n_sfig = 13
+            # figure structure
+            fig = plt.figure(constrained_layout=True, figsize=(6.5, 6))
+            sfigs = fig.subfigures(nrows=3, ncols=1, width_ratios=[1], height_ratios=[1, 1, 1])
+            sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
+            sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+            sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
+
+            sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='Choice commitment schematic')
+            sfigs_row0[1] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row0[1], update_type=['switch'],
+                                                                      behavior_only=True)
+
+            sfigs_row1[0] = hpc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[0], update_type=['switch'])
+            sfigs_row1[1] = pfc_visualizer.plot_goal_coding_by_commitment(sfigs_row1[1], update_type=['switch'])
+
+            sfigs_row2[0] = hpc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs_row2[0],
+                                                                                        update_type=['switch'],
+                                                                                        tags='sfig13_CA1_commitment')
+            sfigs_row2[1] = pfc_visualizer.plot_goal_coding_by_commitment_single_trials(sfigs_row2[1],
+                                                                                        update_type=['switch'],
+                                                                                        tags='sfig13_PFC_commitment')
+
+            # figure saving
+            self.add_panel_labels(sfigs)
+            self.results_io.save_fig(fig=fig, filename=f'supp_figure_{n_sfig}', tight_layout=False, results_type='manuscript')
+
+            # figure structure - supp fig 10#new sf14, good as is
+            n_sfig = 14
             fig = plt.figure(constrained_layout=True, figsize=(6.5, 9))
             sfigs = fig.subfigures(nrows=2, ncols=1, width_ratios=[1], height_ratios=[1, 4])
             sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
@@ -606,8 +707,8 @@ class UpdateTaskFigureGenerator:
         sfigs_row1 = sfigs[1].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
 
         # plot data
-        #sfigs[0] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[0], update_type='switch', time_label='start_time')#, time_label='start_time', prev_turn='same'
-        #sfigs[1] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[1], update_type='switch', time_label='start_time', prev_turn='diff')#,start_nan=True)
+        sfigs[0] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[0], update_type='switch', time_label='start_time', prev_turn='same')#, time_label='start_time', prev_turn='same'
+        sfigs[1] = hpc_visualizer_long_window.plot_decoding_output_heatmap(sfigs[1], update_type='switch', time_label='start_time', prev_turn='diff')#,start_nan=True)
         #sfigs_row0[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row0[0], ylim=(0.0, 0.1625),
         #                                                            time_label = ['start_time'], tags='figb_whole_start_t6')#, half='front')
         # sfigs_row0[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row0[1], ylim=(0.0, 0.1625),
@@ -803,11 +904,11 @@ class UpdateTaskFigureGenerator:
         self.results_io.save_fig(fig=fig, filename=f'supp_figure_h4_test7', tight_layout=False, results_type='response') 
         
     def plot_figure_i(self):#for comparing location coding across regions please work
-        location_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
-                                                     analysis_kwargs=dict(features=['y_position'],
-                                                                          params=dict(region=['CA1','PFC'])),
-                                                     visualization_kwargs=dict(window=10),
-                                                     overwrite=self.overwrite)
+        # location_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
+        #                                              analysis_kwargs=dict(features=['y_position'],
+        #                                                                   params=dict(region=['CA1','PFC'])),
+        #                                              visualization_kwargs=dict(window=10),
+        #                                              overwrite=self.overwrite)
         choice_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
                                                        analysis_kwargs=dict(features=['choice'],
                                                                             params=dict(region=['CA1','PFC'])),
@@ -818,17 +919,17 @@ class UpdateTaskFigureGenerator:
         sfigs = fig.subfigures(nrows=3, ncols=1, height_ratios=[1,1,1])
         sfigs_row0 = sfigs[0].subfigures(nrows=1, ncols=2, width_ratios=[1, 1])
         
-        #sfigs_row0[0] = choice_visualizer.plot_goal_coding_stats_regionchoice(sfigs_row0[0], comparison='region', ylim=(0.05, 0.1625), 
-        #                                                         update_type=['non_update'], tags='figi_regions_chioce')#prob_value='error',)
+        sfigs_row0[0] = choice_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[0], comparison='region', ylim=(0.05, 0.1625), 
+                                                                 update_type=['non_update'], tags='figi_regions_chioce', time_window=(-2, 0), time_label=['t_update'])#prob_value='error',)
         #sfigs_row2[0] = location_visualizer.plot_goal_coding_stats(sfigs_row0[1], time_window=(0, 1), tags='sfig_PFC_position')
-        # sfigs_row0[1] = choice_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[1], update_type=['non_update'],comparison='region',prob_value='prob_sum', title='', tags='',
+        # sfigs_row0[1] = location_visualizer.plot_goal_coding_stats_nomap(sfigs_row0[1], update_type=['non_update'],comparison='region',prob_value='prob_sum', title='', tags='loc_regions',
         #                                                                  time_window=(-2, 0), use_zscores=False, other_zones=dict(), stripplot=False,use_residuals=False, 
         #                                                                     use_delay=False, ylim=None,time_label=['t_update'], prev_turn=None, half=None)
-        #sfigs_row0[1] = location_visualizer.plot_region_error_distribution(sfigs_row0[1], update_type='non_update', error_meaure='decoding_error', prob_value='prob_sum', feat='position')
+        #sfigs_row0[1] = location_visualizer.plot_region_error_distribution(sfigs_row0[1], update_type='non_update', error_meaure='decoding_error', prob_value='prob_sum', feat='position', tags='location')
         #sfigs_row0[0] = choice_visualizer.plot_region_error_distribution(sfigs_row0[0],update_type='non_update',error_meaure='decoding_error', prob_value='prob_sum', feat='choice')
-        sfigs[1] = location_visualizer.plot_decoding_output_heatmap(sfigs[1], update_type='non_update', time_label='t_update')#, time_label='start_time'
+        #sfigs[1] = location_visualizer.plot_decoding_output_heatmap(sfigs[1], update_type='non_update', time_label='t_update')#, time_label='start_time'
         #
-        self.results_io.save_fig(fig=fig, filename=f'supp_figurei_chogoalall', tight_layout=False, results_type='response') 
+        self.results_io.save_fig(fig=fig, filename=f'supp_figurei_locgoalall_t3', tight_layout=False, results_type='response') 
         
         
     def plot_figure_j(self):#Danielle add for making all of the remaining heatmaps with inital and new flipped
@@ -886,20 +987,20 @@ class UpdateTaskFigureGenerator:
         #                                                       update_type=['switch', 'stay', 'non_update'],
         #                                                       time_window=(-1.5, -0.25))
         
-        # sfigs_row1[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row1[0], tags='sf_HPC_cho_1.5_05_t9',
-        #                                                       update_type=['switch', 'stay', 'non_update'],
+        # sfigs_row1[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row1[0], tags='sf_HPC_cho_1.5_05_t10',
+        #                                                       update_type=['stay', 'non_update'],
         #                                                       time_window=(-1.5, -0.5), all_trials=False)
-        # sfigs_row1[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row1[1], tags='sf_PFC_cho_1.5_05_Ct9',
-        #                                                       update_type=['switch', 'non_update'],
-        #                                                       time_window=(-1.5, -0.5), all_trials=False)
-        # sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags='sf_HPC_cho_1.5_05_allt9',
-        #                                                       update_type=['switch', 'stay', 'non_update'],
-        #                                                       time_window=(-1.5, -0.5), all_trials=True)
-        sfigs_row2[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[1], tags='sf_PFC_cho_1.5_05_allt9',
+        sfigs_row1[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row1[1], tags='sf_PFC_cho_1.5_05_Ct9',
                                                               update_type=['switch', 'non_update'],
-                                                              time_window=(-1.5, -0.5), all_trials=True, subsample=True)
+                                                              time_window=(-1.5, -0.5), all_trials=False)
+        # sfigs_row2[0] = hpc_visualizer.plot_goal_coding_stats(sfigs_row2[0], tags='sf_HPC_cho_1.5_05_allt10',
+        #                                                       update_type=['switch', 'non_update'],
+        #                                                       time_window=(-1.5, -0.5), all_trials=True)
+        # sfigs_row2[1] = pfc_visualizer.plot_goal_coding_stats(sfigs_row2[1], tags='sf_PFC_cho_1.5_05_allt9',
+        #                                                       update_type=['switch', 'non_update'],
+        #                                                       time_window=(-1.5, -0.5), all_trials=True, subsample=True)
         
-        self.results_io.save_fig(fig=fig, filename=f'supp_figure_k_t9', tight_layout=False, results_type='response')
+        self.results_io.save_fig(fig=fig, filename=f'supp_figure_k_t11', tight_layout=False, results_type='response')
 
     def plot_figure_l(self):
         hpc_visualizer = self.run_analysis_pipeline(analysis_to_run='Decoder',
