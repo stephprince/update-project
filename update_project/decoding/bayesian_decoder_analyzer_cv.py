@@ -336,31 +336,6 @@ class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
             self.spikes = []  # if no units match criteria, leave spikes empty
 
         # # split data into training/encoding and testing/decoding trials
-        # self.train_df, self.test_df, self.test_delay_only_df, self.test_update_only_df = self._train_test_split()
-
-        # # get start/stop times of train and test trials
-        # self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
-        # self.decoder_times = self._get_time_intervals(self.test_df['start_time'], self.test_df['stop_time'],
-        #                                               align_times=self.test_df['t_update'])
-        # self.decoder_times_delay_only = self._get_time_intervals(self.test_delay_only_df['start_time'],
-        #                                                          self.test_delay_only_df['stop_time'],
-        #                                                          align_times=self.test_delay_only_df['t_update'])
-        # self.decoder_times_update_only = self._get_time_intervals(self.test_update_only_df['start_time'],
-        #                                                           self.test_update_only_df['stop_time'],
-        #                                                           align_times=self.test_update_only_df['t_update'])
-
-        # # select feature
-        # self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
-        # self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
-        # self.features_test_delay_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_delay_only)
-        # if np.size(self.decoder_times_update_only):
-        #     self.features_test_update_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_update_only)
-        # else:
-        #     self.features_test_update_only = pd.DataFrame()
-
-        # # select additional data for post-processing
-        # self.theta = nap.TsdFrame(self.theta, time_units='s', time_support=self.decoder_times)
-        # self.velocity = nap.TsdFrame(self.velocity, time_units='s', time_support=self.decoder_times)
         
         #categorical label for stratification (check this, not 100% sure about this)
         y = self.data['trial_type']
@@ -404,33 +379,6 @@ class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
 
     def _encode(self):
         # if there are no units/spikes to use for encoding, create empty dataframe as default
-        # self.model = pd.DataFrame()
-        # self.model_test = pd.DataFrame()
-        # self.model_delay_only = pd.DataFrame()
-        # self.model_update_only = pd.DataFrame()
-        # self.bins = []
-
-        # if self.spikes:  # if there were units and spikes to use for encoding
-        #     if self.dim_num == 1:
-        #         feat_input = self.features_train[self.feature_names[0]]
-        #         self.bins = np.linspace(*self.limits[self.feature_names[0]], self.encoder_bin_num + 1)
-        #         self.model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
-        #                                   ep=self.encoder_times, minmax=self.limits[self.feature_names[0]])
-        #         self.model_test = self.encoder(group=self.spikes, feature=self.features_test[self.feature_names[0]],
-        #                                        nb_bins=self.encoder_bin_num, ep=self.decoder_times,
-        #                                        minmax=self.limits[self.feature_names[0]])
-        #         self.model_delay_only = self.encoder(group=self.spikes,
-        #                                              feature=self.features_test_delay_only[self.feature_names[0]],
-        #                                              nb_bins=self.encoder_bin_num, ep=self.decoder_times_delay_only,
-        #                                              minmax=self.limits[self.feature_names[0]])
-        #         if np.size(self.features_test_update_only):
-        #             self.model_update_only = self.encoder(group=self.spikes,
-        #                                                   feature=self.features_test_update_only[self.feature_names[0]],
-        #                                                   nb_bins=self.encoder_bin_num, ep=self.decoder_times_update_only,
-        #                                                   minmax=self.limits[self.feature_names[0]])
-        #     elif self.dim_num == 2:
-        #         self.model, self.bins = self.encoder(group=self.spikes, feature=self.features_train,
-        #                                              nb_bins=self.encoder_bin_num, ep=self.encoder_times)
         
         # Create empty lists to store models for each split
         self.models = []
@@ -483,33 +431,7 @@ class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
 
         return self
 
-    def _decode(self):
-        # get arguments for decoder
-        # kwargs = dict(tuning_curves=self.model, group=self.spikes, ep=self.decoder_times,
-        #               bin_size=self.decoder_bin_size)
-        # if self.dim_num == 2:
-        #     kwargs.update(binsxy=self.bins)
-
-        # if self.prior == 'history-dependent':
-        #     if self.dim_num == 1:
-        #         kwargs.update(feature=self.features_train)
-        #     elif self.dim_num == 2:
-        #         kwargs.update(features=self.features_train)
-
-        # # run decoding
-        # if self.model.any().any():
-        #     self.decoded_values, self.decoded_probs = self.decoder(**kwargs)
-        #     edge_spaces = np.squeeze(np.argwhere(np.sum(self.model, axis=1).to_numpy() == 0))
-        #     self.decoded_probs.iloc[:, edge_spaces] = np.nan
-        # else:
-        #     self.decoded_values = pd.DataFrame()
-        #     self.decoded_probs = pd.DataFrame()
-
-        # # convert to binary if needed
-        # if self.convert_to_binary:
-        #     self.decoded_values.values[self.decoded_values > 0] = int(1)
-        #     self.decoded_values.values[self.decoded_values < 0] = int(-1)
-        
+    def _decode(self):      
         # Create lists to store decoded values and probabilities for each split
         self.decoded_values = pd.DataFrame()
         self.decoded_probs = pd.DataFrame()

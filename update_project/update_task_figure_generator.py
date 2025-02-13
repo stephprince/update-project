@@ -20,7 +20,7 @@ class UpdateTaskFigureGenerator:
     def __init__(self, sessions, overwrite=False):
         self.sessions = sessions
         self.overwrite = overwrite
-        self.results_io = ResultsIO(creator_file=__file__, folder_name='response_figures')
+        self.results_io = ResultsIO(creator_file=__file__, folder_name='manuscript_2')
 
         self.analysis_classes = dict(Behavior=BehaviorAnalyzer,
                                      Choice=ChoiceAnalyzer,
@@ -652,8 +652,6 @@ class UpdateTaskFigureGenerator:
 
             # figure saving
             self.results_io.save_fig(fig=fig, filename=f'supp_figure_pre_correct', tight_layout=False, results_type='manuscript')
-
-
         
     def plot_supp_figure_all_trials(self):#use for supp_figure 2F
         encoder_trials_all = dict(update_type=[1, 2, 3], correct=[0, 1], maze_id=[3, 4])
@@ -676,12 +674,8 @@ class UpdateTaskFigureGenerator:
         sfigs_row2 = sfigs[2].subfigures(nrows=1, ncols=2, width_ratios=[2, 1])
 
         # plot data
-        #sfigs_row0[0] = self.plot_placeholder(sfigs_row0[0], text='schematic of using all trials for decoder')
-        #sfigs_row0[0] = hpc_visualizer_long_window_all.plot_decoding_output_heatmap(sfigs_row0[0])
-        #sfigs[1] = hpc_visualizer_encode_all.plot_goal_coding(sfigs[1], tags='sfig4_CA1_position_all')#
         sfigs_row2[0] = hpc_visualizer_encode_all.plot_goal_coding_stats(sfigs_row2[0], tags='sfig4_CA1_position_stats',
                                                                        time_window=(0, 1.5))
-        #
 
         # figure saving
         self.add_panel_labels(sfigs)
