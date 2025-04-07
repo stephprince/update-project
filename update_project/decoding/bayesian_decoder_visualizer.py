@@ -4,6 +4,9 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from math import sqrt
+from sklearn.metrics import mean_squared_error
+import statsmodels.api as sm
 
 from pathlib import Path
 from matplotlib import ticker
@@ -21,13 +24,13 @@ from update_project.base_visualization_class import BaseVisualizationClass
 
 
 class BayesianDecoderVisualizer(BaseVisualizationClass):
-    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None, window=2.5):
+    def __init__(self, data, exclusion_criteria=None, params=None, threshold_params=None, window=2.5, turn_to_flip=2):
         super().__init__(data)
         self.exclusion_criteria = exclusion_criteria or dict(units=20, trials=50)
         self.params = params
         self.threshold_params = threshold_params or dict(num_units=[self.exclusion_criteria['units']],
                                                          num_trials=[self.exclusion_criteria['trials']])
-        self.aggregator = BayesianDecoderAggregator(exclusion_criteria=self.exclusion_criteria)
+        self.aggregator = BayesianDecoderAggregator(exclusion_criteria=self.exclusion_criteria, turn_to_flip=turn_to_flip)
         self.aggregator.run_df_aggregation(data, overwrite=True, window=window)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 
@@ -67,18 +70,206 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         # self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
         # self.plot_all_groups_error(main_group=group_names, sub_group='animal')
         # self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
-        # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)
-
-    def plot_decoding_output_heatmap(self, sfig, update_type='switch', prob_value='prob_sum', feat='position'):#include something to indicate if removing iti
-        # load up data
-        plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
-        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
-                                                                       prob_value=prob_value)
+        # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)        
+        
+    def plot_decoding_error_location(self, sfig, update_type=['non_update'], prob_value='prob_sum', time_label='t_update', other_zones=dict(), ylim=None):
+        plot_groups = dict(update_type=update_type, turn_type=[1, 2], correct=[1], time_label=[time_label])
+        #decoding_measures = 'zscore_prob' if use_zscores else prob_value
+        choice_mapping = {z: z for z in other_zones}
+        choice_mapping['initial_stay'] = 'initial'
+        choice_mapping['switch'] = 'new'
+        
+        #trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+        #                                                               prob_value=prob_value)#not sure if I need trial data or if I will recreate from align data with mask
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
                                                                  ret_df=True)
+        
+        #making a mask based on location of the animal. should limit to only the home arm between initial cue and choice cue
+        error2 = np.stack(aligned_data['error'])#don't want probability, want error
+        features2 = np.stack(aligned_data['feature'])
+        mask = (features2 < 120.35) #& (features2 > 250.35)#should remove any time while intial cue is presented or arms themselves
+        #probability2[expanded_mask] = np.nan
+        aligned_data.error[mask] = np.nan
+        
+        #reshaping + manipulating array like calc_trial_by_trial_quant_data. calc also gets zscores, but should be available in tria_data if needed? if not, add zscore lines and uncomment below
+        quant_df = self.aggregator.quantify_aligned_data(param_data, aligned_data, ret_df=True, other_zones=other_zones)#getting bounds and quantifying choice
+        if np.size(quant_df) and quant_df is not None:
+            # get diff from baseline
+            prob_sum_mat = np.vstack(quant_df[prob_value])
+            align_end = np.argwhere(quant_df['times'].values[0] >= 0)[0][0]
+            align_start = np.argwhere(quant_df['times'].values[0] >= -1.5)[0][0]
+            if align_end != 0:
+                # align_end = align_end - 1  # get index immediately preceding 0 if not the first one
+                prob_sum_diff = prob_sum_mat.T - np.nanmean(prob_sum_mat[:, align_start:align_end], axis=1)
+            elif align_end == 0:
+                prob_sum_diff = prob_sum_mat.T - prob_sum_mat[:, align_end]  # only use first bin if that's all there is
+            quant_df['diff_baseline'] = list(prob_sum_diff.T)
+            #quant_df['zscore_prob'] = list((prob_sum_mat - zscore_mean) / zscore_std)
 
+            # get diff from left vs. right bounds
+            quant_df['trial_index'] = quant_df.index
+            quant_df = (quant_df
+                        .explode(['times', 'prob_sum', 'prob_over_chance', 'diff_baseline', 'zscore_prob',
+                                  'rotational_velocity', 'translational_velocity', 'error'])
+                        .reset_index())
+            quant_df['times_binned'] = pd.cut(quant_df['times'], np.linspace(*time_window, n_time_bins)).apply(
+                lambda x: x.mid)
+            quant_df = pd.DataFrame(quant_df.to_dict())  # fix to avoid object dtype errors in seaborn
+            choice_df = quant_df.pivot(
+                index=['session_id', 'animal', 'time_label', 'times', 'times_binned', 'trial_index'],
+                columns=['choice'],
+                values=[prob_value, 'diff_baseline']).reset_index()  # had times here before, , 'zscore_prob'
+            choice_df['diff_switch_stay'] = choice_df[(prob_value, 'switch')] - choice_df[(prob_value, 'initial_stay')]
+            #choice_df['zscore_diff_switch_stay'] = choice_df[('zscore_prob', 'switch')] - \
+            #                                       choice_df[('zscore_prob', 'initial_stay')]
+            choice_df.columns = ['_'.join(c) if c[1] != '' else c[0] for c in choice_df.columns.to_flat_index()]
+            #array now reshaped, quant_df is my current array.
+        trial_data = quant_df
+        #now back to trial_data, should hopefully just be able to use regionchoice for the remaining
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'time_label', 'feature_name', 
+                    'choice']
+        data_for_stats = (trial_data
+                      .query(
+            f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
+                      .groupby(groupby_cols)[[decoding_measures, 'diff_baseline', 'error']]  # group by trial/trial type
+                      .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                      .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
+        
+        data_for_stats.reset_index(inplace=True)
+        data_for_stats['choice'] = data_for_stats['choice'].map(choice_mapping)
+        data_for_stats[comparison] = data_for_stats[comparison].map(label_map)#renaming non update to delay only
+        diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
+                                      values=['error_mean'])#f'{decoding_measures}_mean'
+                     .reset_index())
+        diff_data[('initial_vs_new', '')] = diff_data[('error_mean', 'initial')] - \
+                                            diff_data[('error_mean', 'new')]##f'{decoding_measures}_mean' in both ()
+        diff_data = diff_data.droplevel(1, axis=1)
+
+        # setup stats - group variables, pairs to compare, and levels of hierarchical data
+        var = 'error_mean'#f'{decoding_measures}_mean'
+        group = 'choice'
+        group_list = data_for_stats['choice'].unique()#zones that are being decoded (what i want to be compared)
+        plot_groups['region'] = [('CA1',), ('PFC',)]
+        combo_list = [label_map[g] for g in plot_groups[comparison]]#switch back to comparison in plot groups later
+        combos = list(itertools.combinations(combo_list, r=2))
+        pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
+        if comparison == 'choice':
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice'],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        else:
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        # plot data
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+        colors = [self.colors[t] for t in list(label_map.values())]
+
+        sess_averages = data_for_stats.groupby(['session_id', group, comparison])[var].mean().reset_index()
+        common_kwargs = dict(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0],
+                             hue_order=list(label_map.values()), errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+        if comparison == 'representations':
+            common_kwargs.update(hue=group)
+        if stripplot:
+            ax[0] = sns.stripplot(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0],
+                                  hue_order=list(label_map.values()), zorder=1, jitter=True,
+                                  palette=[self.colors['home_medium']] * len(colors), alpha=0.4, dodge=True )#legend=False,
+            if comparison == 'representations':
+                common_kwargs.update(hue=group)
+        category_order = ['initial','new']#'local','central',
+        ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5, order=category_order)
+        ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None, order=category_order)
+        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update onset')
+        ax[0].get_legend().remove()
+        rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
+        if ylim:
+            ax[0].set(ylim=ylim)
+        # add stats annotations
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                          f'& variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+                          hue_order=list(label_map.values()), order=category_order)
+        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+                       hue_order=list(label_map.values()), order=category_order)
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+        bins = self.aggregator.group_aligned_df['bins'].values[0]
+        data_for_stats['error_mean'] = (data_for_stats['error_mean'] - np.min(bins)) / (np.max(bins) - np.min(bins))
+        data_for_stats = data_for_stats.query('choice == "initial"')
+        stats.run(data_for_stats, dependent_vars=['error_mean'], group_vars=['choice', comparison],
+                  pairs=pairs, filename=f'decoding_error_stats_{comparison}_{tags}')
+        sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
+        return sfig
+
+    def plot_decoding_output_heatmap(self, sfig, update_type='switch', prob_value='prob_sum', feat='position',start_nan=False, time_label='t_update', prev_turn=None):
+        # load up data
+        plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=[time_label])
+        #if start_nan:
+        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['start_time','t_update'])
+        #else:
+        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value, hm=True)
+        aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                 ret_df=True)
+        if prev_turn is not None:
+            file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+            df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the trial types, made from behavior data where all trials still present with info
+            combined_data = df.sort_values(by=['animal','session_id','trial_id'])
+            combined_data['prev_turn_type'] = combined_data.groupby(['animal','session_id'])['turn_type'].shift(1)#making prev_turn_type have the value of the previous 
+            if prev_turn == 'diff':
+                # Filter combined_data to get trials where the previous turn_type was 'right'
+                right_right_turn_trials = combined_data[(combined_data['prev_turn_type'] == 'right')#since update switches
+                                                        & (combined_data['turn_type'] == 'right')
+                                                        | (combined_data['prev_turn_type'] == 'left')
+                                                        & (combined_data['turn_type'] == 'left')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                aligned_data = aligned_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            elif prev_turn == 'same':#refers to if mouse is turning the same way prev and initially told to do the same turn. is flipped because these are switch trials
+                # Filter combined_data to get trials where the previous turn_type was 'right'
+                right_right_turn_trials = combined_data[(combined_data['prev_turn_type'] == 'right')
+                                                        & (combined_data['turn_type'] == 'left')
+                                                        | (combined_data['prev_turn_type'] == 'left')
+                                                        & (combined_data['turn_type'] == 'right')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                aligned_data = aligned_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            elif prev_turn == 'check':
+                right_right_turn_trials = combined_data[(combined_data['turn_type'] == 'left')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                aligned_data = aligned_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            elif prev_turn == 'second_check':
+                aligned_data = aligned_data.query('turn_type == 1')
+                
+
+        #if aligned_data.time_label == 'start_time':
+        #    aligned_data.probability[:] = np.nan
+        #if trial_data.time_label == 'start_time':
+        #    trial_data.probability[:] = np.nan
+        
         clim = (0.02, 0.045) if feat == 'position' else (0.02, 0.04)
-        prob_map = np.nanmean(np.stack(aligned_data['probability']), axis=0)
+        #mask = np.array([np.any(np.isnan(f)) for f in aligned_data['feature']])
+        probability2 = np.stack(aligned_data['probability'])
+        features2 = np.stack(aligned_data['feature'])
+        if start_nan:
+            mask = np.isnan(features2)| (features2 < 6)#6 should remove any time from when the mouse is "sitting" at the start
+            #mask = np.zeros_like(features2, dtype=bool)
+            #print("The maximum value from features2[:, :15] is:", np.max(features2[:, :15]))
+            #print("The minimum value from features2[:, :15] is:", np.min(features2[:, :15]))
+            #mask[:, :15] = features2[:,:15] > 255
+            expanded_mask = np.broadcast_to(mask[:, np.newaxis, :], probability2.shape)
+            probability2[expanded_mask] = np.nan
+    
+        #nan out any probability when the mouse is before the 0.1 (assuming track starts at 0) if needed
+        prob_map = np.nanmean(probability2, axis=0)
         true_feat = np.nanmean(np.stack(aligned_data['feature']), axis=0)
         time_bins = np.linspace(aligned_data['times'].apply(np.nanmin).min(),
                                 aligned_data['times'].apply(np.nanmax).max(),
@@ -93,9 +284,108 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         if aligned_data['feature_name'].values[0] in ['choice', 'x_position']:  # if bounds are on ends of track, make home between
             bounds = [(bounds[0][1], bounds[1][0]), *bounds]
             ylabel = 'p(new choice)'
+            print(ylabel,bounds)
         else:
             bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
             ylabel = 'fraction of track'
+            print(ylabel,bounds)
+
+        # plot figure
+        ax = sfig.subplots(nrows=1, ncols=1)
+        im_times = (time_bins[0] - np.diff(time_bins)[0] / 2, time_bins[-1] + np.diff(time_bins)[0] / 2)
+        clipping_masks, images = dict(), dict()
+        for b, arm in zip(bounds, ['home', 'initial', 'new']):
+            mask = mpl.patches.Rectangle(xy=(0, b[0]), width=1, height=b[1] - b[0],
+                                         facecolor='white', alpha=0, transform=ax.get_yaxis_transform())
+            clipping_masks[arm] = mask
+            images[arm] = ax.imshow(prob_map, cmap=self.colors[f'{arm}_cmap'], aspect='auto',
+                                    origin='lower', vmin=clim[0], vmax=clim[1],
+                                    extent=[im_times[0], im_times[-1], track_fraction[0], track_fraction[-1]])
+            images[arm].set_clip_path(clipping_masks[arm])
+            ticks = None if arm == 'home' else []
+            label = f'prob.{self.new_line}density' if arm == 'home' else ''
+            cbar = plt.colorbar(images[arm], ax=ax, pad=0.01, fraction=0.046, shrink=0.5, aspect=12,
+                                ticks=ticks)
+            cbar.ax.set_title(label, fontsize=8, ha='center')
+            for line in b:
+                ax.axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75, )
+        ax.plot(time_bins, true_feat, color=self.colors[f'incorrect'], linestyle='dotted', linewidth=1.25,
+                label='actual position')#self.colors[f'{update_type}_light']
+
+        # plot edge spaces in track
+        # spaces = getattr(self.aggregator.group_aligned_df['virtual_track'].values[0], 'edge_spacing', [])
+        # for s in spaces:
+        #     ax.axhspan(*s, color='white', edgecolor=None,)
+        ax.axvline(0, color='k', linestyle='dashed', alpha=0.5)
+        if prev_turn is None:
+            ax.set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
+                xlim=(time_bins[0], time_bins[-1]), xlabel='time around update (s)')
+            ax.set_title(self.label_maps['update_type'][update_type], color=self.colors[update_type])
+        if prev_turn is not None:
+            ax.set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
+                xlim=(time_bins[0], time_bins[-1]), xlabel='time from initial cue (s)')
+            if prev_turn == 'same':
+                ax.set_title('same initial goal as prior trial', color=self.colors[update_type])
+            elif prev_turn == 'diff':
+                ax.set_title('opposite initial goal from prior trial', color=self.colors[update_type])
+        
+        ax.legend(loc='lower right', labelcolor='linecolor')
+        sfig.suptitle('Decoded position', fontsize=12)
+
+        return sfig
+    
+    def plot_decoding_output_heatmap_lr(self, sfig, update_type='switch', prob_value='prob_sum', feat='position',start_nan=False, time_label='t_update'):
+        # load up data
+        plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=[time_label])
+        #if start_nan:
+        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['start_time','t_update'])
+        #else:
+        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value)
+        aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                 ret_df=True)
+
+
+        #if aligned_data.time_label == 'start_time':
+        #    aligned_data.probability[:] = np.nan
+        #if trial_data.time_label == 'start_time':
+        #    trial_data.probability[:] = np.nan
+        
+        clim = (0.02, 0.045) if feat == 'position' else (0.02, 0.04)
+        #mask = np.array([np.any(np.isnan(f)) for f in aligned_data['feature']])
+        probability2 = np.stack(aligned_data['probability'])
+        features2 = np.stack(aligned_data['feature'])
+        if start_nan:
+            mask = np.isnan(features2)| (features2 < 6)#6 should remove any time from when the mouse is "sitting" at the start
+            #mask = np.zeros_like(features2, dtype=bool)
+            print("The maximum value from features2[:, :15] is:", np.max(features2[:, :15]))
+            print("The minimum value from features2[:, :15] is:", np.min(features2[:, :15]))
+            #mask[:, :15] = features2[:,:15] > 255
+            expanded_mask = np.broadcast_to(mask[:, np.newaxis, :], probability2.shape)
+            probability2[expanded_mask] = np.nan
+    
+        #nan out any probability when the mouse is before the 0.1 (assuming track starts at 0) if needed
+        prob_map = np.nanmean(probability2, axis=0)
+        true_feat = np.nanmean(np.stack(aligned_data['feature']), axis=0)
+        time_bins = np.linspace(aligned_data['times'].apply(np.nanmin).min(),
+                                aligned_data['times'].apply(np.nanmax).max(),
+                                np.shape(prob_map)[1])
+        feat_bins = np.linspace(aligned_data['bins'].apply(np.nanmin).min(),
+                                aligned_data['bins'].apply(np.nanmax).max(),
+                                np.shape(prob_map)[0])
+        track_fraction = (feat_bins - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        bounds = [(b - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+                  for b in trial_data['bound_values'].unique()]
+        if aligned_data['feature_name'].values[0] in ['choice', 'x_position']:  # if bounds are on ends of track, make home between
+            bounds = [(bounds[0][1], bounds[1][0]), *bounds]
+            ylabel = 'p(new choice)'
+            print(ylabel,bounds)
+        else:
+            bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
+            ylabel = 'fraction of track'
+            print(ylabel,bounds)
 
         # plot figure
         ax = sfig.subplots(nrows=1, ncols=1)
@@ -135,15 +425,21 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_goal_coding(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
                          ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update'],
-                         correct_type=[1, 0], use_residuals=False, other_zones=None):
+                         correct_type=[1, 0], use_residuals=False, other_zones=None, use_delay=False, time_label=['t_update']):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
         plot_groups.update(update_type=update_type)
+        plot_groups.update(time_label=time_label)
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value=prob_value, other_zones=other_zones)
         sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
-        trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+        if use_delay:
+            trial_data = trial_data.query('update_type == "non_update"')
+        elif comparison == 'correct':
+            trial_data = trial_data.query('update_type == "switch"') 
+        else:
+            trial_data
         trial_types = update_type if comparison == 'update_type' else correct_type
         if use_residuals:
             trial_data = self.aggregator.get_residuals(trial_data, by_session=True)  #TODO
@@ -269,6 +565,190 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
 
         return sfig
+    
+    def subsample_trials(self, data):
+        #currently have this set to create the same ratio of C to I trials for switch trials as delay only trials, could change if needed
+        trial_types = data['update_type'].unique().tolist()
+        
+         # Count correct and incorrect trials for each type
+        counts = data[data['update_type'] == 'non_update']['correct'].value_counts()
+        # Assign counts to variables
+        num_correct_non_update = counts.get(1, 0)  # Default to 0 if missing
+        num_incorrect_non_update = counts.get(0, 0)  # Default to 0 if missing
+        
+        best_ratio = num_correct_non_update/num_incorrect_non_update#update this ratio so it is for pfc not hpc
+        subsampled_data = []
+        
+        trial_type = 'switch'
+        correct_trials = data[(data['update_type'] == trial_type) & (data['correct'] == 1)]
+        correct_trial_index = correct_trials.iloc[0::2].index  # Select every second row, starting from index 0 (all even, so all initial)
+        
+        incorrect_trials = data[(data['update_type'] == trial_type) & (data['correct'] == 0)]
+        incorrect_trial_index = incorrect_trials.iloc[0::2].index  # Select every second row, starting from index 0 (all even, so all initial)
+
+        # Adjust sample sizes to match the best ratio
+        max_correct_sample = int(len(incorrect_trial_index) * best_ratio)
+        max_incorrect_sample = int(len(correct_trial_index) / best_ratio)
+
+        correct_sample_ids = np.random.choice(correct_trial_index, size=min(len(correct_trial_index), max_correct_sample), replace=False)
+        incorrect_sample_ids = incorrect_trial_index
+
+        sampled_trial_inds = np.concatenate([correct_sample_ids, incorrect_sample_ids])
+        sampled_trial_ids = np.concatenate([sampled_trial_inds, sampled_trial_inds + 1])#adding back on the new indices for each trial
+        delay_trial_ids = data.loc[data['update_type'] == 'non_update'].index
+        sampled_trial_ids = np.concatenate([delay_trial_ids, sampled_trial_ids])
+        subsampled_data.append(data.loc[data.index.isin(sampled_trial_ids)])
+        # Combine all subsets into one DataFrame
+        subsampled_data = pd.concat(subsampled_data, ignore_index=True)
+        #need to still append ALL non_update trials
+
+        return subsampled_data.sort_index()
+    
+    def plot_goal_coding_indtrials(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', heatmap=False,
+                         ylim=None, with_velocity=False, tags=None, update_type=['switch', 'non_update'],
+                         correct_type=[1], use_residuals=False, other_zones=None, use_delay=False, ave_bins=False, time_window=(0,1.5)):
+        # load up data
+        plot_groups = self.plot_group_comparisons_full['update_type']
+        label_map = self.label_maps['update_type']
+        plot_groups.update(update_type=update_type)
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value, other_zones=other_zones, time_window=(0, 2.5))
+        
+        sub_groups = groups if groups else 'feature_name'  # set as default to not break data down more unless needed
+        if use_delay:
+            trial_data = trial_data.query('update_type == "non_update"')
+        elif comparison == 'correct':
+            trial_data = trial_data.query('update_type == "switch"') 
+        else:
+            trial_data
+        trial_types = update_type if comparison == 'update_type' else correct_type
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data, by_session=True)  #TODO
+            prob_value = 'resid'
+
+        # plot figure
+        nrows = 1  # default value if no other info provided
+        height_ratios = [1]
+        if heatmap:
+            nrows = nrows + 1
+            height_ratios = [1] * nrows
+        elif groups and not heatmap:
+            nrows = len(trial_data[groups].unique())
+            height_ratios = [1] * nrows
+        elif with_velocity:
+            nrows = nrows + 1
+            height_ratios = [2, 1]
+        ax = sfig.subplots(nrows=nrows, ncols=len(update_type), sharex=True, sharey='row', squeeze=False,
+                           height_ratios=height_ratios)
+        for comp, data in trial_data.groupby(comparison):
+            col_id = np.argwhere(np.array(list(trial_types)) == comp)[0][0]
+            if not heatmap:
+                for s_name, s_data in data.groupby(sub_groups):
+                    i = 2 if with_velocity else 1
+                    row_id = np.argwhere(data[sub_groups].unique() == s_name)[0][0] * i
+                    trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
+                                             values=prob_value)
+                    time_filter = trial_mat.columns[trial_mat.columns >= 0]
+                    trial_mat = trial_mat[time_filter]
+                    new_mat = trial_mat.query('choice == "switch"').to_numpy()
+                    initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                    norm_diff_mat = (new_mat - initial_mat)/(new_mat + initial_mat)#should give a normalized representation of how much initial vs new coding is happening at each bin
+                    time_bins = trial_mat.columns.to_numpy()
+                    # Chosen the p-value below which will indicate significance
+                    alpha = 0.05
+                    if ave_bins:
+                        flat_norm_diff_mat = np.nanmean(norm_diff_mat, axis=1)
+                        ax[row_id][col_id].set_xlabel('bin average norm_diff_mat Values')
+                        ax[row_id][col_id].set_ylabel('probability')
+                        ax[row_id][col_id].set_title('Distribution of bin averaged norm_diff_mat Values')
+                        count = np.sum((flat_norm_diff_mat <= 0.5) & (flat_norm_diff_mat >= -0.5))
+                        print(f"Number of values equal to between 0.5: {count}")
+                        count2 = len(flat_norm_diff_mat)
+                        print(f"total number of values: {count2}")
+                        
+                    else:
+                        flat_norm_diff_mat = norm_diff_mat.flatten()
+                        ax[row_id][col_id].set_xlabel('norm_diff_mat Values')
+                        ax[row_id][col_id].set_ylabel('probability')
+                        ax[row_id][col_id].set_title('Distribution of norm_diff_mat Values')
+                        # Logical condition to check for 1 or -1
+                        count = np.sum((flat_norm_diff_mat == 1) & (flat_norm_diff_mat == -1))
+
+                        print(f"Number of values equal to 1 or -1: {count}")
+                        count = np.sum((flat_norm_diff_mat <= 0.5) | (flat_norm_diff_mat >= -0.5))
+                        print(f"Number of values equal to between 0.5: {count}")
+                        count2 = len(flat_norm_diff_mat)
+                        print(f"total number of values: {count2}")
+                        
+                    sns.histplot(flat_norm_diff_mat, bins=30, kde=True, color='skyblue', stat='probability', ax=ax[row_id][col_id])
+                    flat_norm_diff_mat = flat_norm_diff_mat[~np.isnan(flat_norm_diff_mat)]#needed for lillifors test
+                    ksstat, pvalue = sm.stats.diagnostic.lilliefors(flat_norm_diff_mat)
+                    if pvalue > alpha:
+                        result = 'Normal'
+                    else:
+                        result = 'NOT Normal'
+                    print(f'Lilliefors: {result:>21s}')
+                    print(ksstat)
+                    
+
+                    ax[row_id][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+                    if ylim:
+                        ax[row_id][col_id].set(ylim=ylim)
+
+                    if with_velocity:
+                        veloc_data = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
+                                                  columns='times',
+                                                  values='rotational_velocity')
+                        veloc_mat = veloc_data.query('choice == "switch"').to_numpy()  # velocity data same for both
+                        ax[row_id + 1][col_id].plot(time_bins, np.mean(veloc_mat, axis=0), color=self.colors['home'])
+                        ax[row_id + 1][col_id].fill_between(time_bins, np.nanmean(veloc_mat, axis=0) + sem(veloc_mat),
+                                                            np.nanmean(veloc_mat, axis=0) - sem(veloc_mat),
+                                                            color=self.colors['new'], alpha=0.2)
+                        ax[row_id + 1][col_id].axvline(0, color='k', linestyle='dashed', alpha=0.5)
+
+                        # add markers to indicate timepoints where data switched
+                        diff_initial_switch = np.nanmean(initial_mat, axis=0) - np.nanmean(new_mat, axis=0)
+                        diff_veloc = np.diff(np.diff(np.nanmean(veloc_mat, axis=0), prepend=np.nan), prepend=np.nan)
+                        if np.where(diff_initial_switch < 0)[0].any():
+                            post_update = int(len(time_bins) / 2)
+                            neural_flip_moment = np.where(diff_initial_switch < 0)[0][0] - 1
+                            veloc_flip_moment = np.where(diff_veloc[post_update:] < 0)[0][0] + post_update - 1
+                            x_neural = time_bins[neural_flip_moment] + np.diff(time_bins)[0] / 2
+                            y_neural = np.nanmean(initial_mat, axis=0)[neural_flip_moment]
+                            x_veloc = time_bins[veloc_flip_moment] + np.diff(time_bins)[0] / 2
+                            y_veloc = np.nanmean(veloc_mat, axis=0)[veloc_flip_moment]
+                            ax[row_id][col_id].annotate("", arrowprops=dict(arrowstyle='simple', facecolor='black'),
+                                                        xy=(x_neural, y_neural), xytext=(x_neural, y_neural*1.5),
+                                                        xycoords='data', textcoords='data')
+                            ax[row_id + 1][col_id].annotate("",  arrowprops=dict(arrowstyle='simple', facecolor='black'),
+                                                            xy=(x_veloc, y_veloc), xytext=(x_veloc, y_veloc*2),
+                                                            xycoords='data', textcoords='data')
+            else:
+                time_bins = data['times'].unique()
+                color_map = {'switch': 'new', 'initial_stay': 'initial'}
+                for row_id, c in enumerate(['initial_stay', 'switch']):
+                    matrix = (data
+                              .query(f'choice == "{c}"')
+                              .groupby([groups, 'times'])['diff_baseline']
+                              .mean().unstack().to_numpy())
+                    im = ax[row_id][col_id].imshow(matrix, cmap=self.colors[f'{color_map[c]}_cmap'], vmin=0, vmax=0.2,
+                                                   aspect='auto', origin='lower',
+                                                   extent=[time_bins.min(), time_bins.max(), 0, np.shape(matrix)[0]], )
+                    ax[row_id][col_id].axvline(0, color='k', linestyle='dashed')
+                    if col_id == len(label_map.keys()) - 1:
+                        plt.colorbar(im, ax=ax[row_id][col_id], pad=0.04, location='right', fraction=0.046,
+                                     label='Δ prob. density from t=0')
+            ax[0][col_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
+
+        # add stats bars above each plot
+        #ylims = ax[row_id][col_id].get_ylim()
+        #sfig.supylabel('prob. density', fontsize=10)
+        #sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
+
+        colors = [self.colors[t] for t in ['initial', 'new']]
+        rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
+
+        return sfig
 
     def plot_motor_timing(self, sfig, comparison='update_type', groups=None, prob_value='prob_sum', tags=None,
                           update_type=['switch', 'non_update'], use_residuals=False):
@@ -361,28 +841,27 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
         return sfig
 
-    def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
+    def plot_nonlocal_coding_stats(self, sfig, comparison='choice', prob_value='prob_sum', title='', tags='',
                                time_window=(0, 1.5), use_zscores=False, other_zones=dict(), stripplot=False,
-                               update_type=['switch', 'non_update'], use_residuals=False, ylim=None):
+                               update_type=['switch'], use_residuals=False, use_delay=False, ylim=None,
+                               time_label='t_update', prev_turn=None, prospective_reps=False, all_trials=False):
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
         choice_mapping = {z: z for z in other_zones}
         choice_mapping['initial_stay'] = 'initial'
         choice_mapping['switch'] = 'new'
 
         # get data
-        plot_groups = self.plot_group_comparisons_full[comparison]
-        plot_groups.update(update_type=update_type)
-        label_map = self.label_maps[comparison]
-        label_map = {k: label_map[k] for k in plot_groups[comparison]}
+        label_map = self.label_maps['choice']
+        plot_groups = dict(update_type = update_type, turn_type = [1, 2], correct = [1], time_label = [time_label])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        n_time_bins=11, time_window=(-2.5, 2.5),
-                                                                       prob_value=prob_value, other_zones=other_zones)
-        trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+                                                                       prob_value=prob_value, other_zones=other_zones, prospective_reps=prospective_reps)
+
         if use_residuals:
             trial_data = self.aggregator.get_residuals(trial_data, by_session=True)
             decoding_measures = 'resid'
 
-        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'feature_name',
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'time_label', 'feature_name', 
                         'choice']
         data_for_stats = (trial_data
                           .query(
@@ -391,6 +870,130 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                           .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
                           .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
         data_for_stats.reset_index(inplace=True)
+        data_for_stats['choice'] = data_for_stats['choice'].map(choice_mapping)
+        #data_for_stats[comparison] = data_for_stats[comparison].map(label_map)#renaming non update to delay only
+        
+        # setup stats - group variables, pairs to compare, and levels of hierarchical data
+        var = f'{decoding_measures}_mean'
+        group = 'choice'
+        group_list = data_for_stats['choice'].unique()#zones that are being decoded (what i want to be compared)
+        
+        #combo_list = [label_map[g] for g in plot_groups[comparison]]#switch back to comparison in plot groups later
+        #combos = list(itertools.combinations(combo_list, r=2))
+        pairs = [(('central',),('initial',)),(('central',),('new',)),(('initial',),('new',))]#check formatting
+        sess_averages = data_for_stats.groupby(['session_id', comparison])[var].mean().reset_index()
+        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                    approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice'],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+
+        # plot data
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+        colors = [self.colors[t] for t in list(label_map.values())]
+
+        if other_zones == ['central']:
+            category_order = ['central','initial','new']#'local','central',
+        else:
+            category_order = ['initial','new']
+        common_kwargs = dict(data=sess_averages, x=comparison, y=var, ax=ax[0], errwidth=3,
+                             order=category_order, join=False, dodge=(0.8 - 0.8 / 3), )#make sess_averages
+        ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)#, order=category_order
+        # common_kwargs = dict(data=diff_data, x=group, y=var, hue=comparison, ax=ax[0],
+        #                      hue_order=list(label_map.values()), errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+        # ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5, order=category_order)
+        ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)#, order=category_order
+        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update onset')
+        #ax[0].get_legend().remove()
+        rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
+        if ylim:
+            ax[0].set(ylim=ylim)
+
+        # add stats annotations
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                          f'& variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+        diff_pairs = [(a[0], b[0]) for a, b in pairs]
+
+        # annot = Annotator(ax[0], pairs=diff_pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+        #                   hue_order=list(label_map.values()), order=category_order)
+        # annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+        #                hue_order=list(label_map.values()), order=category_order)
+        # (annot
+        #  .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+        #  .set_pvalues(pvalues=pvalues)
+        #  .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # get error differences for reporting purposes
+        # bins = self.aggregator.group_aligned_df['bins'].values[0]
+        # data_for_stats['error_mean'] = (data_for_stats['error_mean'] - np.min(bins)) / (np.max(bins) - np.min(bins))
+        # data_for_stats = data_for_stats.query('choice == "initial"')
+        # stats.run(data_for_stats, dependent_vars=['error_mean'], group_vars=['choice', comparison],
+        #           pairs=pairs, filename=f'decoding_error_stats_{comparison}_{tags}')
+
+        sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
+        return sfig
+    
+    def plot_goal_coding_stats(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
+                               time_window=(0, 1.5), use_zscores=False, other_zones=dict(), stripplot=False,
+                               update_type=['switch', 'non_update'], use_residuals=False, use_delay=False, ylim=None, subsample=False,
+                               time_label=['t_update'], prev_turn=None, prospective_reps=False, all_trials=False, half=None, rebaseline=False):
+        decoding_measures = 'zscore_prob' if use_zscores else prob_value
+        choice_mapping = {z: z for z in other_zones}
+        choice_mapping['initial_stay'] = 'initial'
+        choice_mapping['switch'] = 'new'
+
+        # get data
+        plot_groups = self.plot_group_comparisons_full[comparison]
+        plot_groups.update(update_type=update_type)
+        plot_groups.update(time_label=time_label)
+        if all_trials==True: 
+            plot_groups.update(correct=[1, 0]) 
+        label_map = self.label_maps[comparison]
+        label_map = {k: label_map[k] for k in plot_groups[comparison]}#need to have comparison have this variable, look at next
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       n_time_bins=11, time_window=(-2.5, 2.5),
+                                                                       prob_value=prob_value, other_zones=other_zones, prospective_reps=prospective_reps, half=half)
+        if use_delay:
+            trial_data = trial_data.query('update_type == "non_update"')
+        elif comparison == 'correct':
+            trial_data = trial_data.query('update_type == "switch"')
+         
+        else:
+            trial_data
+
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data, by_session=True)
+            decoding_measures = 'resid'
+
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'time_label', 'feature_name', 
+                        'choice']
+        if rebaseline:
+            # Step 1: Define the time range for the pre-window (-1.5 to 0 seconds) for prob_sum
+            pre_window_means = (trial_data
+                .query('times_binned >= -1.5 & times_binned < 0')  # Pre-window time range
+                .groupby(groupby_cols)[prob_value]  # Group by the relevant columns
+                .mean()  # Calculate the mean over the pre-window time range
+                .reset_index()
+                .rename(columns={prob_value: 'prob_sum_pre'}))  # Rename to prob_sum_pre
+            # Step 2: Merge the pre-window means back into the full dataset
+            trial_data1 = trial_data.merge(pre_window_means, on=groupby_cols, how='left')
+            # Step 3: Rename original prob_sum to og_prob_sum
+            trial_data1 = trial_data1.rename(columns={prob_value: 'og_prob_sum'})
+            # Step 4: Normalize the prob_sum by subtracting the pre-window mean and rename it to prob_sum
+            trial_data1[prob_value] = trial_data1['og_prob_sum'] - trial_data1['prob_sum_pre']
+            # Now the 'prob_sum_normalized' column contains the normalized values while all other data remains intact.
+            trial_data = trial_data1
+            
+        data_for_stats = (trial_data
+                          .query(
+            f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
+                          .groupby(groupby_cols)[[decoding_measures, 'diff_baseline', 'error']]  # group by trial/trial type
+                          .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
+        data_for_stats.reset_index(inplace=True)
+        if subsample:#subsampling trials to get equivalent correct/incorrect ratios, currently only works to make switch = delay_only
+            data_for_stats = self.subsample_trials(data_for_stats)
         data_for_stats['choice'] = data_for_stats['choice'].map(choice_mapping)
         data_for_stats[comparison] = data_for_stats[comparison].map(label_map)
         diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
@@ -407,24 +1010,48 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         combo_list = [label_map[g] for g in plot_groups[comparison]]
         combos = list(itertools.combinations(combo_list, r=2))
         pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
-        stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
-                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
-        stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],
-                  pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        if comparison == 'choice':
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice'],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        else:
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
 
         # plot data
-        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+        #fig = plt.figure(constrained_layout=True, figsize=(6.5, 6.5))
+        if prob_value == 'prob_over_chance':
+            sfigs = sfig.subfigures(nrows=2, ncols=1, height_ratios=[1, 1])
+            ax_top = sfigs[0].subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+            ax_bottom = sfigs[1].subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[1, 1]))
+            # Combine all axes into a single flat list
+            ax = [ax_top[0], ax_top[1], ax_bottom[0], ax_bottom[1]]
+        else:
+            ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+            # Flatten for consistency
+            ax = [ax[0], ax[1]]
         colors = [self.colors[t] for t in list(label_map.values())]
 
         sess_averages = data_for_stats.groupby(['session_id', group, comparison])[var].mean().reset_index()
         common_kwargs = dict(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0],
                              hue_order=list(label_map.values()), errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+        if comparison == 'representations':
+            common_kwargs.update(hue=group)
         if stripplot:
             ax[0] = sns.stripplot(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0],
                                   hue_order=list(label_map.values()), zorder=1, jitter=True,
-                                  palette=[self.colors['home_medium']] * len(colors), alpha=0.4, dodge=True, legend=False, )
-        ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
-        ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
+                                  palette=[self.colors['home_medium']] * len(colors), alpha=0.4, dodge=True )#legend=False,
+            if comparison == 'representations':
+                common_kwargs.update(hue=group)
+        if other_zones == ['central']:
+            category_order = ['central','initial','new']#'local','central',
+        else:
+            category_order = ['initial','new']
+        ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5, order=category_order)
+        ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None, order=category_order)
         ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update onset')
         ax[0].get_legend().remove()
         rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
@@ -437,18 +1064,24 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
         pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
         annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
-                          hue_order=list(label_map.values()))
+                          hue_order=list(label_map.values()), order=category_order)
         annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
-                       hue_order=list(label_map.values()), )
+                       hue_order=list(label_map.values()), order=category_order)
         (annot
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
          .annotate(line_offset=0.1, line_offset_to_group=0.025))
+        
+        #saving source data
+        df_export = sess_averages[[group, var, comparison]]
+        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        filename = f'pointplot_data_{tags}_a.xlsx'
+        df_export.to_excel(save_dir / filename, index=False)
 
         sess_averages = diff_data.groupby(['session_id', comparison])['initial_vs_new'].mean().reset_index()
         if stripplot:
-            ax[1] = sns.stripplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], zorder=1, legend=False,
-                                  color=self.colors['home_medium'], order=list(label_map.values()), alpha=0.4)
+            ax[1] = sns.stripplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], zorder=1, 
+                                  color=self.colors['home_medium'], order=list(label_map.values()), alpha=0.4)#legend=False,
         common_kwargs = dict(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], errwidth=3,
                              order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3), )
         ax[1] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
@@ -473,6 +1106,254 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
          .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
          .set_pvalues(pvalues=pvalues)
          .annotate(line_offset=0.1, line_offset_to_group=0.025))
+        
+        #saving source data
+        df_export = sess_averages[['initial_vs_new', comparison]]
+        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        filename = f'pointplot_data_{tags}_b.xlsx'
+        df_export.to_excel(save_dir / filename, index=False)
+
+        # get error differences for reporting purposes
+        bins = self.aggregator.group_aligned_df['bins'].values[0]
+        data_for_stats['error_mean'] = (data_for_stats['error_mean'] - np.min(bins)) / (np.max(bins) - np.min(bins))
+        data_for_stats1 = data_for_stats.query('choice == "initial"')
+        stats.run(data_for_stats1, dependent_vars=['error_mean'], group_vars=['choice', comparison],
+                  pairs=pairs, filename=f'decoding_error_stats_{comparison}_{tags}')
+
+        # get significant difference from zero for reporting purposes
+        sess_averages = (diff_data
+                         .groupby(['animal', 'session_id', 'update_type', 'correct', 'region'])
+                         .mean()
+                         .reset_index())
+        pairs = [[[c]] for c in combo_list]
+        stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
+                      approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+        stats.run(sess_averages, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=pairs,
+                  filename=f'goal_diff_stats_from_0_{comparison}_{tags}')
+        
+        if prob_value == 'prob_over_chance':#need to limit diff_data to switch only trials
+            # sess_averages = (data_for_stats[data_for_stats['update_type'] == 'switch']
+            #                  .groupby(['animal', 'session_id', 'update_type', 'correct', 'region','choice'])
+            #                  .mean()
+            #                  .reset_index())
+            data_for_stats = data_for_stats[data_for_stats['update_type'] == 'switch']
+            if not rebaseline: 
+                data_for_stats['prob_over_chance_mean_shifted'] = data_for_stats['prob_over_chance_mean'] - 1
+                var = 'prob_over_chance_mean_shifted'
+            else:
+                var = 'prob_over_chance_mean'
+            pairs = [[[c]] for c in category_order]#should give zones instead of trial type
+            stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
+                          approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='response', alternatives=['greater'])
+            stats.run(data_for_stats, dependent_vars=[var], group_vars='choice', pairs=pairs,
+                      filename=f'goal_diff_stats_from_1_wilc_{tags}')
+            new_mat = data_for_stats.query('choice == "new"')[var].to_numpy()
+            initial_mat = data_for_stats.query('choice == "initial"')[var].to_numpy()
+            initial_ratio = np.sum((initial_mat <=0))/np.size(initial_mat)
+            print(f"ratio of initial values below 0: {initial_ratio}")
+            new_ratio = np.sum((new_mat <=0))/np.size(new_mat)
+            print(f"ratio of new values below 0: {new_ratio}")
+            # Plot the histogram for initial_mat
+            ax[2].hist(initial_mat.flatten(), bins=30, color='#2459bd', alpha=0.7, edgecolor='black')
+            ax[2].set_title('Histogram of Initial Mat')
+            ax[2].set_xlabel('Values')
+            ax[2].set_ylabel('Frequency')
+            # Plot the histogram for new_mat
+            ax[3].hist(new_mat.flatten(), bins=30, color='#b01e70', alpha=0.7, edgecolor='black')
+            ax[3].set_title('Histogram of New Mat')
+            ax[3].set_xlabel('Values')
+            # Adjust layout
+            plt.tight_layout()
+            #trying zscores
+            # Calculate mean and standard deviation
+            mean_initial = np.nanmean(initial_mat)  # Use nanmean to ignore NaN values, if any
+            std_initial = np.nanstd(initial_mat)    # Use nanstd to ignore NaN values, if any
+            mean_new = np.nanmean(new_mat)  # Use nanmean to ignore NaN values, if any
+            std_new = np.nanstd(new_mat)    # Use nanstd to ignore NaN values, if any
+            # Z-score transformation
+            # Assign the z-scored values to a new column in the DataFrame
+            # data_for_stats['prob_over_chance_mean_shifted_zscore'] = np.nan
+            # data_for_stats.loc[data_for_stats['choice'] == 'initial', 'prob_over_chance_mean_shifted_zscore'] = (
+            #     (data_for_stats.loc[data_for_stats['choice'] == 'initial', 'prob_over_chance_mean_shifted'] - mean_initial)
+            #     / std_initial
+            # )
+            # # Z-score for 'new'
+            # data_for_stats.loc[data_for_stats['choice'] == 'new', 'prob_over_chance_mean_shifted_zscore'] = (
+            #     (data_for_stats.loc[data_for_stats['choice'] == 'new', 'prob_over_chance_mean_shifted'] - mean_new)
+            #     / std_new
+            # )
+            # stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
+            #               approaches=['traditional'], tests=['anova'], results_type='response')
+            # stats.run(data_for_stats, dependent_vars=['prob_over_chance_mean_shifted_zscore'], group_vars='choice', pairs=pairs,
+            #           filename=f'goal_diff_stats_from_1_ttest_{tags}')
+        sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
+        return sfig
+    
+    def plot_goal_coding_stats_regionchoice(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
+                               time_window=(0, 1.5), use_zscores=False, other_zones=dict(), stripplot=False,
+                               update_type=['switch', 'non_update'], use_residuals=False, use_delay=False, ylim=None,
+                               time_label='t_update', prev_turn=None, prospective_reps=False):
+        decoding_measures = 'zscore_prob' if use_zscores else prob_value
+        choice_mapping = {z: z for z in other_zones}
+        choice_mapping['initial_stay'] = 'initial'
+        choice_mapping['switch'] = 'new'
+
+        # get data
+        if comparison == 'cue_type':
+            plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=[time_label])
+            #need to do something for label map potentially in here
+        elif comparison == 'region':#can we combine with above? check how plot_groups is used. might have to make something to pull regions idk
+            plot_groups = dict(update_type = update_type, turn_type = [1, 2], correct = [1], time_label = [time_label])
+            label_map = {('CA1',):'CA1', ('PFC',):'PFC'}
+        else:
+            plot_groups = self.plot_group_comparisons_full[comparison]
+            plot_groups.update(update_type=update_type)
+            label_map = self.label_maps[comparison]
+            label_map = {k: label_map[k] for k in plot_groups[comparison]}#need to have comparison have this variable, look at next
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       n_time_bins=11, time_window=(-2.5, 2.5),
+                                                                       prob_value=prob_value, other_zones=other_zones, prospective_reps=prospective_reps)
+        if use_delay:
+            trial_data = trial_data.query('update_type == "non_update"')
+        elif comparison == 'correct':
+            trial_data = trial_data.query('update_type == "switch"')
+         
+        else:
+            trial_data
+            
+        if prev_turn is not None:
+            file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+            df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the trial types, made from behavior data where all trials still present with info
+            combined_data = df.sort_values(by=['animal','session_id','trial_id'])
+            combined_data['prev_turn_type'] = combined_data.groupby(['animal','session_id'])['turn_type'].shift(1)#making prev_turn_type have the value of the previous 
+            if prev_turn == 'diff':
+                # Filter combined_data to get trials where the previous turn_type was 'right'
+                right_right_turn_trials = combined_data[(combined_data['prev_turn_type'] == 'right')#since update switches
+                                                        & (combined_data['turn_type'] == 'right')
+                                                        | (combined_data['prev_turn_type'] == 'left')
+                                                        & (combined_data['turn_type'] == 'left')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                trial_data = trial_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            elif prev_turn == 'same':#refers to if mouse is turning the same way prev and initially told to do the same turn. is flipped because these are switch trials
+                # Filter combined_data to get trials where the previous turn_type was 'right'
+                right_right_turn_trials = combined_data[(combined_data['prev_turn_type'] == 'right')
+                                                        & (combined_data['turn_type'] == 'left')
+                                                        | (combined_data['prev_turn_type'] == 'left')
+                                                        & (combined_data['turn_type'] == 'right')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                trial_data = trial_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            
+        #trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+        #trial_data = trial_data.query('update_type == "switch"') if comparison == 'choice' else trial_data
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data, by_session=True)
+            decoding_measures = 'resid'
+
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'time_label', 'feature_name', 
+                        'choice']
+        data_for_stats = (trial_data
+                          .query(
+            f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
+                          .groupby(groupby_cols)[[decoding_measures, 'diff_baseline', 'error']]  # group by trial/trial type
+                          .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
+        data_for_stats.reset_index(inplace=True)
+        data_for_stats['choice'] = data_for_stats['choice'].map(choice_mapping)
+        data_for_stats[comparison] = data_for_stats[comparison].map(label_map)#renaming non update to delay only
+        diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
+                                          values=['error_mean'])#f'{decoding_measures}_mean'
+                     .reset_index())
+        diff_data[('initial_vs_new', '')] = diff_data[('error_mean', 'initial')] - \
+                                            diff_data[('error_mean', 'new')]##f'{decoding_measures}_mean' in both ()
+        diff_data = diff_data.droplevel(1, axis=1)
+
+        # setup stats - group variables, pairs to compare, and levels of hierarchical data
+        var = 'error_mean'#f'{decoding_measures}_mean'
+        group = 'choice'
+        group_list = data_for_stats['choice'].unique()#zones that are being decoded (what i want to be compared)
+        plot_groups['region'] = [('CA1',), ('PFC',)]
+        combo_list = [label_map[g] for g in plot_groups[comparison]]#switch back to comparison in plot groups later
+        combos = list(itertools.combinations(combo_list, r=2))
+        pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
+        if comparison == 'choice':
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice'],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        else:
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+
+        # plot data
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+        colors = [self.colors[t] for t in list(label_map.values())]
+
+        sess_averages = data_for_stats.groupby(['session_id', group, comparison])[var].mean().reset_index()
+        common_kwargs = dict(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0],
+                             hue_order=list(label_map.values()), errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+        if comparison == 'representations':
+            common_kwargs.update(hue=group)
+        if stripplot:
+            ax[0] = sns.stripplot(data=sess_averages, x=group, y=var, hue=comparison, ax=ax[0],
+                                  hue_order=list(label_map.values()), zorder=1, jitter=True,
+                                  palette=[self.colors['home_medium']] * len(colors), alpha=0.4, dodge=True )#legend=False,
+            if comparison == 'representations':
+                common_kwargs.update(hue=group)
+        category_order = ['initial','new']#'local','central',
+        ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5, order=category_order)
+        ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None, order=category_order)
+        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density after update onset')
+        ax[0].get_legend().remove()
+        rainbow_text(0.5, 0.9, list(label_map.values()), colors, ax=ax[0], size=8)
+        if ylim:
+            ax[0].set(ylim=ylim)
+
+        # add stats annotations
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                          f'& variable == "{var}"')
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in pairs]
+        annot = Annotator(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+                          hue_order=list(label_map.values()), order=category_order)
+        annot.new_plot(ax[0], pairs=pairs, data=data_for_stats, x=group, y=var, hue=comparison,
+                       hue_order=list(label_map.values()), order=category_order)
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # sess_averages = diff_data.groupby(['session_id', comparison])['initial_vs_new'].mean().reset_index()
+        # if stripplot:
+        #     ax[1] = sns.stripplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], zorder=1, 
+        #                           color=self.colors['home_medium'], order=list(label_map.values()), alpha=0.4)#legend=False,
+        # common_kwargs = dict(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], errwidth=3,
+        #                      order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3), )
+        # ax[1] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
+        # ax[1] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
+        # ax[1].set(ylabel=f'initial - new prob. density')
+        # ax[1].axhline(0, color='k', linestyle='dashed', alpha=0.5)
+
+        # combos = list(itertools.combinations(combo_list, r=2))
+        # diff_pairs = [((c[0],), (c[1],)) for c in combos]
+        # stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=diff_pairs,
+        #           filename=f'goal_diff_stats_{comparison}_{tags}')
+        # stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+        #                                   f'& variable == "initial_vs_new"')
+        # stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        # pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
+        # annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
+        #                   order=list(label_map.values()))
+        # annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
+        #                order=list(label_map.values()),
+        #                )
+        # (annot
+        #  .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+        #  .set_pvalues(pvalues=pvalues)
+        #  .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
         # get error differences for reporting purposes
         bins = self.aggregator.group_aligned_df['bins'].values[0]
@@ -482,22 +1363,257 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                   pairs=pairs, filename=f'decoding_error_stats_{comparison}_{tags}')
 
         # get significant difference from zero for reporting purposes
-        sess_averages = (diff_data
-                         .groupby(['animal', 'session_id', 'update_type', 'correct'])
-                         .mean()
-                         .reset_index())
-        pairs = [[[c]] for c in combo_list]
-        stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
-                      approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
-        stats.run(sess_averages, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=pairs,
-                  filename=f'goal_diff_stats_from_0_{comparison}_{tags}')
+        # sess_averages = (diff_data
+        #                  .groupby(['animal', 'session_id', 'update_type', 'correct', 'region'])
+        #                  .mean()
+        #                  .reset_index())
+        # pairs = [[[c]] for c in combo_list]
+        # stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
+        #               approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
+        # stats.run(sess_averages, dependent_vars=['initial_vs_new'], group_vars=[comparison], pairs=pairs,
+        #           filename=f'goal_diff_stats_from_0_{comparison}_{tags}')
+
+        sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
+        return sfig
+    
+    def plot_goal_coding_stats_nomap(self, sfig, comparison='update_type', prob_value='prob_sum', title='', tags='',
+                               time_window=(0, 1.5), use_zscores=False, other_zones=dict(), stripplot=False,
+                               update_type=['switch', 'non_update'], use_residuals=False, use_delay=False, ylim=None,
+                               time_label='t_update', prev_turn=None, half=None):
+        decoding_measures = 'zscore_prob' if use_zscores else prob_value
+        choice_mapping = {z: z for z in other_zones}
+        choice_mapping['initial_stay'] = 'initial'
+        choice_mapping['switch'] = 'new'
+        if comparison == 'region':
+            
+            label_map = {('CA1',):'CA1', ('PFC',):'PFC'}
+        else:  
+            label_map = {'start_time':'start cue', 't_update':'update cue'}
+
+        # get data
+        if comparison == 'time_label':
+            plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=time_label)
+            #need to do something for label map potentially in here
+            time_window=(0, 1.5)
+        elif comparison == 'region':
+            plot_groups = dict(update_type=update_type, turn_type=[1, 2], correct=[1], time_label=time_label)
+            time_window=(-2.5, 0)
+        else:
+            plot_groups = self.plot_group_comparisons_full[comparison]
+            plot_groups.update(update_type=update_type)
+            
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       n_time_bins=11, time_window=(-2.5, 2.5),
+                                                                       prob_value=prob_value, other_zones=other_zones, half=half)
+        # if use_delay:
+        #     trial_data = trial_data.query('update_type == "non_update"')
+        # elif comparison == 'correct':
+        #     trial_data = trial_data.query('update_type == "switch"')
+         
+        # else:
+        #     trial_data
+            
+        if prev_turn is not None:
+            file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+            df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the trial types, made from behavior data where all trials still present with info
+            combined_data = df.sort_values(by=['animal','session_id','trial_id'])
+            combined_data['prev_turn_type'] = combined_data.groupby(['animal','session_id'])['turn_type'].shift(1)#making prev_turn_type have the value of the previous 
+            if prev_turn == 'diff':
+                # Filter combined_data to get trials where the previous turn_type was 'right'
+                right_right_turn_trials = combined_data[(combined_data['prev_turn_type'] == 'right')#since update switches
+                                                        & (combined_data['turn_type'] == 'right')
+                                                        | (combined_data['prev_turn_type'] == 'left')
+                                                        & (combined_data['turn_type'] == 'left')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                trial_data = trial_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            elif prev_turn == 'same':#refers to if mouse is turning the same way prev and initially told to do the same turn. is flipped because these are switch trials
+                # Filter combined_data to get trials where the previous turn_type was 'right'
+                right_right_turn_trials = combined_data[(combined_data['prev_turn_type'] == 'right')
+                                                        & (combined_data['turn_type'] == 'left')
+                                                        | (combined_data['prev_turn_type'] == 'left')
+                                                        & (combined_data['turn_type'] == 'right')]#turn_type = 2 in aligned_data, also the turn that is flipped
+                trial_data = trial_data.merge(right_right_turn_trials[['trial_id','session_id']],
+                                                  on=['trial_id','session_id'],
+                                                  how='inner')
+            
+        #trial_data = trial_data.query('update_type == "switch"') if comparison == 'correct' else trial_data
+        #trial_data = trial_data.query('update_type == "switch"') if comparison == 'choice' else trial_data
+        if use_residuals:
+            trial_data = self.aggregator.get_residuals(trial_data, by_session=True)
+            decoding_measures = 'resid'
+
+        groupby_cols = ['session_id', 'animal', 'region', 'trial_id', 'update_type', 'correct', 'time_label', 'feature_name',
+                        'choice']
+        data_for_stats = (trial_data
+                          .query(
+            f'times_binned > {time_window[0]} & times_binned < {time_window[-1]}')  # only look at first 1.5 seconds
+                          .groupby(groupby_cols)[[decoding_measures, 'diff_baseline', 'error']]  # group by trial/trial type
+                          .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
+        data_for_stats.reset_index(inplace=True)
+        data_for_stats['choice'] = data_for_stats['choice'].map(choice_mapping)
+        if comparison == 'region':
+            data_for_stats['region'] = data_for_stats['region'].map(label_map)
+            trial_data['region'] = trial_data['region'].map(label_map)
+        
+        diff_data = (data_for_stats.pivot(index=groupby_cols[:-1], columns=['choice'],
+                                          values=[f'{decoding_measures}_mean'])
+                     .reset_index())
+        diff_data[('initial_vs_new', '')] = diff_data[(f'{decoding_measures}_mean', 'initial')] - \
+                                            diff_data[(f'{decoding_measures}_mean', 'new')]
+        diff_data = diff_data.droplevel(1, axis=1)
+        #this is where I need to start checking things based on my region stats
+        if comparison == 'region':
+            diff_pairs = [(('initial', 'CA1'),('initial', 'PFC')),(('new', 'CA1'),('new', 'PFC'))]
+            groups = ['choice','region']
+            pairs = [('CA1', 'PFC')]
+            hues = 'region'
+        else:
+            diff_pairs = [(('initial', 'start_time'),('initial', 't_update')),(('new', 'start_time'),('new', 't_update'))]
+            groups = ['choice','time_label']
+            pairs = [(('start_time',), ('t_update',))]
+            hues = 'time_label'
+        var = f'{decoding_measures}_mean'
+        stats = Stats(levels=['animal', 'session_id','trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+        stats.run(data_for_stats, dependent_vars=[var], group_vars=groups, pairs=diff_pairs,
+                  filename=f'goal_coding_stats_{comparison}_{tags}')#pairs=diff_pairs,
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                          f'& variable == "{var}"')
+        
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0] if isinstance(x, list) else x)#fix for the weird formatting issue
+        pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
+        #pvalues = [stats_data['p_val'].to_numpy()[0]]
+        
+        #plot data
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[3, 1]))
+        if comparison == 'region':
+            colors = [self.colors[t] for t in list(label_map.values())]
+            sess_averages = data_for_stats.groupby(['session_id', 'choice', 'region'])[var].mean().reset_index()
+            hue_ord = list(label_map.values())
+        else:
+            colors = [self.colors[t] for t in ('initial','new')]
+            sess_averages = data_for_stats.groupby(['session_id', 'choice', 'time_label'])[var].mean().reset_index()
+            hue_ord = list(label_map.keys())
+            # diff_data = (diff_data
+            #        .groupby(['animal', 'session_id', 'trial_id', 'time_label'])
+            #        [var].mean()
+            #        .reset_index())
+
+        
+        common_kwargs = dict(data=sess_averages, x='choice', y=var, hue=comparison, ax=ax[0],
+                             hue_order=hue_ord, errwidth=3, join=False, dodge=(0.8 - 0.8 / 3), )
+        
+        category_order = ['initial','new']#'local','central',
+        sns.pointplot(**common_kwargs, palette=colors, order=category_order, scale=1.5)#both used to be ax[0] = 
+        sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None, order=category_order)
+        ax[0].set(xlabel=f'goal location', ylabel=f'prob. density before update onset')
+        #ax[0].get_legend().remove()
+        rainbow_text(0.5, 0.9, list(label_map.keys()), colors, ax=ax[0], size=8)
+        if ylim:
+            ax[0].set(ylim=ylim)
+        decoding_measures = 'prob_sum_mean'
+        ##stats annotations
+        annot = Annotator(ax[0], pairs=diff_pairs, data=data_for_stats, x='choice', y=decoding_measures, hue=comparison,
+                          hue_order=hue_ord)#pairs=combos, before data= #order=list(label_map.values())
+        annot.new_plot(ax[0], pairs=diff_pairs, data=data_for_stats, x='choice', y=decoding_measures, hue=comparison,
+                       hue_order=hue_ord, )
+                       #pairs=combos, before data=order=list(label_map.values()
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        sfig.suptitle(f'{title} goal arm cue quantification', fontsize=12)
+        if comparison == 'region':
+            return sfig
+        
+        # setup stats - group variables, pairs to compare, and levels of hierarchical data
+        # var = f'{decoding_measures}'
+        group = comparison
+        group_list = data_for_stats['choice'].unique()#zones that are being decoded (what i want to be compared)
+        #pairs = [('CA1', 'PFC')]#make sure label map applied correctly or this will break
+        if comparison == 'choice':
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+            stats.run(diff_data, dependent_vars=[var], group_vars=['choice'],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        elif comparison == 'time_label':
+            #order = list(time_label)
+            combos = [('start_time', 't_update')]
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+            stats.run(diff_data, dependent_vars=['initial_vs_new'], group_vars=['time_label'],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_collapse_stats_{comparison}_{tags}')
+        elif comparison == 'region':
+            order=list(label_map.values())
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+            stats.run(diff_data, dependent_vars=[var], group_vars=['choice', comparison],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+        else:
+            stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
+                        approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='manuscript')
+            stats.run(data_for_stats, dependent_vars=[var], group_vars=['choice', comparison],#choice is zones (which i want) and comparison is trial type (which i am dropping and replacing with nothing)
+                    pairs=pairs, filename=f'goal_coding_stats_{comparison}_{tags}')
+
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                          f'& variable == "initial_vs_new"')
+        #plot data initial-new
+        sess_averages = diff_data.groupby(['session_id', 'region','time_label'])['initial_vs_new'].mean().reset_index()
+        #comparison = 'region'
+        if stripplot:
+            ax[1] = sns.stripplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], zorder=1, 
+                                  color=self.colors['home_medium'], order=list(label_map.keys()), alpha=0.4)#legend=False,
+        common_kwargs = dict(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], errwidth=3,
+                             order=['start_time', 't_update'], join=False, dodge=(0.8 - 0.8 / 3), )#order=list(label_map.keys())
+        common_kwargs['order'] = ['start_time', 't_update']
+        ax[1] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
+        ax[1] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
+        ax[1].set(ylabel=f'initial - new prob. density')
+        ax[1].axhline(0, color='k', linestyle='dashed', alpha=0.5)
+
+        
+        #diff_pairs = [((c[0],), (c[1],)) for c in combos]
+        
+        stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        pvalues = [stats_data['p_val'].to_numpy()[0]]
+        #pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]
+        annot = Annotator(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
+                          order=list(label_map.keys()))#order=list(label_map.keys())
+        annot.new_plot(ax[1], pairs=combos, data=diff_data, x=comparison, y='initial_vs_new',
+                       order=['start_time', 't_update'],
+                       )#list(label_map.keys())
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+
+        # get error differences for reporting purposes
+        # bins = self.aggregator.group_aligned_df['bins'].values[0]
+        # data_for_stats['error_mean'] = (data_for_stats['error_mean'] - np.min(bins)) / (np.max(bins) - np.min(bins))
+        # data_for_stats = data_for_stats.query('choice == "initial"')
+        # stats.run(data_for_stats, dependent_vars=['error_mean'], group_vars=['choice', 'region'],
+        #           pairs=pairs, filename=f'decoding_error_stats_region_{tags}')
+
+        # #get significant difference from zero for reporting purposes
+        # sess_averages = (diff_data
+        #                  .groupby(['animal', 'session_id', 'update_type', 'correct','time_label'])
+        #                  .mean()
+        #                  .reset_index())
+        # #pairs = [[[c]] for c in combo_list]
+        # stats = Stats(levels=['animal', 'session_id'], results_io=self.results_io,
+        #               approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='response')
+        # stats.run(sess_averages, dependent_vars=['initial_vs_new'], group_vars='region', pairs=pairs,
+        #           filename=f'goal_diff_stats_from_0_{comparison}_{tags}')
 
         sfig.suptitle(f'{title} goal representation quantification', fontsize=12)
         return sfig
 
     def plot_goal_coding_by_commitment_single_trials(self, sfig, comparison='update_type', prob_value='prob_sum',
                                                      use_zscores=False, metric='view_angle', tags='',
-                                                     update_type=["switch", "stay"], plot_full_breakdown=False):
+                                                     update_type=["switch", "stay"], plot_full_breakdown=False, normalize=False):
         # load up data
         decoding_measures = 'zscore_prob' if use_zscores else prob_value
         plot_groups = self.plot_group_comparisons_full[comparison]
@@ -519,14 +1635,38 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         agg_dict.update({k: (k, lambda x: x.unique()[0]) for k in commitment_cols})
         choice_data = choice_data.merge(trial_data_raw[[*merge_keys, 'zscore_prob']], how='left', left_on=merge_keys,
                                         right_on=merge_keys, validate='one_to_one')
-        trial_data = (choice_data
-                      .query(f'times_binned > 0 & times_binned < 1.5')  # select window
-                      .query(f'update_type in {update_type}')
-                      .groupby(groupby_cols)[[a[0] for a in agg_dict.values()]]
-                      .agg(**agg_dict)  # get mean, peak, or peak latency for each trial (np.argmax)
-                      .reset_index()  # TODO - look into nan values
-                      .dropna(axis=0, subset=['choice_commitment_at_0', 'view_angle_at_0'])
-                      .assign(choice=lambda x: x['choice'].map(dict(initial_stay='initial', switch='new'))))
+        if not normalize:
+            trial_data = (choice_data
+                        .query(f'times_binned > 0 & times_binned < 1.5')  # select window
+                        .query(f'update_type in {update_type}')
+                        .groupby(groupby_cols)[[a[0] for a in agg_dict.values()]]
+                        .agg(**agg_dict)  # get mean, peak, or peak latency for each trial (np.argmax)
+                        .reset_index()  # TODO - look into nan values
+                        .dropna(axis=0, subset=['choice_commitment_at_0', 'view_angle_at_0'])
+                        .assign(choice=lambda x: x['choice'].map(dict(initial_stay='initial', switch='new'))))
+        elif normalize:
+            # Step 1: Define the time range for the pre-window (-1.5 to 0 seconds) for prob_sum
+            pre_window_means = (choice_data
+                .query('times_binned >= -1.5 & times_binned < 0')  # Pre-window time range
+                .groupby(groupby_cols)['prob_sum']  # Group by the relevant columns
+                .mean()  # Calculate the mean over the pre-window time range
+                .reset_index()
+                .rename(columns={'prob_sum': 'prob_sum_pre'}))  # Rename to prob_sum_pre
+            # Step 2: Merge the pre-window means back into the full dataset
+            trial_data1 = choice_data.merge(pre_window_means, on=groupby_cols, how='left')
+            # Step 3: Rename original prob_sum to og_prob_sum
+            trial_data1 = trial_data1.rename(columns={'prob_sum': 'og_prob_sum'})
+            # Step 4: Normalize the prob_sum by subtracting the pre-window mean and rename it to prob_sum
+            trial_data1['prob_sum'] = trial_data1['og_prob_sum'] - trial_data1['prob_sum_pre']
+            # Now the 'prob_sum_normalized' column contains the normalized values while all other data remains intact.
+            trial_data = (trial_data1
+                        .query(f'times_binned > 0 & times_binned < 1.5')  # select window
+                        .query(f'update_type in {update_type}')
+                        .groupby(groupby_cols)[[a[0] for a in agg_dict.values()]]
+                        .agg(**agg_dict)  # get mean, peak, or peak latency for each trial (np.argmax)
+                        .reset_index()  # TODO - look into nan values
+                        .dropna(axis=0, subset=['choice_commitment_at_0', 'view_angle_at_0'])
+                        .assign(choice=lambda x: x['choice'].map(dict(initial_stay='initial', switch='new'))))
 
         if plot_full_breakdown:
             diff_data = (trial_data
@@ -564,10 +1704,17 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 #                  .mean()
                 #                  .reset_index())
                 common_kwargs = dict(data=data, x=f'{metric}_{grouping}', y=dependent_var, order=order,
-                                     ax=ax[row_id][col_id], )
+                                     ax=ax[row_id][col_id], )#y plotting prob_sum from data_to_plot
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, scale=1.5, palette=palette)
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, scale=0.75, palette=['w'] * len(order),
                                                    errorbar=None)
+                
+                #exporting source data
+                data_to_export = data[[f'{metric}_{grouping}', dependent_var]]
+                save_path = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+                filename = f'fig7_data_{tags}.xlsx'
+                data_to_export.to_excel(save_path / filename, index=False)
+                data_to_export.to_excel(save_path / filename, index=False)
                 # arbitrary test for descriptive stats
                 stats = Stats(levels=['animal', 'session_id', 'trial_id'], results_io=self.results_io,
                               approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
@@ -637,7 +1784,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
 
     def plot_goal_coding_by_commitment(self, sfig, comparison='update_type', prob_value='prob_sum',
                                        metric='view_angle', update_type=["switch", "stay"],
-                                       behavior_only=False):
+                                       behavior_only=False, normalize=False):
         # load up data
         plot_groups = self.plot_group_comparisons_full[comparison]
         label_map = self.label_maps[comparison]
@@ -659,8 +1806,18 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
                                          values=prob_value)
                 new_mat = trial_mat.query('choice == "switch"').to_numpy()
-                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
+                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()                    
                 time_bins = trial_mat.columns.to_numpy()
+                
+                if normalize:
+                    # Step 1: Identify indices for columns where times < 0 and times >= 0
+                    pre_zero_indices = np.where(trial_mat.columns < 0)[0]   # Columns where t < 0
+                    # Step 2: Compute the mean of new_mat for the columns with t < 0 (for each row)
+                    pre_zero_mean = np.mean(new_mat[:, pre_zero_indices], axis=1, keepdims=True)
+                    pre_zero_mean2 = np.mean(initial_mat[:,pre_zero_indices], axis=1, keepdims=True)
+                    new_mat -= pre_zero_mean
+                    initial_mat -= pre_zero_mean2
+                    
                 behavior_df = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'],
                                            columns='times', values=metric)
                 behavior_mat = behavior_df.query(
@@ -824,49 +1981,219 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         sorted_data.sort_values('confusion_matrix_sum', ascending=False, inplace=True)
 
         return sorted_data
+    
+    # def plot_region_error_dc(self, update_type='non_update', comparison=region, sub_group=['animal'], time_label=['t_update'], feature=position):
+    #     plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=time_label)
+    #     df = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
+    #                                                              ret_df=True)
+    #     true_feat = np.nanmean(np.stack(aligned_data['feature']), axis=0)
+    #     self.aggregator._summarize()
+    
+    def plot_region_error_distribution(self, sfig, update_type='non_update', error_meaure='decoding_error', prob_value='prob_sum', feat='position', tags=''):
+        plot_groups = dict(update_type=[update_type], time_label=['t_update'], turn_type=[1, 2], correct=[0,1])#, time_label=['t_update']
+        trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                       prob_value=prob_value)
+        aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
+                                                                 ret_df=True)
+        clim = (0.02, 0.045) if feat == 'position' else (0.02, 0.04)
+        #prob_map = np.nanmean(np.stack(aligned_data['probability']), axis=0)
+        true_feat = np.nanmean(np.stack(aligned_data['feature']), axis=0)
+        #time_bins = np.linspace(aligned_data['times'].apply(np.nanmin).min(),
+        #                        aligned_data['times'].apply(np.nanmax).max(),
+        #                        np.shape(prob_map)[1])
+        #feat_bins = np.linspace(aligned_data['bins'].apply(np.nanmin).min(),
+        #                        aligned_data['bins'].apply(np.nanmax).max(),
+        #                        np.shape(prob_map)[0])
+        #track_fraction = (feat_bins - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        #true_feat = (true_feat - np.min(feat_bins)) / (np.max(feat_bins) - np.min(feat_bins))
+        
+        masked_probabilities = []
+        label_map = {('CA1',):'CA1', ('PFC',):'PFC'}
+        for trial_idx, (trial_prob, trial_feature, location) in enumerate(zip(aligned_data['probability'], aligned_data['feature'], aligned_data['location'])):
+            if feat=='position':
+                mask = (trial_feature >= 120.35)
+            else:
+                mask = (location >= 120.35) & (location <= 254)
+            #transposed_mask = mask.T  # or np.transpose(mask)
+            # Repeat the mask along the location axis to match the shape of the probability distribution
+            #expanded_mask = np.repeat(mask[:, np.newaxis], trial_prob.shape[1], axis=1)
+            prob_mask = np.broadcast_to(mask, trial_prob.shape)
+            # Apply the mask to the probability distribution (set masked values to NaN)
+            trial_prob_masked = np.where(prob_mask, trial_prob, np.nan)
+            # Store the masked probabilities
+            masked_probabilities.append(trial_prob_masked)
+        
+        aligned_data['probability_f'] = masked_probabilities
+        #step 2: get the location of peak decoding value, and the the spread. std of results? then the locations for where that std is?
+        decoding_spreads = []
+        decoding_ave_spreads = []
+        
+        for trial_idx, trial_prob in enumerate(aligned_data['probability_f']):
+            trial_spreads = []  # Store spreads for this trial
+            ave_trial_spreads = []
+            # Convert trial_prob to a numpy array (if not already)
+            trial_prob = np.array(trial_prob)  # Shape (n_location_bins, n_locations)
+            
+            for loc in range(trial_prob.shape[1]):  # Iterate over locations
+                if np.all(np.isnan(trial_prob[:, loc])):
+                    # Handle NaN cases
+                    trial_spreads.append(np.nan)
+                    continue
+                
+                # Get the peak value and index for this location
+                peak_location = np.nanargmax(trial_prob[:, loc])#
+                peak_decoding = trial_prob[peak_location, loc]#
+                
+                # Calculate the threshold
+                decoding_std = np.nanstd(trial_prob[:, loc])
+                threshold = peak_decoding - decoding_std
+                
+                # Find the first index before the peak where decoding meets/exceeds the threshold
+                indices_before_peak = np.where(trial_prob[:peak_location + 1, loc] >= threshold)[0]
+                index_before = indices_before_peak[0] if len(indices_before_peak) > 0 else np.nan
+                
+                # Find the first index after the peak where decoding meets/exceeds the threshold
+                indices_after_peak = np.where(trial_prob[peak_location:, loc] >= threshold)[0]
+                index_after = peak_location + indices_after_peak[-1] if len(indices_after_peak) > 0 else np.nan
+                
+                # Compute the spread (index_after - index_before)
+                if not np.isnan(index_before) and not np.isnan(index_after):
+                    spread = index_after - index_before
+                else:
+                    spread = np.nan  # If either index is NaN, spread is undefined
 
-    def plot_all_groups_error(self, main_group, sub_group, thresh_params=False):
+                trial_spreads.append(spread)  # Store the spread for this location
+            ave_trial_spreads = np.nanmean(trial_spreads)
+            decoding_spreads.append(trial_spreads)  # Store the spreads for the trial
+            decoding_ave_spreads.append(ave_trial_spreads)
+        
+        # Add spreads to aligned_data if needed
+        aligned_data['decoding_spread'] = decoding_ave_spreads
+        #step 3: average this across time/trials/etc and plot the results somehow
+        groupby_cols = ['session_id', 'animal', 'region','trial_id']#have no idea how this will work given that the df is a different shape I think
+        data_for_stats = (aligned_data
+                          .groupby(groupby_cols)[['decoding_spread']]  # group by trial/trial type
+                          .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1))) 
+        data_for_stats.reset_index(inplace=True)
+        
+        data_for_stats['region'] = data_for_stats['region'].map(label_map)
+        aligned_data['region'] = aligned_data['region'].map(label_map)
+        sess_averages = data_for_stats.groupby(['session_id', 'region'])['decoding_spread_mean'].mean().reset_index()
+        
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[1, 1]))
+        colors = [self.colors[t] for t in list(label_map.values())]
+
+        common_kwargs = dict(data=sess_averages, x='region', y='decoding_spread_mean', ax=ax[0], errwidth=3,
+                             order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3), )
+        ax[0] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
+        ax[0] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
+        ax[0].set(ylabel=f'decoding error')
+        ax[0].axhline(0, color='k', linestyle='dashed', alpha=0.5)
+        
+        diff_pairs = [('CA1', 'PFC')]#('CA1', 'PFC'), ('PFC', 'CA1')
+        stats = Stats(levels=['animal', 'session_id','trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+        stats.run(data_for_stats, dependent_vars=['decoding_spread_mean'], group_vars='region', pairs=diff_pairs,
+                  filename=f'goal_coding_stats_region_{tags}')#pairs=diff_pairs,
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "anova"'
+                                          f'& variable == "decoding_spread_mean"')
+        pvalues = [stats_data['p_val'].to_numpy()[0]]
+        #pairs = [(str(p[0]), str(p[1])) for p in pairs]
+        annot = Annotator(ax, pairs=diff_pairs, data=data_for_stats, x='region', y='decoding_spread_mean'
+                          )#pairs=combos, before data= #order=list(label_map.values())
+        annot.new_plot(ax, pairs=diff_pairs, data=data_for_stats, x='region', y='decoding_spread_mean',
+                       order=list(label_map.values()),
+                       )#pairs=combos, before data=
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
+        sfig.suptitle(f'spread representation quantification', fontsize=12)
+        return sfig
+        
+        
+
+    def plot_all_groups_error(self, sfig, update_type='non_update', main_group=['region'], sub_group=['animal'], error_measures = 'decoding_error', time_label=['t_update'], thresh_params=False, title='', tags=''):
         print('Plotting group decoding error distributions...')
+        #plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=time_label)
+        data_list = []
+        for sess_dict in self.data:
+            if not sess_dict['excluded_session']:
+                sess_summary = sess_dict['summary_df']
+                temp_df = pd.DataFrame({
+                    'decoded_feature': sess_summary.decoded_feature,
+                    'decoding_error': sess_summary.decoding_error,
+                    'actual_feature': sess_summary.actual_feature,
+                    'update_type': sess_summary.update_type,
+                    'region': [sess_dict['region']] * len(sess_summary),
+                    'session_id': [sess_dict['session_id']] * len(sess_summary),
+                    'animal': [sess_dict['animal']]*len(sess_summary),
+                    'trial_id': sess_summary.trial_id
+                })
+                mask = (temp_df['update_type'] == 'delay only') & (temp_df['actual_feature'] >= 130.35)# & (temp_df['actual_feature'] <= 245)#eliminating arms + 10 and initial cue + 10 for buffer
+                filt_df = temp_df[mask]
+                filt_df['rmse_cont']=sqrt(mean_squared_error(filt_df['actual_feature'], filt_df['decoded_feature']))
+            #temp_df_ave = data.groupby(['trial_id', 'update_type','animal','region','session_id'])[['decoding_error', 'rmse']].mean().reset_index()
+                data_list.append(filt_df)
+        df = pd.concat(data_list, ignore_index=True)
+        label_map = {('CA1',):'CA1', ('PFC',):'PFC'}
+        
+        group_data = df#.groupby(main_group)  # main group is what gets the different plots
+        
+        groupby_cols = ['session_id', 'animal', 'region']#og had 'session_id','animal','trial_id','update_type','correct','feature_name','choice'. need to get animal
+        data_for_stats = (group_data
+                          .groupby(groupby_cols)[['decoding_error', 'rmse_cont']]  # group by trial/trial type
+                          .agg(['mean'])  # get mean, peak, or peak latency for each trial (np.argmax)
+                          .pipe(lambda x: x.set_axis(x.columns.map('_'.join), axis=1)))  # fix columns so flattened
+        data_for_stats.reset_index(inplace=True)
+        #data_for_stats['choice'] = data_for_stats['choice'].map(choice_mapping)
+        data_for_stats['region'] = data_for_stats['region'].map(label_map)
+        group_data['region'] = group_data['region'].map(label_map)
 
-        # select no threshold data to plot if thresholds indicated, otherwise combine
-        if thresh_params:
-            df_list = []
-            for thresh_val in self.threshold_params[sub_group]:
-                new_df = self.aggregator.group_df[self.aggregator.group_df[sub_group] >= thresh_val]
-                new_df[f'{sub_group}_thresh'] = thresh_val
-                df_list.append(new_df)  # duplicate dfs for each thresh
-            df = pd.concat(df_list, axis=0, ignore_index=True)
-            sub_group = f'{sub_group}_thresh'  # rename threshold
-        else:
-            df = self.aggregator.group_df
+        sess_averages = data_for_stats.groupby(['session_id', 'region'])['rmse_cont_mean','decoding_error_mean'].mean().reset_index()#getting session averages
 
-        group_data = df.groupby(main_group)  # main group is what gets the different plots
-        for name, data in group_data:
-            nrows = 3  # 1 row for each plot type (cum fract, hist, violin)
-            ncols = 3  # 1 column for RMSE dist, 1 for error dist, 1 for confusion_matrix dist
-            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 10))
+        # plot data
+        ax = sfig.subplots(nrows=1, ncols=2, gridspec_kw=dict(width_ratios=[1, 1]))
+        colors = [self.colors[t] for t in list(label_map.values())]
+        # if stripplot:
+        #     ax[1] = sns.stripplot(data=sess_averages, x=comparison, y='initial_vs_new', ax=ax[1], zorder=1, legend=False,
+        #                           color=self.colors['home_medium'], order=list(label_map.values()), alpha=0.4)
+        
+        common_kwargs = dict(data=sess_averages, x='region', y='rmse_cont_mean', ax=ax[1], errwidth=3,
+                             order=list(label_map.values()), join=False, dodge=(0.8 - 0.8 / 3), )
+        ax[1] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
+        ax[1] = sns.pointplot(**common_kwargs, palette=['w'] * len(colors), scale=0.75, errorbar=None)
+        ax[1].set(ylabel=f'rmse_mean')
+        ax[1].axhline(0, color='k', linestyle='dashed', alpha=0.5)
 
-            # raw decoding errors
-            title = 'Median raw error - all sessions'
-            xlabel = 'Decoding error (|true - decoded|)'
-            plot_distributions(data, axes=axes, column_name='raw_error', group=sub_group, row_ids=[0, 1, 2],
-                               col_ids=[0, 0, 0], xlabel=xlabel, title=title)
+        #combos = list(itertools.combinations(combo_list, r=2))
+        #diff_pairs = [(('CA1',), ('PFC',))]
+        diff_pairs = [('CA1', 'PFC')]#('CA1', 'PFC'), ('PFC', 'CA1')
+        stats = Stats(levels=['animal', 'session_id','trial_id'], results_io=self.results_io,
+                      approaches=['mixed_effects'], tests=['anova', 'emmeans'], results_type='response')
+        stats.run(data_for_stats, dependent_vars=['rmse_cont_mean'], group_vars='region', pairs=diff_pairs,
+                  filename=f'locattion_region_rmse_error')#pairs=diff_pairs,
+        stats_data = stats.stats_df.query(f'approach == "mixed_effects" & test == "emmeans"'
+                                          f'& variable == "rmse_cont_mean"')
+        #stats_data['pair'] = stats_data['pair'].apply(lambda x: x[0])  # TODO - add to stats function
+        #diff_pairs = ['CA1','PFC']#no idea how this will work but we will see
+        #pvalues = [stats_data[stats_data['pair'] == tuple(p)]['p_val'].to_numpy()[0] for p in diff_pairs]
+        #pvalues = [stats_data[stats_data['pair'] == p]['p_val'].to_numpy()[0] for p in diff_pairs]#DC change back
+        pvalues = [stats_data['p_val'].to_numpy()[0]]
+        #pairs = [(str(p[0]), str(p[1])) for p in pairs]
+        annot = Annotator(ax[1], pairs=diff_pairs, data=data_for_stats, x='region', y='rmse_cont_mean'
+                          )#pairs=combos, before data= #order=list(label_map.values())
+        annot.new_plot(ax[1], pairs=diff_pairs, data=data_for_stats, x='region', y='rmse_cont_mean',
+                       order=list(label_map.values()),
+                       )#pairs=combos, before data=
+        (annot
+         .configure(test=None, test_short_name='mann-whitney', text_format='star', text_offset=0.05)
+         .set_pvalues(pvalues=pvalues)
+         .annotate(line_offset=0.1, line_offset_to_group=0.025))
 
-            # rmse
-            title = 'Root mean square error - all sessions'
-            xlabel = 'RMSE'
-            plot_distributions(data, axes=axes, column_name='rmse', group=sub_group, row_ids=[0, 1, 2],
-                               col_ids=[1, 1, 1], xlabel=xlabel, title=title)
-
-            # confusion matrix sums
-            title = 'Confusion matrix sum - all sessions'
-            xlabel = 'Probability'
-            plot_distributions(data, axes=axes, column_name='confusion_matrix_sum', group=sub_group, row_ids=[0, 1, 2],
-                               col_ids=[2, 2, 2], xlabel=xlabel, title=title)
-
-            # wrap up and save plot
-            fig.suptitle(f'Decoding error - all sessions - {name}')
-            self.results_io.save_fig(fig=fig, axes=axes, filename=f'group_error', additional_tags=f'{name}_{sub_group}')
+        sfig.suptitle(f'{title} error representation quantification', fontsize=12)
+        return sfig
 
     def plot_parameter_comparison(self, data, name, thresh_params=False):
         print('Plotting parameter comparisons..')
@@ -2013,6 +3340,12 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 colors = [self.colors[t] for t in data.query('target == "shuffled"')['update_type'].unique()]
                 common_kwargs = dict(data=data.query('target == "actual"'), x='update_type', y='score',
                                      ax=ax[row_id][col_id], errwidth=3, join=False,)
+                #saving source data
+                plot_data = data.query('target == "shuffled"')[['update_type', 'score']]
+                save_path = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+                filename = f'pointplot_prediction_data_{tags}.xlsx'
+                plot_data.to_excel(save_path / filename, index=False)
+                
                 ax[row_id][col_id] = sns.pointplot(**common_kwargs, palette=colors, scale=1.5)
                 ax[row_id][col_id].set(xlabel=f'update type', ylabel=f'prediction accuracy', ylim=(0.475, 0.625))
 
@@ -2043,6 +3376,14 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         label_map = self.label_maps[comparison]
         theta_data = self.aggregator.calc_theta_phase_data(self.aggregator.group_aligned_df, plot_groups,
                                                            ret_by_trial=True)
+        
+        #exporting source data
+        raw_data_export = theta_data.query(f'bin_name == "full" & times in {time} & update_type in {update_type}')
+        data_export = raw_data_export[['phase_bins', 'initial', 'new', 'central', 'probability','times']]
+        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        filename = f'phase_plot_data_{tags}.xlsx'
+        data_export.to_excel(save_dir / filename, index=False)
+            
         averages = (theta_data
                     .query(f'bin_name == "full" & times in {time} & update_type in {update_type}')
                     .groupby(['update_type', 'times', 'phase_mid'])[['initial', 'new', 'central', 'theta_amplitude']]
@@ -2085,6 +3426,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                   data[(var, 'mean')] - data[(var, 'sem')],
                                                   data[(var, 'mean')] + data[(var, 'sem')],
                                                   color=self.colors[f'{var}'], alpha=0.25)
+
             ax[row_ind][col_ind].set(title=label_map[name[0]])
             ax[row_ind][0].set(ylabel='prob. density')
 
@@ -2119,6 +3461,12 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         combos = [('initial', 'central'), ('new', 'central')]
         group_list = post_modulation['phase_mid'].unique()
         pairs = [((g, c[0]), (g, c[1],)) for c in combos for g in group_list]
+        
+        #exporting source data
+        df_export = post_modulation[['phase_mid','prob_value','choice']]
+        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        filename = f'phase_stats_data_{tags}.xlsx'
+        df_export.to_excel(save_dir / filename, index=False)
 
         # plot phase modulation comparisons between goal arm locations
         colors = [self.colors[t] for t in arm_cats]

@@ -11,16 +11,17 @@ from sklearn.model_selection import train_test_split
 from update_project.general.results_io import ResultsIO
 from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
-from update_project.general.acquisition import get_velocity
+from update_project.general.acquisition import get_velocity, get_location
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.preprocessing import get_commitment_data
 from update_project.base_analysis_class import BaseAnalysisClass
 
 
 class BayesianDecoderAnalyzer(BaseAnalysisClass):
-    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
+    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):#turn off after this
         # setup parameters
         self.region = params.get('region', ['CA1', 'PFC'])
+        self.subset_reg = params.get('subset_reg', False)
         self.units_types = params.get('units_types',
                                       dict(region=self.region,  # dict of filters to apply to units table
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
@@ -50,7 +51,8 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         trial_types = [str(t) for t in self.encoder_trial_types['correct']]
         self.results_tags = f"{'_'.join(features)}_regions_{'_'.join(self.units_types['region'])}_" \
                             f"enc_bins{self.encoder_bin_num}_dec_bins{self.decoder_bin_size}_speed_thresh" \
-                            f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"
+                            f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"\
+                            f"{'_subset3' if self.subset_reg == True else ''}"#_regions after features DC add back
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem,
                                     tags=self.results_tags)
         self.data_files = dict(bayesian_decoder_output=dict(vars=['encoder_times', 'decoder_times',
@@ -60,20 +62,21 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                                                   'train_df', 'test_df', 'test_delay_only_df', 'test_update_only_df',
                                                                   'model', 'model_test', 'model_delay_only', 'model_update_only',
                                                                   'bins', 'decoded_values', 'decoded_probs',
-                                                                  'theta', 'velocity', 'commitment'],#add prev_trial here?
+                                                                  'theta', 'velocity', 'commitment','location'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
-                                                 'feature_names', 'linearized_features', ],
-                                           format='npz'))
+                                                 'feature_names', 'linearized_features',],
+                                           format='npz'))#need to add some sort of thing for list of cells to use. both regions? only subsetted?
 
         # setup data
-        self.feature_names = features#features and feature name is what we are decoding
+        self.feature_names = features
         self.trials = get_trials_dataframe(nwbfile, with_pseudoupdate=True)
         self.units = nwbfile.units.to_dataframe()
         self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
+        self.location = get_location(nwbfile)
         self.commitment = get_commitment_data(nwbfile, self.results_io)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.limits = {feat: self.virtual_track.get_limits(feat) for feat in self.feature_names}
@@ -86,7 +89,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
 
     def run_analysis(self, overwrite=False, export_data=True):
         print(f'Decoding data for session {self.results_io.session_id}...')
-
+ 
         if overwrite:
             self._preprocess()._encode()._decode()  # build model
             if export_data:
@@ -181,8 +184,10 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
             # append new start/stop times to data struct
             new_times = movements_df[movements_df['moving'] == True].index
             if np.isnan(align):
-                new_left = new_times.left.values
-                new_right = new_times.right.values
+                new_left = np.array(new_times.left.values[0])
+                new_right = np.array(new_times.right.values[-1])
+                new_starts.append(new_left.item())
+                new_stops.append(new_right.item())
             else:
                 n_steps_back = np.floor((align - new_times.left.values) / self.decoder_bin_size)
                 n_steps_forward = np.floor((new_times.right.values - align) / self.decoder_bin_size)
@@ -192,9 +197,11 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                               (new_right - new_left)) < self.decoder_bin_size * 2, \
                     'Durations differences after adjustment should be no more than 2x bin size (1 bin for forward and' \
                     ' back'
+                new_starts.append(new_left[-1].item())
+                new_stops.append(new_right[-1].item())
 
-            new_starts.append(new_left)
-            new_stops.append(new_right)
+            #new_starts.append(new_left)
+            #new_stops.append(new_right[-1].item())
 
         if np.size(new_starts):
             start = np.hstack(new_starts)
@@ -285,6 +292,43 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         # get spikes
         units_mask = pd.concat([self.units[k].isin(v) for k, v in self.units_types.items()], axis=1).all(axis=1)
         units_subset = self.units[units_mask]
+        if self.subset_reg:
+            file_path = 'Y:\\singer\\Steph\\Code\\update-project\\results\\response_figures\\unit_counts_per_region.xlsx'
+            df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the unit numbers for each region from each nwb session
+            df['file_without_ext'] = df['File'].str.replace('.nwb', '', regex=False)#removing .nwb from each session name
+            # Find the row where the 'file' column matches the session_id
+            matching_row = df[df['file_without_ext'] == self.results_io.session_id]
+            # Extract the number of units for CA1 and PFC (assuming the columns are named 'CA1_units' and 'PFC_units')
+            if not matching_row.empty:
+                ca1_units = matching_row['CA1'].values[0]
+                pfc_units = matching_row['PFC'].values[0]
+                print(f"matching session ID found for {self.results_io.session_id} CA1 units: {ca1_units}, PFC units: {pfc_units}")
+                if ca1_units > pfc_units and self.region == "CA1":
+                    ca1_mask = np.random.choice(np.arange(units_subset),size=pfc_units, replace=False)
+                    data = {
+                        'session_id': [session_id] * len(units_subset),
+                        'ca1_mask': [True if i in ca1_mask else False for i in range(len(ca1_mask))],  # Example CA1 mask
+                    }
+                    # Create a pandas DataFrame
+                    df2 = pd.DataFrame(data)
+                    output_file_path = r'Y:\singer\NWBData\output\unit_masks_{self.results.session_id}.csv'
+                    df2.to_csv(output_file_path, index=False)
+                    print(f"Mask data for session {self.results.session_id} saved to {output_file_path}")
+                    units_subset=units_subset[ca1_mask]
+                    
+                elif pfc_units > ca1_units and self.region == "PFC":
+                    pfc_mask = np.random.choice(np.arange(units_subset),size=ca1_units, replace=False)
+                    data = {
+                        'session_id': [session_id] * len(units_subset),
+                        'pfc_mask': [True if i in pfc_mask else False for i in range(len(pfc_mask))],  # Example CA1 mask
+                    }
+                    # Create a pandas DataFrame
+                    df2 = pd.DataFrame(data)
+                    output_file_path = r'Y:\singer\NWBData\output\unit_masks_{self.results.session_id}.csv'
+                    df2.to_csv(output_file_path, index=False)
+                    print(f"Mask data for session {self.results.session_id} saved to {output_file_path}")
+                    units_subset=units_subset[pfc_mask]
+
         spikes_dict = {n: nap.Ts(t=units_subset.loc[n, 'spike_times'], time_units='s') for n in units_subset.index}
         if spikes_dict:
             self.spikes = nap.TsGroup(spikes_dict, time_units='s')
@@ -317,6 +361,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         # select additional data for post-processing
         self.theta = nap.TsdFrame(self.theta, time_units='s', time_support=self.decoder_times)
         self.velocity = nap.TsdFrame(self.velocity, time_units='s', time_support=self.decoder_times)
+        self.location = nap.TsdFrame(self.location, time_units='s', time_support=self.decoder_times)
 
         return self
 

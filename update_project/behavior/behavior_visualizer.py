@@ -71,6 +71,10 @@ class BehaviorVisualizer(BaseVisualizationClass):
                       approaches=['traditional'], tests=['wilcoxon_one_sample'], results_type='manuscript')
         stats.run(df_by_bin, dependent_vars=['proportion correct'], group_vars=['update_type'],
                   filename=f'prop_correct_vs_chance_by_window{tags}', pairs=pairs)
+        
+        #saving source data
+        df_export = df_by_bin[['update_type', 'proportion correct']]
+        df_export.to_excel(r"Y:\singer\Steph\Code\update-project\results\sourcedata\boxplot_data_fig1b.xlsx", index=False)
 
         sess_averages = (df_by_update_type
                          .explode('prop_correct')
@@ -157,6 +161,28 @@ class BehaviorVisualizer(BaseVisualizationClass):
                                                                          'switch_update': 'switch',
                                                                          'stay_update': 'stay'})
         trajectory_df = trajectory_df.query(f'correct == 1 & update_type in {update_type}')
+        
+        data_list = []
+        for session_id, session_data in enumerate(self.data):
+    # Extract animal ID and session ID from session_data or session_id as appropriate
+            animal_id = session_data['animal']  # Assuming animal ID is stored in session_data
+            session_identifier = session_data['session_id']  # The session_id is already the identifier (e.g., '00')
+
+    # Extract the relevant columns from the 'trajectories' DataFrame
+            trajectories_df = pd.DataFrame(session_data['trajectories'])
+            trajectories_df = trajectories_df[['trial_id', 'turn_type']]
+
+    # Add animal and session ID columns
+            trajectories_df['animal'] = animal_id
+            trajectories_df['session_id'] = session_identifier
+
+    # Append the DataFrame to the list
+            data_list.append(trajectories_df)
+            combined_df = pd.concat(data_list, ignore_index=True)
+        file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+        combined_df.to_excel(file_path, index=False)
+            #df = pd.read_parquet(file_path)
+            #df = pd.read_feather(file_path)
 
         ax = sfig.subplots(nrows=1, ncols=len(update_type), sharey=True, squeeze=False)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
@@ -207,10 +233,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
-        trajectory_df = trajectory_df.query(f'update_type in {update_type}')
-        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
-                                                                         'switch_update': 'switch',
-                                                                         'stay_update': 'stay'})
+        trajectory_df = (trajectory_df
+                         .query(f'update_type in {update_type}')
+                         .assign(update_type=lambda x: x['update_type'].map({'non_update': 'delay only',
+                                                                   'switch_update': 'switch',
+                                                                   'stay_update': 'stay'})))
         var_mapping = dict(x_position=dict(title='lateral position', ylabel='fraction of lateral distance', norm=60),
                            rotational_velocity=dict(title='rotational velocity', ylabel='roll (a.u.)', norm=False),
                            translational_velocity=dict(title='forward velocity', ylabel='pitch (a.u.)', norm=False),)
@@ -268,10 +295,11 @@ class BehaviorVisualizer(BaseVisualizationClass):
                    .reset_index(drop=True))
         trajectory_df = pd.concat([temp_df[['animal', 'session_id']],
                                    pd.DataFrame(list(temp_df['trajectories']))], axis=1)
-        trajectory_df = trajectory_df.query(f'update_type in {update_type}')
-        trajectory_df['update_type'] = trajectory_df['update_type'].map({'non_update': 'delay only',
-                                                                         'switch_update': 'switch',
-                                                                         'stay_update': 'stay'})
+        trajectory_df = (trajectory_df
+                         .query(f'update_type in {update_type}')
+                         .assign(update_type=lambda x: x['update_type'].map({'non_update': 'delay only',
+                                                                   'switch_update': 'switch',
+                                                                   'stay_update': 'stay'})))
 
         ax = sfig.subplots(nrows=1, ncols=1)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):

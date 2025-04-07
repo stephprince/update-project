@@ -20,7 +20,7 @@ class SessionLoader:
 
         self.animals = animals or [17, 20, 25, 28, 29, 33, 34]
         self.dates_included = dates_included or []
-        self.dates_excluded = dates_excluded or []
+        self.dates_excluded = dates_excluded or[]
 
     @staticmethod
     def get_animal_id(session_name):

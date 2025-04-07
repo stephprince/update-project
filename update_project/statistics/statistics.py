@@ -55,20 +55,29 @@ class Stats:
 
         stats_output = []
         descript_output = []
-        for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):
-            if a == 'bootstrap' and t != 'direct_prob':  # only run bootstrapping for direct prob test
+        print (self.approaches)
+        print(self.tests)
+        print(self.dependent_vars)
+        print(self.alternatives)
+        for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):#look what's in here to see what's comparisons this is generating
+            if a == 'bootstrap' and t == 'direct_prob':  # only run bootstrapping for direct prob test#DC change back
                 continue
             else:
                 self._setup_data(approach=a, data=df)
 
                 descript = self._get_descriptive_stats(approach=a, test=t, alternative=alt)
+                print('got descript')
                 descript_output.append(descript)
+                print('appended descript')
 
                 stats = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
+                print('got stats on line 69 noice')
                 stats_output.append(stats)
+                print('appended stats from performing test')
 
         self.stats_df = pd.concat(stats_output, axis=0)
         self.descript_df = pd.concat(descript_output, axis=0)
+        print('completed the run')
 
         self._export_stats(filename)
 
@@ -79,6 +88,7 @@ class Stats:
 
         self.descript_df = self._get_descriptive_stats(approach='traditional', test='na', alternative='na')
         self.stats_df = pd.DataFrame()
+        print('completed get_summary')
 
         self._export_stats(filename, summary_only=True)
 
@@ -107,10 +117,12 @@ class Stats:
 
         # run tests that look across pairs
         for var in self.dependent_vars:
-            if test == 'emmeans':
+            if test == 'emmeans':#this one
+                print('emmeans is go')
                 emm = emmeans.emmeans(self.model, 'predictor', contr='pairwise', adjust='tukey')
                 emm_df = self.r_to_pandas_df(ro.r['summary'](emm.rx2('contrasts')))
                 emm_df['pairs'] = [[literal_eval(c) for c in row.split(' - ')] for row in emm_df['contrast'].to_list()]
+                print('emmeans pairs evaluated')
                 for _, row in emm_df.iterrows():
                     matching_pair = [p for p in pairs if (p[0] in row['pairs'] and p[1] in row['pairs'])]
                     if matching_pair:
@@ -120,16 +132,22 @@ class Stats:
                                            test_statistic_name=test_statistic_name,
                                            df=row.get('df'), p_val=row["p.value"],
                                            alternative='two-sided')
+                        print('emmeans output made')
                         pair_outputs.append(test_output)
-            elif test == 'anova':
+                        print('emmeans output appended')
+            elif test == 'anova':#this one
                 if approach == 'mixed_effects':
+                    print('anova is go')
                     anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model, ddf="Kenward-Roger")))
+                    print('anova_df is made')
                     test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
                                        test_statistic=anova_df['F value'].to_numpy()[0],
                                        test_statistic_name='F value',
                                        df=anova_df['DenDF'], p_val=anova_df["Pr(>F)"].to_numpy()[0],
                                        alternative='anova with Kenward-Rogers method')
+                    print('anova is run')
                     pair_outputs.append(test_output)
+                    print('anova is appended')
                 else:
                     print('not currently supported')
                     # output = pg.mixed_anova()  # TODO - determine if I need mixed or not
@@ -186,18 +204,21 @@ class Stats:
         return pd.DataFrame(pair_outputs)
 
     def _get_descriptive_stats(self, approach, test, alternative):
+        # Ensure self.group_vars is a list
+        self.group_vars = self.group_vars if isinstance(self.group_vars, list) else [self.group_vars]
+        #self.df_processed['region'] = self.df_processed['region'].apply(lambda x: x[0] if isinstance(x, tuple) else x)
         descriptive_stats = (self.df_processed
-                              .groupby(self.group_vars)[self.dependent_vars]
+                              .groupby(self.group_vars)[self.dependent_vars]#group by region and decoding_error_mean
                               .describe()
                               .reset_index()
-                              .melt(id_vars=[(g, '') for g in self.group_vars], value_name='metric',
+                              .melt(id_vars=self.group_vars, value_name='metric',
                                     var_name=['variable_0', 'variable_1'])
                               .pipe(lambda x: x.set_axis(x.columns.map(''.join), axis=1))
                               .pivot(columns='variable_1', index=[*self.group_vars, 'variable_0'],
                                      values='metric')
                               .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
                               .reset_index()
-                              .assign(sem=lambda x: x['std'] / np.sqrt(x['count'])))
+                              .assign(sem=lambda x: x['std'] / np.sqrt(x['count'])))#(g, '') for g in  needs to go in id_vars=[(g, '') for g in self.group_vars] DC change back
         descriptive_stats.insert(0, 'approach', approach)
         descriptive_stats.insert(1, 'test', test)
         descriptive_stats.insert(2, 'alternative', alternative)
@@ -205,18 +226,17 @@ class Stats:
         if test == 'spearman':
             descriptive_stats[self.group_vars[0]] = self.group_vars[0]
             descriptive_stats = descriptive_stats.iloc[0:2, :]
-
         return descriptive_stats
 
     def _export_stats(self, filename, summary_only=False):
-        self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', results_type=self.results_type,
-                                          format='csv')
+        # self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', results_type=self.results_type,
+        #                                   format='csv')
         self.results_io.export_statistics(self._get_stats_text(), f'{filename}_text', results_type=self.results_type,
                                           format='txt')
-
-        if not summary_only:
-            self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', results_type=self.results_type,
-                                              format='csv')
+        #
+        # if not summary_only:
+        #     self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', results_type=self.results_type,
+        #                                       format='csv')
 
     def _get_stats_text(self):
         descript_text = self.descript_df.apply(lambda x: self.descript_to_text(x), axis=1)
@@ -237,18 +257,24 @@ class Stats:
     def stats_to_text(x):
         comparison = f'{x["pair"][0][0]} vs. {x["pair"][0][1]}' if len(x['pair'][0]) > 1 else f'{x["pair"][0][0]}'
         if x['df'] is not np.nan:
-            text = f'{x["test_statistic_name"]}({x["df"]}) = {x["test_statistic"]}, p = {x["p_val"]:.4f}, ' \
+            text = f'{x["test_statistic_name"]}({x["df"]}) = {x["test_statistic"]}, p = {x["p_val"]:.3e}, ' \
                    f'{x["variable"]} for {comparison}, {x["test"]} {new_line} '
         else:
-            text = f'{x["test_statistic_name"]} = {x["test_statistic"]}, p = {x["p_val"]:.4f}, ' \
-                   f'{x["variable"]} for {comparison}, {x["test"]} {new_line} '
+            text = f'{x["test_statistic_name"]} = {x["test_statistic"]}, p = {x["p_val"]:.3e}, ' \
+                   f'{x["variable"]} for {comparison}, {x["test"]} {new_line} '#both .3e used to be .4f. this should make it do scientific notation
         return text
 
     def _get_mixed_effects_model(self, data):
-        data['predictor'] = data[self.group_vars].apply(tuple, axis=1)
+        if self.group_vars != 'region':
+            data['predictor'] = data[self.group_vars].apply(tuple, axis=1)
+        else:
+            data['predictor'] = data[self.group_vars]
         for var in self.dependent_vars:
 
-            formula = f'{var} ~ predictor + (1|animal) + (1|animal:session_id)'  # equivalent to var ~ predictor + 1|animal/session_id
+            if self.group_vars == 'time_label':
+                formula = f'{var} ~ predictor + (1|animal) + (1|animal:session_id:trial_id)'  
+            else:
+                formula = f'{var} ~ predictor + (1|animal) + (1|animal:session_id)'# equivalent to var ~ predictor + 1|animal/session_id
             model = lme4.lmer(formula, data=self.pandas_to_r_df(data))
             # TODO - add checks for assumptions of mixed effects models
 
@@ -274,7 +300,7 @@ class Stats:
 
         return r_df
 
-    def _bootstrap_recursive(self, data, current_level=0, output_data=None):
+    def _bootstrap_recursive(self, data, current_level=0, output_data=None):#check if this is getting run, could be causing an infinite loop DC
         unique_samples = np.unique(data[self.levels[current_level]])
         random_samples = rng.choice(unique_samples, len(unique_samples))
 

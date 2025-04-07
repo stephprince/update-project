@@ -25,11 +25,11 @@ from update_project.statistics.statistics import Stats, get_fig_stats, get_compa
 
 class BayesianDecoderAggregator:
 
-    def __init__(self, exclusion_criteria=None, align_times=None, analyzer_name=None):
+    def __init__(self, exclusion_criteria=None, align_times=None, analyzer_name=None, turn_to_flip=2):
         self.exclusion_criteria = exclusion_criteria
         self.align_times = align_times or ['start_time', 't_delay', 't_update', 't_delay2', 't_choice_made']
-        self.flip_trials_by_turn = True  # default false
-        self.turn_to_flip = 2
+        self.flip_trials_by_turn = True  #
+        self.turn_to_flip = turn_to_flip#
         self.analyzer_name = analyzer_name or 'analyzer'
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
         self.data_files = dict(bayesian_aggregator_output=dict(vars=['group_df', 'group_aligned_df'], format='pkl'),
@@ -61,10 +61,10 @@ class BayesianDecoderAggregator:
                 feature=sess_dict[self.analyzer_name].feature_names[0],
                 num_units=len(sess_dict[self.analyzer_name].spikes),
                 num_trials=len(sess_dict[self.analyzer_name].train_df),
-                excluded_session=self._meets_exclusion_criteria(sess_dict[self.analyzer_name]), )
+                excluded_session=self._meets_exclusion_criteria(sess_dict, sess_dict[self.analyzer_name]), )
             metadata_keys = ['bins', 'virtual_track', 'model', 'model_test', 'model_delay_only', 'model_update_only',
                              'results_io', 'results_tags', 'convert_to_binary', 'encoder_bin_num', 'decoder_bin_size',
-                             'decoder_test_size']
+                             'decoder_test_size']#model needs to be singular once done with cv. change back
             metadata_dict = {k: getattr(sess_dict[self.analyzer_name], k) for k in metadata_keys}
             if hasattr(sess_dict[self.analyzer_name].encoder_bin_num, 'item'):
                 metadata_dict['encoder_bin_num'] = sess_dict[self.analyzer_name].encoder_bin_num.item()
@@ -143,7 +143,7 @@ class BayesianDecoderAggregator:
         self.group_aligned_df = pd.concat(flipped_data, axis=0)
         self.group_aligned_df.sort_index(inplace=True)
 
-    def select_group_aligned_data(self, param_data, filter_dict, ret_df=False):
+    def select_group_aligned_data(self, param_data, filter_dict, ret_df=False, summary=False):
         # filter for specific features
         mask = pd.concat([param_data[k].isin(v) for k, v in filter_dict.items()], axis=1).all(axis=1)
         data_subset = param_data[mask]
@@ -162,6 +162,8 @@ class BayesianDecoderAggregator:
 
         if ret_df:
             return data_subset
+        elif summary:
+            return group_data, summary_df
         else:
             return group_data
 
@@ -341,12 +343,14 @@ class BayesianDecoderAggregator:
         start_bin, stop_bin = self.get_bound_bins(prob_density_bins, bounds)
         integrated_prob = np.nansum(prob_density[start_bin:stop_bin], axis=axis)  # (trials, feature bins, window)
         # num_bins = len(prob_density[start_bin:stop_bin])
-        # prob_over_chance = integrated_prob * len(prob_density_bins) / num_bins
+        # prob_over_chance = integrated_prob * len(prob_density_bins) / num_bins#uncomment these lines to normalize maybe. try
 
         return integrated_prob
 
     @staticmethod
     def get_bound_bins(bins, bound_values):
+        if len(bins) == 5:
+            bins = bins[1]#won't work for non cv. change back
         start_bin, stop_bin = np.searchsorted(bins, bound_values)
         if bins[0] == bound_values[0]:
             stop_bin = stop_bin + 1
@@ -377,16 +381,20 @@ class BayesianDecoderAggregator:
 
         return bin_inds
 
-    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False, other_zones=None):
+    def quantify_aligned_data(self, param_data, aligned_data, ret_df=False, other_zones=None, half=None, prospective_reps=False, hm=False):
         if np.size(aligned_data) and aligned_data is not None:
             # get bounds to use to quantify choices
             bins = param_data['bins'].values[0]
+            if len(bins) == 5:
+                bins = bins[0]
             virtual_track = param_data['virtual_track'].values[0]
             bounds = virtual_track.choice_boundaries.get(param_data['feature_name'].values[0], dict())
             other_zones_dict = dict()
             if other_zones:
                 if 'central' in other_zones:
                     bounds['home'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
+                    if prospective_reps:
+                        bounds['home']=(5, 50)
                     other_zones_dict['home'] = 'central'
                 if 'original' in other_zones:
                     bounds['original'] = (virtual_track.cue_start_locations['y_position']['initial cue'],
@@ -396,7 +404,10 @@ class BayesianDecoderAggregator:
                     bounds['local'] = virtual_track.home_boundaries.get(param_data['feature_name'].values[0], dict())
                     other_zones_dict['local'] = 'local'
 
-            choice_mapping = dict(left='initial_stay', right='switch', **other_zones_dict)
+            if self.turn_to_flip == 2:
+                choice_mapping = dict(left='initial_stay', right='switch', **other_zones_dict)
+            elif self.turn_to_flip == 1:
+                choice_mapping = dict(left='switch', right='initial_stay', **other_zones_dict)
 
             if isinstance(aligned_data, dict):
                 prob_map = aligned_data['probability']
@@ -407,6 +418,17 @@ class BayesianDecoderAggregator:
             prob_choice = dict()
             num_bins = dict()
             bin_inds = self.adjust_bound_bins(bins, bounds)
+            if bin_inds['left_stop'] == 43:
+                bin_inds['home_stop'] = 7
+            if half=='backbin':
+                bin_inds['right_start'] = bin_inds['right_stop'] - 1
+                bin_inds['left_start'] = bin_inds['left_stop']-1
+            elif half == 'front':
+                bin_inds['right_stop'] = bin_inds['right_stop'] - round((bin_inds['right_stop'] - bin_inds['right_start'])/2)
+                bin_inds['left_stop'] = bin_inds['left_stop']-round((bin_inds['left_stop'] - bin_inds['left_start'])/2)
+            elif half == 'rearhalf':
+                bin_inds['right_start'] = bin_inds['right_start'] + ((bin_inds['right_stop'] - bin_inds['right_start'])//2)
+                bin_inds['left_start'] = bin_inds['left_start'] + ((bin_inds['left_stop'] - bin_inds['left_start'])//2)
 
             output_list = []
             for bound_name, bound_values in bounds.items():  # loop through left/right bounds
@@ -432,7 +454,7 @@ class BayesianDecoderAggregator:
                     stats={k: get_fig_stats(v, axis=0) for k, v in bound_quantification.items()})
                 bound_quantification.update(bound_values=bound_values,
                                             threshold=threshold)
-                prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for
+                prob_choice[bound_name] = bound_quantification  # choice calculating probabilities for#prob_sum has values here half
 
                 if ret_df:  # if returning dataframe compile data accordingly
                     bound_quantification.update(dict(choice=bound_name, trial_index=aligned_data.index.to_numpy()))
@@ -450,7 +472,7 @@ class BayesianDecoderAggregator:
                            .set_index('trial_index'))
                 output_df = pd.merge(aligned_data[['session_id', 'animal', 'region', 'trial_id', 'update_type',
                                                    'correct', 'turn_type', 'feature_name', 'time_label', 'times',
-                                                   'rotational_velocity', 'translational_velocity', 'error']],
+                                                   'rotational_velocity', 'translational_velocity', 'error','location']],
                                      list_df, left_index=True, right_index=True)
                 output_df['choice'] = output_df['choice'].map(choice_mapping)
                 return output_df
@@ -536,18 +558,18 @@ class BayesianDecoderAggregator:
         return pd.Series([corr, corr_coeff, corr_lags, corr_sliding, corr_coeff_sliding, lags_sliding, times_sliding],
                          index=['corr', 'corr_coeff', 'corr_lags', 'corr_sliding',
                                 'corr_coeff_sliding', 'lags_sliding', 'times_sliding'])
-
+        
     def calc_trial_by_trial_quant_data(self, param_data, plot_groups, prob_value='prob_over_chance', n_time_bins=3,
-                                       time_window=(0, 2.5), other_zones=None):
+                                       time_window=(0, 2.5), other_zones=None, half=None, prospective_reps=False, hm=False):#put in heatmap visualizer
         # get data for z-scoring (all trial types but only times around update)
         group_aligned_data = self.select_group_aligned_data(param_data, dict(time_label=['t_update']), ret_df=True)
-        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, other_zones=other_zones)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, other_zones=other_zones, prospective_reps=prospective_reps)#, half=half)#half=xx here
         zscore_mean = np.nanmean(np.stack(quant_df[prob_value]))
         zscore_std = np.nanstd(np.stack(quant_df[prob_value]))
 
         # get data for quantification
         group_aligned_data = self.select_group_aligned_data(param_data, plot_groups, ret_df=True)
-        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, other_zones=other_zones)
+        quant_df = self.quantify_aligned_data(param_data, group_aligned_data, ret_df=True, other_zones=other_zones, half=half, prospective_reps=prospective_reps, hm=hm)
 
         if np.size(quant_df) and quant_df is not None:
             # get diff from baseline
@@ -605,13 +627,15 @@ class BayesianDecoderAggregator:
         cols_to_keep = ['session_id', 'animal', 'region', 'bins', 'encoder_bin_num', 'decoder_bin_size',
                         'decoder_test_size', 'virtual_track', 'aligned_data']
         temp_data = param_data[cols_to_keep].explode('aligned_data').reset_index(drop=True)
-        aligned_data = pd.json_normalize(temp_data['aligned_data'], max_level=0).drop(['stats'], axis='columns')
+        aligned_data = pd.json_normalize(temp_data['aligned_data'], max_level=0)
+        if 'stats' in aligned_data.columns:
+            aligned_data = aligned_data.drop(['stats'], axis='columns')
         aligned_data_df = pd.concat([temp_data, aligned_data], axis=1)
         aligned_data_df.drop(['aligned_data'], axis='columns', inplace=True)  # remove the extra aligned data column
 
         data_to_explode = ['trial_id', 'feature', 'decoding', 'error', 'probability', 'turn_type', 'correct',
                            'theta_phase', 'theta_amplitude', 'rotational_velocity', 'translational_velocity',
-                           'choice_commitment', 'view_angle']
+                           'choice_commitment', 'view_angle','location']
         exploded_df = aligned_data_df.explode(data_to_explode).reset_index(drop=True)
         exploded_df.dropna(axis='rows', inplace=True)
 
@@ -677,8 +701,20 @@ class BayesianDecoderAggregator:
     def _summarize(decoder):
         # get decoded values
         if decoder.decoded_values.any().any():
-            decoded_series = decoder.decoded_values.as_series()
-            decoded_series.index = np.round(decoded_series.index.to_numpy(), 4)
+            if isinstance(decoder.decoded_values, (pd.DataFrame, pd.Series)):
+                decoded_series = decoder.decoded_values
+                decoded_series = pd.DataFrame(decoded_series)
+                decoded_series.index = np.round(decoded_series.index.to_numpy(), 4)
+                if isinstance(decoded_series, pd.DataFrame):
+                    if decoded_series.shape[1] == 1:  # Check if there is only one column
+                        decoded_series = decoded_series.iloc[:, 0]  # Convert to Series by selecting the only column
+                    else:
+                        raise ValueError("decoded_series is a DataFrame with more than one column. Specify which column to use.")
+                decoded_series = pd.Series(decoded_series)
+                
+            else:
+                decoded_series = decoder.decoded_values.as_series()
+                decoded_series.index = np.round(decoded_series.index.to_numpy(), 4)
         else:
             decoded_series = pd.Series()
 
@@ -698,7 +734,10 @@ class BayesianDecoderAggregator:
         df_decode_results['decoding_error_rolling'] = df_decode_results['decoding_error'].rolling(20,
                                                                                                   min_periods=20).mean()
         if decoder.decoded_probs.any().any():
-            df_decode_results['prob_dist'] = [x for x in decoder.decoded_probs.as_dataframe().to_numpy()]
+            if isinstance(decoder.decoded_probs, pd.DataFrame):
+                df_decode_results['prob_dist'] = [x for x in decoder.decoded_probs.to_numpy()]
+            else:
+                df_decode_results['prob_dist'] = [x for x in decoder.decoded_probs.as_dataframe().to_numpy()]
             df_positions = df_decode_results[['actual_feature', 'decoded_feature']].dropna(how='any')
             rmse = sqrt(mean_squared_error(df_positions['actual_feature'], df_positions['decoded_feature']))
         else:
@@ -723,26 +762,44 @@ class BayesianDecoderAggregator:
 
         return df_decode_results
 
-    def _meets_exclusion_criteria(self, data):
+    def _meets_exclusion_criteria(self, sess_dict, data):
         exclude_session = False  # default to include session
 
         # apply exclusion criteria
         units_threshold = self.exclusion_criteria.get('units', 0)
-        if len(data.spikes) < units_threshold:
-            exclude_session = True
-
         trials_threshold = self.exclusion_criteria.get('trials', 0)
-        if len(data.train_df) < trials_threshold:
-            exclude_session = True
+
+        if data.subset_reg == True:
+            file_path = 'Y:\\singer\\Steph\\Code\\update-project\\results\\response_figures\\unit_counts_per_region.xlsx'
+            df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the unit numbers for each region from each nwb session
+            df['file_without_ext'] = df['File'].str.replace('.nwb', '', regex=False)#removing .nwb from each session name
+            # Find the row where the 'file' column matches the session_id
+            matching_row = df[df['file_without_ext'] == sess_dict['session_id']]
+            # Extract the number of units for CA1 and PFC (assuming the columns are named 'CA1_units' and 'PFC_units')
+            if not matching_row.empty:
+                ca1_units = matching_row['CA1'].values[0]
+                pfc_units = matching_row['PFC'].values[0]
+                if ca1_units < units_threshold or pfc_units < units_threshold:
+                    exclude_session = True
+            else:
+                exclude_session = True
+            if len(data.test_df) < trials_threshold:
+                exclude_session = True
+        else:
+            if len(data.spikes) < units_threshold:
+                exclude_session = True
+            if len(data.train_df) < trials_threshold:
+                exclude_session = True
 
         return exclude_session
 
     def _get_confusion_matrix(self, data, bins):
         if len(bins):
-            df_bins = pd.cut(data['actual_feature'], bins, include_lowest=True)
+            df_bins = pd.cut(data['actual_feature'], bins, include_lowest=True)#will no longer work with non cv decoding. change back
             decoding_matrix = data['prob_dist'].groupby(df_bins).apply(
                 lambda x: self._get_mean_prob_dist(x, bins)).values
-
+            #decoding_matrix = [arr for arr in decoding_matrix if arr.shape == (50,)]#will no longer work with non cv decoding, change back
+            
             confusion_matrix = np.vstack(decoding_matrix).T  # transpose so that true position is on the x-axis
         else:
             confusion_matrix = []
@@ -751,6 +808,8 @@ class BayesianDecoderAggregator:
 
     def _align_by_times(self, decoder, window):
         nbins = int(window * 2 / decoder.decoder_bin_size)
+        # if window==10:
+        #      nbins = int(nbins//2)#DC uncomment
 
         trial_type_dict = dict(non_update=1, switch=2, stay=3)
         output = []
@@ -777,13 +836,15 @@ class BayesianDecoderAggregator:
                 trans_col = np.argwhere(decoder.velocity.columns == 'translational')[0][0]
                 view_col = np.argwhere(decoder.commitment.columns == 'view_angle')[0][0]
                 choice_col = np.argwhere(decoder.commitment.columns == 'choice_commitment')[0][0]
+                location_col = np.argwhere(decoder.location.columns == 'location')[0][0]
                 vars = dict(feature=decoder.features_test.iloc[:, 0], decoded=decoder.decoded_values,
                             probability=decoder.decoded_probs, theta_phase=decoder.theta.iloc[:, phase_col],
                             theta_amplitude=decoder.theta.iloc[:, amp_col],
                             rotational_velocity=decoder.velocity.iloc[:, rot_col],
                             translational_velocity=decoder.velocity.iloc[:, trans_col],
                             choice_commitment=decoder.commitment.iloc[:, choice_col],
-                            view_angle=decoder.commitment.iloc[:, view_col])
+                            view_angle=decoder.commitment.iloc[:, view_col],
+                            location=decoder.location.iloc[:, location_col])
                 locs = self._get_start_stop_locs(vars, mid_times, window_start, window_stop)
 
                 interp_dict = dict()
@@ -816,7 +877,7 @@ class BayesianDecoderAggregator:
                 # get means and sem
                 data = dict()
                 vars_to_save = ['feature', 'error', 'probability', 'theta_phase', 'theta_amplitude',
-                                'rotational_velocity', 'translational_velocity', 'choice_commitment', 'view_angle']
+                                'rotational_velocity', 'translational_velocity', 'choice_commitment', 'view_angle', 'location']
                 for name in decoder.feature_names:
                     assert np.shape(np.array(interp_dict[name]['feature']))[0] == np.shape(turns)[0]
                     data = dict(feature_name=name,

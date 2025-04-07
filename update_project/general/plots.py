@@ -197,23 +197,23 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
                        show_median=True,
                        palette=None, histstat='proportion', ):
     if group:
-        palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
-        if len(palette) > len(data[group].unique()):
-            palette = palette[:len(data[group].unique())]
+        palette = palette or sns.color_palette(n_colors=len(data[group].stack().unique()))
+        if len(palette) > len(data[group].stack().unique()):
+            palette = palette[:len(data[group].stack().unique())]
     else:
         palette = palette or sns.color_palette()
 
     if group and show_median:
-        medians = data.groupby([group])[column_name].median()
-        limits = [np.nanmin(data.groupby([group])[column_name].min().values),
-                  np.nanmax(data.groupby([group])[column_name].max().values)]
+        medians = data.groupby(group)[column_name].median()#group was in [], DC change back
+        limits = [np.nanmin(data.groupby(group)[column_name].min().values),#group was in [], DC change back
+                  np.nanmax(data.groupby(group)[column_name].max().values)]#group was in [], DC change back
     else:
         medians = {column_name: data[column_name].median()}
         limits = [data[column_name].min(), data[column_name].max()]
 
     # cum fraction plots
-    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=group, ax=axes[row_ids[0]][col_ids[0]],
-                                                palette=palette)
+    axes[row_ids[0]][col_ids[0]] = sns.ecdfplot(data=data, x=column_name, hue=data['region'], ax=axes[row_ids[0]][col_ids[0]],
+                                                palette=palette)#hue was group, DC change back
     axes[row_ids[0]][col_ids[0]].set_title(title)
     axes[row_ids[0]][col_ids[0]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
     axes[row_ids[0]][col_ids[0]].set_aspect(1. / axes[row_ids[0]][col_ids[0]].get_data_ratio(), adjustable='box')
@@ -226,17 +226,17 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
                                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
 
     # histograms
-    axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=group, ax=axes[row_ids[1]][col_ids[1]],
-                                                element='step', palette=palette, stat=histstat, common_norm=False)
+    axes[row_ids[1]][col_ids[1]] = sns.histplot(data=data, x=column_name, hue=data['region'], ax=axes[row_ids[1]][col_ids[1]],
+                                                element='step', palette=palette, stat=histstat, common_norm=False)#hue was group, DC change back
     axes[row_ids[1]][col_ids[1]].set(xlabel=xlabel, ylabel='Proportion', xlim=limits)
 
     # violin plots
-    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x=group, y=column_name, ax=axes[row_ids[2]][col_ids[2]],
-                                                  palette=palette)
+    axes[row_ids[2]][col_ids[2]] = sns.violinplot(data=data, x='region', y=column_name, ax=axes[row_ids[2]][col_ids[2]],
+                                                  palette=palette)#x was group, DC change back
     plt.setp(axes[row_ids[2]][col_ids[2]].collections, alpha=.25)
     if stripplot:
-        sns.stripplot(data=data, y=column_name, x=group, size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],
-                      palette=palette)
+        sns.stripplot(data=data, y=column_name, x='region', size=3, jitter=True, ax=axes[row_ids[2]][col_ids[2]],
+                      palette=palette)#x was group, DC change back
     axes[row_ids[2]][col_ids[2]].set_title(title)
 
 
