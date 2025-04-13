@@ -798,7 +798,6 @@ class BayesianDecoderAggregator:
             df_bins = pd.cut(data['actual_feature'], bins, include_lowest=True)#will no longer work with non cv decoding. change back
             decoding_matrix = data['prob_dist'].groupby(df_bins).apply(
                 lambda x: self._get_mean_prob_dist(x, bins)).values
-            #decoding_matrix = [arr for arr in decoding_matrix if arr.shape == (50,)]#will no longer work with non cv decoding, change back
             
             confusion_matrix = np.vstack(decoding_matrix).T  # transpose so that true position is on the x-axis
         else:
@@ -808,8 +807,6 @@ class BayesianDecoderAggregator:
 
     def _align_by_times(self, decoder, window):
         nbins = int(window * 2 / decoder.decoder_bin_size)
-        # if window==10:
-        #      nbins = int(nbins//2)#DC uncomment
 
         trial_type_dict = dict(non_update=1, switch=2, stay=3)
         output = []

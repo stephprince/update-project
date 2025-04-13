@@ -12,9 +12,6 @@ def run_all_figures(animals, dates_included=None, overwrite=False):
     # generate all manuscript figures
     analyzer.plot_main_figures()
     analyzer.plot_supplemental_figures()
-    ###analyzer.plot_supp_figure_all_trials()#all trials used for encoding. for supp fig 2
-
-    
 
 
 if __name__ == '__main__':

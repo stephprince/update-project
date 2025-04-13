@@ -8,7 +8,7 @@ from update_project.general.plots import clean_plot
 
 
 class ResultsIO:
-    git_hash = 'test_hash'#Repo(search_parent_directories=True).head.object.hexsha[:10]#swap back when pulling from github
+    git_hash = Repo(search_parent_directories=True).head.object.hexsha[:10]
     base_path = Path(__file__).absolute().parent.parent.parent / 'results'
 
     def __init__(self, creator_file, git_hash=git_hash, base_path=base_path, session_id='', folder_name='', tags=''):

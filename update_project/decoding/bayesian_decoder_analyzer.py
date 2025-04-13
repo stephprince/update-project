@@ -18,7 +18,7 @@ from update_project.base_analysis_class import BaseAnalysisClass
 
 
 class BayesianDecoderAnalyzer(BaseAnalysisClass):
-    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):#turn off after this
+    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
         # setup parameters
         self.region = params.get('region', ['CA1', 'PFC'])
         self.subset_reg = params.get('subset_reg', False)
@@ -68,7 +68,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
                                                  'feature_names', 'linearized_features',],
-                                           format='npz'))#need to add some sort of thing for list of cells to use. both regions? only subsetted?
+                                           format='npz'))
 
         # setup data
         self.feature_names = features

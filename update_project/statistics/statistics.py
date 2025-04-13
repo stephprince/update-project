@@ -206,7 +206,6 @@ class Stats:
     def _get_descriptive_stats(self, approach, test, alternative):
         # Ensure self.group_vars is a list
         self.group_vars = self.group_vars if isinstance(self.group_vars, list) else [self.group_vars]
-        #self.df_processed['region'] = self.df_processed['region'].apply(lambda x: x[0] if isinstance(x, tuple) else x)
         descriptive_stats = (self.df_processed
                               .groupby(self.group_vars)[self.dependent_vars]#group by region and decoding_error_mean
                               .describe()
@@ -300,7 +299,7 @@ class Stats:
 
         return r_df
 
-    def _bootstrap_recursive(self, data, current_level=0, output_data=None):#check if this is getting run, could be causing an infinite loop DC
+    def _bootstrap_recursive(self, data, current_level=0, output_data=None):
         unique_samples = np.unique(data[self.levels[current_level]])
         random_samples = rng.choice(unique_samples, len(unique_samples))
 
