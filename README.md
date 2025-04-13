@@ -59,8 +59,3 @@ All figures will save in the local `update-project/results/manuscript-figures` f
 (Note: the scripts assume all raw data is stored on an internal server at `/singer/NWBData/UpdateTask`,
 future examples will include instructions for data deposited online).
 
-If you would like to run any of the modules individually, 
-or generate figures not included in the final version of the paper, 
-each analysis stream has its own submodule.
-(e.g. `run_decoding.py` found in the update_project/decoding folder)
-
