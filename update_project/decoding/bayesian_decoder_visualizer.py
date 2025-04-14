@@ -44,33 +44,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             tags = "_".join([str(n) for n in g_name])
             kwargs = dict(plot_groups=self.plot_group_comparisons, tags=tags)
             self.plot_motor_controls(data, **kwargs)
-            # self.plot_theta_data(data, kwargs)
-            # self.plot_group_aligned_stats(data, **kwargs)
-            # self.plot_group_aligned_comparisons(data, **kwargs)
-            # self.plot_performance_comparisons(data, tags=tags)
-            #
-            # # make plots for individual plot groups (e.g. correct/incorrect, left/right, update/non-update)
-            # for plot_types in list(itertools.product(*self.plot_groups.values())):
-            #     plot_group_dict = {k: v for k, v in zip(self.plot_groups.keys(), plot_types)}
-            #     title = '_'.join([''.join([k, str(v)]) for k, v in zip(self.plot_groups.keys(), plot_types)])
-            #     kwargs = dict(title=title, plot_groups=plot_group_dict, tags=f'{tags}_{title}')
-            #     self.plot_group_aligned_data(data, **kwargs)
-            #     self.plot_scatter_dists_around_update(data, **kwargs)
-            #     self.plot_trial_by_trial_around_update(data, **kwargs)
-
-        # # plot model metrics (comparing parameters across brain regions and features)
-        # for name, data in self.aggregator.group_df.groupby(group_names):  # TODO - regions/features in same plot?
-        #     self.plot_group_confusion_matrices(data, name, )
-        #     self.plot_tuning_curves(data, name, )
-        #     self.plot_all_confusion_matrices(data, name)
-        #     self.plot_parameter_comparison(data, name, thresh_params=True)
-        #
-        # # make plots with both brain regions
-        # self.plot_multiregional_data()
-        # self.plot_all_groups_error(main_group=group_names[0], sub_group=group_names[1])
-        # self.plot_all_groups_error(main_group=group_names, sub_group='animal')
-        # self.plot_all_groups_error(main_group='feature', sub_group='num_units', thresh_params=True)
-        # self.plot_all_groups_error(main_group='feature', sub_group='num_trials', thresh_params=True)        
+            self.plot_theta_data(data, kwargs)
+            self.plot_group_aligned_stats(data, **kwargs)
+            self.plot_group_aligned_comparisons(data, **kwargs)
+            self.plot_performance_comparisons(data, tags=tags)
         
     def plot_decoding_error_location(self, sfig, update_type=['non_update'], prob_value='prob_sum', time_label='t_update', other_zones=dict(), ylim=None):
         plot_groups = dict(update_type=update_type, turn_type=[1, 2], correct=[1], time_label=[time_label])
@@ -79,8 +56,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         choice_mapping['initial_stay'] = 'initial'
         choice_mapping['switch'] = 'new'
         
-        #trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
-        #                                                               prob_value=prob_value)#not sure if I need trial data or if I will recreate from align data with mask
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
                                                                  ret_df=True)
         
@@ -1074,7 +1049,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         
         #saving source data
         df_export = sess_averages[[group, var, comparison]]
-        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        save_dir = self.results_io.get_source_data_path()
         filename = f'pointplot_data_{tags}_a.xlsx'
         df_export.to_excel(save_dir / filename, index=False)
 
@@ -1109,7 +1084,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         
         #saving source data
         df_export = sess_averages[['initial_vs_new', comparison]]
-        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        save_dir = self.results_io.get_source_data_path()
         filename = f'pointplot_data_{tags}_b.xlsx'
         df_export.to_excel(save_dir / filename, index=False)
 
@@ -1711,7 +1686,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 
                 #exporting source data
                 data_to_export = data[[f'{metric}_{grouping}', dependent_var]]
-                save_path = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+                save_path = self.results_io.get_source_data_path()
                 filename = f'fig7_data_{tags}.xlsx'
                 data_to_export.to_excel(save_path / filename, index=False)
                 data_to_export.to_excel(save_path / filename, index=False)
@@ -3342,7 +3317,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                      ax=ax[row_id][col_id], errwidth=3, join=False,)
                 #saving source data
                 plot_data = data.query('target == "shuffled"')[['update_type', 'score']]
-                save_path = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+                save_path = self.results_io.get_source_data_path()
                 filename = f'pointplot_prediction_data_{tags}.xlsx'
                 plot_data.to_excel(save_path / filename, index=False)
                 
@@ -3380,7 +3355,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         #exporting source data
         raw_data_export = theta_data.query(f'bin_name == "full" & times in {time} & update_type in {update_type}')
         data_export = raw_data_export[['phase_bins', 'initial', 'new', 'central', 'probability','times']]
-        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        save_dir = self.results_io.get_source_data_path()
         filename = f'phase_plot_data_{tags}.xlsx'
         data_export.to_excel(save_dir / filename, index=False)
             
@@ -3464,7 +3439,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         
         #exporting source data
         df_export = post_modulation[['phase_mid','prob_value','choice']]
-        save_dir = Path(r"Y:\singer\Steph\Code\update-project\results\sourcedata")
+        save_dir = self.results_io.get_source_data_path()
         filename = f'phase_stats_data_{tags}.xlsx'
         df_export.to_excel(save_dir / filename, index=False)
 

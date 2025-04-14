@@ -74,7 +74,8 @@ class BehaviorVisualizer(BaseVisualizationClass):
         
         #saving source data
         df_export = df_by_bin[['update_type', 'proportion correct']]
-        df_export.to_excel(r"Y:\singer\Steph\Code\update-project\results\sourcedata\boxplot_data_fig1b.xlsx", index=False)
+        path = self.results_io.get_source_data_path()
+        df_export.to_excel(path / "boxplot_data_fig1b.xlsx", index=False)
 
         sess_averages = (df_by_update_type
                          .explode('prop_correct')
