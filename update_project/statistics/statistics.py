@@ -199,7 +199,7 @@ class Stats:
                                      values='metric')
                               .reindex(['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'], axis=1)
                               .reset_index()
-                              .assign(sem=lambda x: x['std'] / np.sqrt(x['count'])))#(g, '') for g in  needs to go in id_vars=[(g, '') for g in self.group_vars] DC change back
+                              .assign(sem=lambda x: x['std'] / np.sqrt(x['count'])))
         descriptive_stats.insert(0, 'approach', approach)
         descriptive_stats.insert(1, 'test', test)
         descriptive_stats.insert(2, 'alternative', alternative)
