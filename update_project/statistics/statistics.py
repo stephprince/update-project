@@ -55,10 +55,6 @@ class Stats:
 
         stats_output = []
         descript_output = []
-        print (self.approaches)
-        print(self.tests)
-        print(self.dependent_vars)
-        print(self.alternatives)
         for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):#look what's in here to see what's comparisons this is generating
             if a == 'bootstrap' and t == 'direct_prob':  # only run bootstrapping for direct prob test#DC change back
                 continue
@@ -66,18 +62,13 @@ class Stats:
                 self._setup_data(approach=a, data=df)
 
                 descript = self._get_descriptive_stats(approach=a, test=t, alternative=alt)
-                print('got descript')
                 descript_output.append(descript)
-                print('appended descript')
 
                 stats = self._perform_test(approach=a, test=t, alternative=alt, pairs=pairs)
-                print('got stats on line 69 noice')
                 stats_output.append(stats)
-                print('appended stats from performing test')
 
         self.stats_df = pd.concat(stats_output, axis=0)
         self.descript_df = pd.concat(descript_output, axis=0)
-        print('completed the run')
 
         self._export_stats(filename)
 
@@ -88,7 +79,6 @@ class Stats:
 
         self.descript_df = self._get_descriptive_stats(approach='traditional', test='na', alternative='na')
         self.stats_df = pd.DataFrame()
-        print('completed get_summary')
 
         self._export_stats(filename, summary_only=True)
 
@@ -118,11 +108,9 @@ class Stats:
         # run tests that look across pairs
         for var in self.dependent_vars:
             if test == 'emmeans':#this one
-                print('emmeans is go')
                 emm = emmeans.emmeans(self.model, 'predictor', contr='pairwise', adjust='tukey')
                 emm_df = self.r_to_pandas_df(ro.r['summary'](emm.rx2('contrasts')))
                 emm_df['pairs'] = [[literal_eval(c) for c in row.split(' - ')] for row in emm_df['contrast'].to_list()]
-                print('emmeans pairs evaluated')
                 for _, row in emm_df.iterrows():
                     matching_pair = [p for p in pairs if (p[0] in row['pairs'] and p[1] in row['pairs'])]
                     if matching_pair:
@@ -132,22 +120,16 @@ class Stats:
                                            test_statistic_name=test_statistic_name,
                                            df=row.get('df'), p_val=row["p.value"],
                                            alternative='two-sided')
-                        print('emmeans output made')
                         pair_outputs.append(test_output)
-                        print('emmeans output appended')
             elif test == 'anova':#this one
                 if approach == 'mixed_effects':
-                    print('anova is go')
                     anova_df = self.r_to_pandas_df(ro.r['as.data.frame'](ro.r['anova'](self.model, ddf="Kenward-Roger")))
-                    print('anova_df is made')
                     test_output = dict(pair=((self.group_vars[0], ''),), variable=var, test=test, approach=approach,
                                        test_statistic=anova_df['F value'].to_numpy()[0],
                                        test_statistic_name='F value',
                                        df=anova_df['DenDF'], p_val=anova_df["Pr(>F)"].to_numpy()[0],
                                        alternative='anova with Kenward-Rogers method')
-                    print('anova is run')
                     pair_outputs.append(test_output)
-                    print('anova is appended')
                 else:
                     print('not currently supported')
                     # output = pg.mixed_anova()  # TODO - determine if I need mixed or not
@@ -206,7 +188,6 @@ class Stats:
     def _get_descriptive_stats(self, approach, test, alternative):
         # Ensure self.group_vars is a list
         self.group_vars = self.group_vars if isinstance(self.group_vars, list) else [self.group_vars]
-        #self.df_processed['region'] = self.df_processed['region'].apply(lambda x: x[0] if isinstance(x, tuple) else x)
         descriptive_stats = (self.df_processed
                               .groupby(self.group_vars)[self.dependent_vars]#group by region and decoding_error_mean
                               .describe()
@@ -300,7 +281,7 @@ class Stats:
 
         return r_df
 
-    def _bootstrap_recursive(self, data, current_level=0, output_data=None):#check if this is getting run, could be causing an infinite loop DC
+    def _bootstrap_recursive(self, data, current_level=0, output_data=None):
         unique_samples = np.unique(data[self.levels[current_level]])
         random_samples = rng.choice(unique_samples, len(unique_samples))
 

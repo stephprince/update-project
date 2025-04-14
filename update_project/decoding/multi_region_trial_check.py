@@ -5,6 +5,9 @@ import pynwb
 import numpy as np
 import csv
 #not sure if i need a class. check
+from pathlib import Path
+from update_project.general.results_io import ResultsIO
+from update_project.general.session_loader import SessionLoader
 
 # Define the regions of interest
 regions_of_interest = ['CA1', 'PFC']
@@ -13,7 +16,10 @@ regions_of_interest = ['CA1', 'PFC']
 unit_counts = {}
 
 # Path to the folder with NWB files
-nwb_directory = 'Y:\singer\NWBData\UpdateTask'
+# nwb_directory = 'Y:\singer\NWBData\UpdateTask'
+session_db = SessionLoader(animals=[17, 20, 25, 28, 29, 33, 34])
+results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
+nwb_directory = session_db.base_path
 
 # Function to count units in each region
 def count_units_in_region(units, regions_of_interest):
@@ -43,8 +49,9 @@ for nwb_file in os.listdir(nwb_directory):
                 unit_counts[nwb_file] = region_counts
                     
 # write the results to a CSV file
-
-with open('unit_counts_per_region.csv', 'w', newline='') as csvfile:
+out_fname = results_io.get_data_filename(filename=f'unit_counts_per_region',
+                                         format='csv',)
+with open(out_fname, 'w', newline='') as csvfile:
     fieldnames = ['File', 'CA1', 'mPFC']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 

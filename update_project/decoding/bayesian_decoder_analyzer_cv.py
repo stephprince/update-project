@@ -293,7 +293,8 @@ class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
         units_mask = pd.concat([self.units[k].isin(v) for k, v in self.units_types.items()], axis=1).all(axis=1)
         units_subset = self.units[units_mask]
         if self.subset_reg:
-            file_path = 'Y:\\singer\\Steph\\Code\\update-project\\results\\response_figures\\unit_counts_per_region.xlsx'
+            path = self.results_io.get_results_path(results_type='response')
+            file_path = path / 'unit_counts_per_region.xlsx'
             df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the unit numbers for each region from each nwb session
             df['file_without_ext'] = df['File'].str.replace('.nwb', '', regex=False)#removing .nwb from each session name
             # Find the row where the 'file' column matches the session_id

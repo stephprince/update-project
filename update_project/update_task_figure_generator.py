@@ -112,7 +112,7 @@ class UpdateTaskFigureGenerator:
 
         return visualizer
 
-    def plot_figure_1(self, with_supplement=True):#DC good as is
+    def plot_figure_1(self, with_supplement=True):
         behavior_visualizer = self.run_analysis_pipeline(analysis_to_run='Behavior', overwrite=self.overwrite)
         example_visualizer = self.run_analysis_pipeline(analysis_to_run='Examples', overwrite=self.overwrite,
                                                         session_names=[('S', 29, 211118)])
