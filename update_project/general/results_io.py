@@ -59,7 +59,7 @@ class ResultsIO:
             assert self.session_id is not None, "No session id provided so cannot create session folder"
             results_path = base_path / self.session_id / results_name
         elif results_type == 'manuscript':
-            results_path = base_path / results_name/'results2'
+            results_path = base_path / results_name
         elif results_type == 'response':
             results_path = base_path/'response_figures'
 
