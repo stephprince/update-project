@@ -52,7 +52,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         self.results_tags = f"{'_'.join(features)}_regions_{'_'.join(self.units_types['region'])}_" \
                             f"enc_bins{self.encoder_bin_num}_dec_bins{self.decoder_bin_size}_speed_thresh" \
                             f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"\
-                            f"{'_subset3' if self.subset_reg == True else ''}"#_regions after features DC add back
+                            f"{'_subset3' if self.subset_reg == True else ''}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem,
                                     tags=self.results_tags)
         self.data_files = dict(bayesian_decoder_output=dict(vars=['encoder_times', 'decoder_times',
