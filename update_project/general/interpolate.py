@@ -35,7 +35,7 @@ def interp1d_time_intervals(data, start_locs, stop_locs, new_times, time_offset)
     for start, stop, offset in zip(start_locs, stop_locs, time_offset):
         times = np.array(data.iloc[start:stop].index) - offset
         values = data.iloc[start:stop].values
-        values = np.squeeze(values)#also may not work non cv, change back
+        values = np.squeeze(values)
         if len(times) == 1:
             fxn = lambda x: np.full_like(x, values)
         else:

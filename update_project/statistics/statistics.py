@@ -56,7 +56,7 @@ class Stats:
         stats_output = []
         descript_output = []
         for a, t, alt in itertools.product(self.approaches, self.tests, self.alternatives):#look what's in here to see what's comparisons this is generating
-            if a == 'bootstrap' and t == 'direct_prob':  # only run bootstrapping for direct prob test#DC change back
+            if a == 'bootstrap' and t != 'direct_prob':  # only run bootstrapping for direct prob test
                 continue
             else:
                 self._setup_data(approach=a, data=df)
@@ -210,14 +210,8 @@ class Stats:
         return descriptive_stats
 
     def _export_stats(self, filename, summary_only=False):
-        # self.results_io.export_statistics(self.descript_df, f'{filename}_descriptive', results_type=self.results_type,
-        #                                   format='csv')
         self.results_io.export_statistics(self._get_stats_text(), f'{filename}_text', results_type=self.results_type,
                                           format='txt')
-        #
-        # if not summary_only:
-        #     self.results_io.export_statistics(self.stats_df, f'{filename}_p_values', results_type=self.results_type,
-        #                                       format='csv')
 
     def _get_stats_text(self):
         descript_text = self.descript_df.apply(lambda x: self.descript_to_text(x), axis=1)
