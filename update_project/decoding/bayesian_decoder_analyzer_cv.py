@@ -312,7 +312,9 @@ class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
                     }
                     # Create a pandas DataFrame
                     df2 = pd.DataFrame(data)
-                    output_file_path = r'Y:\singer\NWBData\output\unit_masks_{self.results.session_id}.csv'
+                    output_file_path = self.results_io.get_data_filename(filename=f'unit_masks_{self.results.session_id}',
+                                                                         results_type='response', 
+                                                                         format='csv')
                     df2.to_csv(output_file_path, index=False)
                     print(f"Mask data for session {self.results.session_id} saved to {output_file_path}")
                     units_subset=units_subset[ca1_mask]
@@ -325,7 +327,9 @@ class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
                     }
                     # Create a pandas DataFrame
                     df2 = pd.DataFrame(data)
-                    output_file_path = r'Y:\singer\NWBData\output\unit_masks_{self.results.session_id}.csv'
+                    output_file_path = self.results_io.get_data_filename(filename=f'unit_masks_{self.results.session_id}',
+                                                                         results_type='response', 
+                                                                         format='csv')
                     df2.to_csv(output_file_path, index=False)
                     print(f"Mask data for session {self.results.session_id} saved to {output_file_path}")
                     units_subset=units_subset[pfc_mask]

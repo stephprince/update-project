@@ -194,7 +194,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
                                                                  ret_df=True)
         if prev_turn is not None:
-            file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+            file_path = self.results_io.get_data_filename(filename=f'combined_data',
+                                                results_type='response', 
+                                                format='xlsx')
             df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the trial types, made from behavior data where all trials still present with info
             combined_data = df.sort_values(by=['animal','session_id','trial_id'])
             combined_data['prev_turn_type'] = combined_data.groupby(['animal','session_id'])['turn_type'].shift(1)#making prev_turn_type have the value of the previous 
@@ -1197,7 +1199,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
             trial_data
             
         if prev_turn is not None:
-            file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+            file_path = self.results_io.get_data_filename(filename=f'combined_data',
+                                                        results_type='response', 
+                                                        format='xlsx')
             df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the trial types, made from behavior data where all trials still present with info
             combined_data = df.sort_values(by=['animal','session_id','trial_id'])
             combined_data['prev_turn_type'] = combined_data.groupby(['animal','session_id'])['turn_type'].shift(1)#making prev_turn_type have the value of the previous 
@@ -1389,7 +1393,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         #     trial_data
             
         if prev_turn is not None:
-            file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+            file_path = self.results_io.get_data_filename(filename=f'combined_data',
+                                                        results_type='response', 
+                                                        format='xlsx')
             df = pd.read_excel(file_path)#loading in the excel spreadsheet with all of the trial types, made from behavior data where all trials still present with info
             combined_data = df.sort_values(by=['animal','session_id','trial_id'])
             combined_data['prev_turn_type'] = combined_data.groupby(['animal','session_id'])['turn_type'].shift(1)#making prev_turn_type have the value of the previous 

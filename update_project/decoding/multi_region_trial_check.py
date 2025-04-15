@@ -16,7 +16,6 @@ regions_of_interest = ['CA1', 'PFC']
 unit_counts = {}
 
 # Path to the folder with NWB files
-# nwb_directory = 'Y:\singer\NWBData\UpdateTask'
 session_db = SessionLoader(animals=[17, 20, 25, 28, 29, 33, 34])
 results_io = ResultsIO(creator_file=__file__, folder_name=Path(__file__).parent.stem)
 nwb_directory = session_db.base_path

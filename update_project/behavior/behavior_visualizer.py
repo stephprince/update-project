@@ -180,10 +180,10 @@ class BehaviorVisualizer(BaseVisualizationClass):
     # Append the DataFrame to the list
             data_list.append(trajectories_df)
             combined_df = pd.concat(data_list, ignore_index=True)
-        file_path = r"Y:\singer\Steph\Code\update-project\results\decoding\intermediate_data\combined_data.xlsx"
+        file_path = self.results_io.get_data_filename(filename=f'combined_data',
+                                                      results_type='response', 
+                                                      format='xlsx')
         combined_df.to_excel(file_path, index=False)
-            #df = pd.read_parquet(file_path)
-            #df = pd.read_feather(file_path)
 
         ax = sfig.subplots(nrows=1, ncols=len(update_type), sharey=True, squeeze=False)
         for (update, turn), group in trajectory_df.groupby(['update_type', 'turn_type']):
