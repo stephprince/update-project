@@ -60,10 +60,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                                  ret_df=True)
         
         #making a mask based on location of the animal. should limit to only the home arm between initial cue and choice cue
-        error2 = np.stack(aligned_data['error'])#don't want probability, want error
         features2 = np.stack(aligned_data['feature'])
         mask = (features2 < 120.35) #& (features2 > 250.35)#should remove any time while intial cue is presented or arms themselves
-        #probability2[expanded_mask] = np.nan
         aligned_data.error[mask] = np.nan
         
         #reshaping + manipulating array like calc_trial_by_trial_quant_data. calc also gets zscores, but should be available in tria_data if needed? if not, add zscore lines and uncomment below
@@ -185,10 +183,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
     def plot_decoding_output_heatmap(self, sfig, update_type='switch', prob_value='prob_sum', feat='position',start_nan=False, time_label='t_update', prev_turn=None):
         # load up data
         plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=[time_label])
-        #if start_nan:
-        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['start_time','t_update'])
-        #else:
-        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value=prob_value, hm=True)
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
@@ -225,12 +219,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                                                   how='inner')
             elif prev_turn == 'second_check':
                 aligned_data = aligned_data.query('turn_type == 1')
-                
-
-        #if aligned_data.time_label == 'start_time':
-        #    aligned_data.probability[:] = np.nan
-        #if trial_data.time_label == 'start_time':
-        #    trial_data.probability[:] = np.nan
         
         clim = (0.02, 0.045) if feat == 'position' else (0.02, 0.04)
         #mask = np.array([np.any(np.isnan(f)) for f in aligned_data['feature']])
@@ -238,10 +226,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         features2 = np.stack(aligned_data['feature'])
         if start_nan:
             mask = np.isnan(features2)| (features2 < 6)#6 should remove any time from when the mouse is "sitting" at the start
-            #mask = np.zeros_like(features2, dtype=bool)
-            #print("The maximum value from features2[:, :15] is:", np.max(features2[:, :15]))
-            #print("The minimum value from features2[:, :15] is:", np.min(features2[:, :15]))
-            #mask[:, :15] = features2[:,:15] > 255
             expanded_mask = np.broadcast_to(mask[:, np.newaxis, :], probability2.shape)
             probability2[expanded_mask] = np.nan
     
@@ -261,11 +245,9 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         if aligned_data['feature_name'].values[0] in ['choice', 'x_position']:  # if bounds are on ends of track, make home between
             bounds = [(bounds[0][1], bounds[1][0]), *bounds]
             ylabel = 'p(new choice)'
-            print(ylabel,bounds)
         else:
             bounds = [(track_fraction[0], bounds[0][0]), *bounds]  # else put at start
             ylabel = 'fraction of track'
-            print(ylabel,bounds)
 
         # plot figure
         ax = sfig.subplots(nrows=1, ncols=1)
@@ -314,20 +296,10 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
     def plot_decoding_output_heatmap_lr(self, sfig, update_type='switch', prob_value='prob_sum', feat='position',start_nan=False, time_label='t_update'):
         # load up data
         plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=[time_label])
-        #if start_nan:
-        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['start_time','t_update'])
-        #else:
-        #    plot_groups = dict(update_type=[update_type], turn_type=[1, 2], correct=[1], time_label=['t_update'])
         trial_data, _ = self.aggregator.calc_trial_by_trial_quant_data(self.aggregator.group_aligned_df, plot_groups,
                                                                        prob_value=prob_value)
         aligned_data = self.aggregator.select_group_aligned_data(self.aggregator.group_aligned_df, plot_groups,
                                                                  ret_df=True)
-
-
-        #if aligned_data.time_label == 'start_time':
-        #    aligned_data.probability[:] = np.nan
-        #if trial_data.time_label == 'start_time':
-        #    trial_data.probability[:] = np.nan
         
         clim = (0.02, 0.045) if feat == 'position' else (0.02, 0.04)
         #mask = np.array([np.any(np.isnan(f)) for f in aligned_data['feature']])
@@ -335,10 +307,8 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
         features2 = np.stack(aligned_data['feature'])
         if start_nan:
             mask = np.isnan(features2)| (features2 < 6)#6 should remove any time from when the mouse is "sitting" at the start
-            #mask = np.zeros_like(features2, dtype=bool)
             print("The maximum value from features2[:, :15] is:", np.max(features2[:, :15]))
             print("The minimum value from features2[:, :15] is:", np.min(features2[:, :15]))
-            #mask[:, :15] = features2[:,:15] > 255
             expanded_mask = np.broadcast_to(mask[:, np.newaxis, :], probability2.shape)
             probability2[expanded_mask] = np.nan
     
@@ -716,11 +686,6 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                         plt.colorbar(im, ax=ax[row_id][col_id], pad=0.04, location='right', fraction=0.046,
                                      label='Δ prob. density from t=0')
             ax[0][col_id].set_title(label_map[comp], color=self.colors[label_map[comp]])
-
-        # add stats bars above each plot
-        #ylims = ax[row_id][col_id].get_ylim()
-        #sfig.supylabel('prob. density', fontsize=10)
-        #sfig.supxlabel('time around update (s)', ha='center', fontsize=10)
 
         colors = [self.colors[t] for t in ['initial', 'new']]
         rainbow_text(0.05, 0.05, ['initial', 'new'], colors, ax=ax[0][col_id], size=8)
@@ -1787,7 +1752,7 @@ class BayesianDecoderVisualizer(BaseVisualizationClass):
                 trial_mat = s_data.pivot(index=['choice', 'trial_index', 'session_id', 'animal'], columns='times',
                                          values=prob_value)
                 new_mat = trial_mat.query('choice == "switch"').to_numpy()
-                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()                    
+                initial_mat = trial_mat.query('choice == "initial_stay"').to_numpy()
                 time_bins = trial_mat.columns.to_numpy()
                 
                 if normalize:

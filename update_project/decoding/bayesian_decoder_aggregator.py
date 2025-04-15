@@ -349,8 +349,6 @@ class BayesianDecoderAggregator:
 
     @staticmethod
     def get_bound_bins(bins, bound_values):
-        if len(bins) == 5:
-            bins = bins[1]#won't work for non cv. change back
         start_bin, stop_bin = np.searchsorted(bins, bound_values)
         if bins[0] == bound_values[0]:
             stop_bin = stop_bin + 1
@@ -796,7 +794,7 @@ class BayesianDecoderAggregator:
 
     def _get_confusion_matrix(self, data, bins):
         if len(bins):
-            df_bins = pd.cut(data['actual_feature'], bins, include_lowest=True)#will no longer work with non cv decoding. change back
+            df_bins = pd.cut(data['actual_feature'], bins, include_lowest=True)
             decoding_matrix = data['prob_dist'].groupby(df_bins).apply(
                 lambda x: self._get_mean_prob_dist(x, bins)).values
             
