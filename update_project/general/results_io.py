@@ -60,10 +60,19 @@ class ResultsIO:
             results_path = base_path / self.session_id / results_name
         elif results_type == 'manuscript':
             results_path = base_path / results_name
+        elif results_type == 'response':
+            results_path = base_path/'response_figures'
 
         Path(results_path).mkdir(parents=True, exist_ok=True)
 
         return results_path
+    
+    def get_source_data_path(self, results_name=''):
+        # This is a special case for the source data folder
+        source_data_path = self.base_path / 'source_data' / results_name
+        Path(source_data_path).mkdir(parents=True, exist_ok=True)
+
+        return source_data_path
 
     def get_figure_args(self, filename, results_type='group', additional_tags='', results_name='', format='pdf'):
         results_path = self.get_results_path(results_type, results_name)

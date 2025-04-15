@@ -12,6 +12,9 @@ _pycache_/
 *.asv
 *.mex*
 
+# vscode
+.vscode/*
+
 #folders
 results/*
 data/*

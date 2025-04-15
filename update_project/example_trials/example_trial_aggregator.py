@@ -8,14 +8,14 @@ from update_project.single_units.single_unit_aggregator import SingleUnitAggrega
 class ExampleTrialAggregator:
 
     def __init__(self):
-        self.turn_to_flip = 2
+        self.turn_to_flip = 1#DC changed for visualization purposes
         self.plot_groups = dict(update_type=['non_update', 'switch', 'stay'],
                                 turn_type=[1, 2],
                                 correct=[0, 1])
 
-    def run_aggregation(self, data, exclusion_criteria, align_window=5, align_times=['t_update']):
+    def run_aggregation(self, data, exclusion_criteria, align_window=5, align_times=['t_update'], turn_to_flip=2):
         # get single unit aggregated data
-        self.single_unit_agg = SingleUnitAggregator(exclusion_criteria=exclusion_criteria, analyzer_name='single_unit')
+        self.single_unit_agg = SingleUnitAggregator(exclusion_criteria=exclusion_criteria, analyzer_name='single_unit', turn_to_flip=turn_to_flip)
         self.single_unit_agg.run_aggregation(data)
         spikes = self.single_unit_agg.select_group_aligned_data(self.single_unit_agg.group_aligned_data,
                                                                 self.plot_groups)
@@ -24,7 +24,7 @@ class ExampleTrialAggregator:
         # get bayesian decoder aggregated data
         # note less trials in the decoder output bc some used for training the model and not included as output
         self.decoder_agg = BayesianDecoderAggregator(exclusion_criteria=exclusion_criteria, align_times=align_times,
-                                                     analyzer_name='decoder')
+                                                     analyzer_name='decoder', turn_to_flip=self.turn_to_flip)
         self.decoder_agg.run_df_aggregation(data, window=align_window)
         decoding = self.decoder_agg.select_group_aligned_data(self.decoder_agg.group_aligned_df, self.plot_groups,
                                                                 ret_df=True)

@@ -16,5 +16,4 @@ def run_all_figures(animals, dates_included=None, overwrite=False):
 
 if __name__ == '__main__':
     animals = [17, 20, 25, 28, 29, 33, 34]
-
     run_all_figures(animals)

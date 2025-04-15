@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from update_project.general.virtual_track import UpdateTrack
 
 
 def get_velocity(nwbfile):
@@ -24,3 +25,12 @@ def get_licks(nwbfile):
     licks = pd.DataFrame(dict(licks=pd.Series(index=timestamps[:], data=lick_voltage),))
 
     return licks
+
+def get_location(nwbfile):
+    virtual_track = UpdateTrack(linearization=bool(['y_position']))
+    time_series = nwbfile.processing['behavior']['position'].get_spatial_series('position')
+    raw_data = time_series.data[:]
+    data = virtual_track.linearize_track_position(raw_data)
+    
+    location = pd.DataFrame(dict(location=pd.Series(index=time_series.timestamps[:], data=data),))
+    return location

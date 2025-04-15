@@ -85,9 +85,10 @@ class ChoiceVisualizer(BaseVisualizationClass):
             random_samples = rng.choice(range(np.shape(indiv_mat)[0]), num_trials)  # TODO - only full delay non-update
             trials = np.stack(indiv_mat.to_numpy()).T[:, random_samples]
 
-            linestyle = 'solid' if g_name == 'right' else 'dashed'
+            linestyle = 'solid' #if g_name == 'right' else 'dashed'
+            color = sns.color_palette("blend:#9a7bab,#6e119f", as_cmap=True)  if g_name == 'left' else sns.color_palette("blend:#707070,#303030", as_cmap=True)##d7c0e4 for left, #c0c0c0
             for t in trials.T:
-                ax[0] = colorline(pos_bins, t, cmap=self.colors['choice_cmap'], linestyle=linestyle, alpha=0.5, ax=ax[0])
+                ax[0] = colorline(pos_bins, t, cmap=color, linestyle=linestyle, alpha=0.5, ax=ax[0])#self.colors['choice_cmap']
         ax[0] = add_task_phase_lines(ax[0], cue_locations=cue_fractions, text_height=0.975, text_brackets=True)
         ax[0].set(title=f'Example trials', xlabel='fraction of track', ylabel='p(right choice)', ylim=(0, 1.1))
 
@@ -95,7 +96,7 @@ class ChoiceVisualizer(BaseVisualizationClass):
                         Line2D([0], [0], color=self.colors['choice'][-1], linestyle='dashed', linewidth=1),]
         ax[0].legend(custom_lines, trial_performance['target'].unique(), loc='lower left')
 
-        # plot session averages
+        #plot session averages
         sns.boxplot(cue_performance, x='cue', y='log_likelihood', ax=ax[1], width=0.5, medianprops={'color': 'white'},
                     showfliers=False, palette=self.colors['choice_commitment'][1:])
         ax[1].set(title='Accuracy', xlabel='task phase', ylabel='log likelihood')

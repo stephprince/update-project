@@ -19,7 +19,7 @@ from update_project.general.plots import add_task_phase_lines, colorline
 
 class ExampleTrialVisualizer(BaseVisualizationClass):
 
-    def __init__(self, data, ):
+    def __init__(self, data, turn_to_flip=2, ):
         super().__init__(data)
         exploded_data = [dict(**d, **r) for d in data for r in d['analyzer'].session_data]
         for d in exploded_data:
@@ -27,6 +27,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         self.data = exploded_data
 
         self.n_example_trials = 20
+        self.turn_to_flip = turn_to_flip
         self.plot_groups.update(turn_type=[[1], [2]], correct=[[1]])  # only plot example trials with continuous linearized position
         self.align_window = data[0]['analyzer'].single_unit_params['align_window']
         self.both_regions = data[0]['analyzer'].both_regions_only  # only plot session if it has data from both regions
@@ -36,7 +37,8 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         self.aggregator = ExampleTrialAggregator()
         self.aggregator.run_aggregation(self.data,
                                         exclusion_criteria=self.exclusion_criteria,
-                                        align_window=self.align_window)
+                                        align_window=self.align_window,
+                                        turn_to_flip=self.turn_to_flip)
         self.results_io = ResultsIO(creator_file=__file__, folder_name=Path().absolute().stem)
 
     def plot(self):
@@ -196,7 +198,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         pos_limits = self.get_position_limits(plot_group_dict, data)
         data = data.query(f'trial_id == "{trial_id}" & region == "{region}"')
 
-        ax = fig.subplots(6, 1, sharex=True, height_ratios=[1, 1, 1, 4, 4, 1])
+        ax = fig.subplots(6, 1, sharex=True, height_ratios=[1, 1, 1, 8, 8, 1])
         times = data['new_times'].to_numpy()[0]  # for full sampled data
         bin_times = np.linspace(times[0], times[-1], 100 * self.align_window)  # for spiking rasters
 
@@ -267,7 +269,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
                 ax[3].axhline(line, color=self.colors['phase_dividers'], alpha=0.5, linewidth=0.75)
 
         # plot true position
-        feat = true_feat / np.max(true_feat)
+        feat = true_feat#/np.max(true_feat) ax of true_feat is trumax/380. now max true_feat = 322/380. i want 0-.85
         ax[3].plot(decoding_times, feat, color=self.colors[f'incorrect'],
                    linestyle='dotted', linewidth=1.5, alpha=0.25, label='actual position')
         ax[3].set(ylim=(track_fraction[0], track_fraction[-1]), ylabel=ylabel,
@@ -278,7 +280,7 @@ class ExampleTrialVisualizer(BaseVisualizationClass):
         show_psth_raster(gen_data['spikes'].to_list(), ax=ax[4], start=times[0],
                          end=times[-1],
                          group_inds=gen_data['max_selectivity_type'].map(
-                             {np.nan: 0, 'switch': 1, 'stay': 2}),
+                             {np.nan: 0, 'switch': 2, 'stay': 1}),
                          colors=[self.colors[c] for c in ['nan', 'new', 'initial']],
                          show_legend=False,
                          linewidths=0.75)

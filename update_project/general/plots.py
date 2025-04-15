@@ -197,9 +197,9 @@ def plot_distributions(data, axes, column_name, group, row_ids, col_ids, xlabel,
                        show_median=True,
                        palette=None, histstat='proportion', ):
     if group:
-        palette = palette or sns.color_palette(n_colors=len(data[group].unique()))
-        if len(palette) > len(data[group].unique()):
-            palette = palette[:len(data[group].unique())]
+        palette = palette or sns.color_palette(n_colors=len(data[group].stack().unique()))
+        if len(palette) > len(data[group].stack().unique()):
+            palette = palette[:len(data[group].stack().unique())]
     else:
         palette = palette or sns.color_palette()
 

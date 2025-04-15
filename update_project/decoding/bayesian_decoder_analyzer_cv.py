@@ -7,21 +7,22 @@ from bisect import bisect, bisect_left
 from pathlib import Path
 from pynwb import NWBFile
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 
 from update_project.general.results_io import ResultsIO
 from update_project.general.virtual_track import UpdateTrack
 from update_project.general.lfp import get_theta
-from update_project.general.acquisition import get_velocity, get_location
+from update_project.general.acquisition import get_velocity
 from update_project.general.trials import get_trials_dataframe
 from update_project.general.preprocessing import get_commitment_data
 from update_project.base_analysis_class import BaseAnalysisClass
 
 
-class BayesianDecoderAnalyzer(BaseAnalysisClass):
-    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):
+class BayesianDecoderAnalyzerCV(BaseAnalysisClass):
+    def __init__(self, nwbfile: NWBFile, session_id: str, features: list, params=dict()):#turn off after this
         # setup parameters
         self.region = params.get('region', ['CA1', 'PFC'])
-        self.subset_reg = params.get('subset_reg', False)
+        self.subset_reg = False
         self.units_types = params.get('units_types',
                                       dict(region=self.region,  # dict of filters to apply to units table
                                            cell_type=['Pyramidal Cell', 'Narrow Interneuron', 'Wide Interneuron']))
@@ -49,10 +50,10 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
 
         # setup file paths for io
         trial_types = [str(t) for t in self.encoder_trial_types['correct']]
-        self.results_tags = f"{'_'.join(features)}_regions_{'_'.join(self.units_types['region'])}_" \
-                            f"enc_bins{self.encoder_bin_num}_dec_bins{self.decoder_bin_size}_speed_thresh" \
+        self.results_tags = f"{'_'.join(features)}_{'_'.join(self.units_types['region'])}_" \
+                            f"enc_binscvtest{self.encoder_bin_num}_dec_bins{self.decoder_bin_size}_speed_thresh" \
                             f"{self.speed_threshold}_trial_types{'_'.join(trial_types)}"\
-                            f"{'_subset3' if self.subset_reg == True else ''}"
+                            f"{'_subset' if self.subset_reg == True else ''}"
         self.results_io = ResultsIO(creator_file=__file__, session_id=session_id, folder_name=Path(__file__).parent.stem,
                                     tags=self.results_tags)
         self.data_files = dict(bayesian_decoder_output=dict(vars=['encoder_times', 'decoder_times',
@@ -62,13 +63,13 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                                                                   'train_df', 'test_df', 'test_delay_only_df', 'test_update_only_df',
                                                                   'model', 'model_test', 'model_delay_only', 'model_update_only',
                                                                   'bins', 'decoded_values', 'decoded_probs',
-                                                                  'theta', 'velocity', 'commitment','location'],
+                                                                  'theta', 'velocity', 'commitment'],
                                                             format='pkl'),
                                params=dict(vars=['speed_threshold', 'firing_threshold', 'units_types',
                                                  'encoder_trial_types', 'encoder_bin_num', 'decoder_trial_types',
                                                  'decoder_bin_type', 'decoder_bin_size', 'decoder_test_size', 'dim_num',
                                                  'feature_names', 'linearized_features',],
-                                           format='npz'))
+                                           format='npz'))#make sure these are labelled all or converted to all as needed
 
         # setup data
         self.feature_names = features
@@ -76,7 +77,6 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         self.units = nwbfile.units.to_dataframe()
         self.data = self._setup_data(nwbfile)
         self.velocity = get_velocity(nwbfile)
-        self.location = get_location(nwbfile)
         self.commitment = get_commitment_data(nwbfile, self.results_io)
         self.theta = get_theta(nwbfile, adjust_reference=True, session_id=session_id)
         self.limits = {feat: self.virtual_track.get_limits(feat) for feat in self.feature_names}
@@ -91,7 +91,7 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         print(f'Decoding data for session {self.results_io.session_id}...')
  
         if overwrite:
-            self._preprocess()._encode()._decode()  # build model
+            self._preprocess()._encode()._decode()  # build model. will need to put a for loop in all of these processes
             if export_data:
                 self._export_data()  # save output data
         else:
@@ -313,8 +313,8 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
                     # Create a pandas DataFrame
                     df2 = pd.DataFrame(data)
                     output_file_path = self.results_io.get_data_filename(filename=f'unit_masks_{self.results.session_id}',
-                                                        results_type='response', 
-                                                        format='csv')
+                                                                         results_type='response', 
+                                                                         format='csv')
                     df2.to_csv(output_file_path, index=False)
                     print(f"Mask data for session {self.results.session_id} saved to {output_file_path}")
                     units_subset=units_subset[ca1_mask]
@@ -340,94 +340,139 @@ class BayesianDecoderAnalyzer(BaseAnalysisClass):
         else:
             self.spikes = []  # if no units match criteria, leave spikes empty
 
-        # split data into training/encoding and testing/decoding trials
-        self.train_df, self.test_df, self.test_delay_only_df, self.test_update_only_df = self._train_test_split()
-
-        # get start/stop times of train and test trials
-        self.encoder_times = self._get_time_intervals(self.train_df['start_time'], self.train_df['stop_time'])
-        self.decoder_times = self._get_time_intervals(self.test_df['start_time'], self.test_df['stop_time'],
-                                                      align_times=self.test_df['t_update'])
-        self.decoder_times_delay_only = self._get_time_intervals(self.test_delay_only_df['start_time'],
-                                                                 self.test_delay_only_df['stop_time'],
-                                                                 align_times=self.test_delay_only_df['t_update'])
-        self.decoder_times_update_only = self._get_time_intervals(self.test_update_only_df['start_time'],
-                                                                  self.test_update_only_df['stop_time'],
-                                                                  align_times=self.test_update_only_df['t_update'])
-
-        # select feature
-        self.features_train = nap.TsdFrame(self.data, time_units='s', time_support=self.encoder_times)
-        self.features_test = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times)
-        self.features_test_delay_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_delay_only)
-        if np.size(self.decoder_times_update_only):
-            self.features_test_update_only = nap.TsdFrame(self.data, time_units='s', time_support=self.decoder_times_update_only)
-        else:
-            self.features_test_update_only = pd.DataFrame()
-
-        # select additional data for post-processing
-        self.theta = nap.TsdFrame(self.theta, time_units='s', time_support=self.decoder_times)
-        self.velocity = nap.TsdFrame(self.velocity, time_units='s', time_support=self.decoder_times)
-        self.location = nap.TsdFrame(self.location, time_units='s', time_support=self.decoder_times)
-
+        # # split data into training/encoding and testing/decoding trials
+        
+        #categorical label for stratification (check this, not 100% sure about this)
+        y = self.data['trial_type']
+        num_splits = 5
+        # Initialize StratifiedKFold
+        skf = StratifiedKFold(n_splits=num_splits, shuffle=True, random_state=42)
+        # Create an empty list to store all splits
+        self.splits_data = []
+        
+        # Loop over the splits
+        for fold, (train_index, test_index) in enumerate(skf.split(self.data, y)):
+            print(f"Running fold {fold + 1}")
+            # Split the data into training/encoding and testing/decoding
+            train_df = self.data.iloc[train_index]
+            test_df = self.data.iloc[test_index]
+            # Get time intervals of train and test trials
+            encoder_times = self._get_time_intervals(train_df['start_time'], train_df['stop_time'])
+            decoder_times = self._get_time_intervals(test_df['start_time'], test_df['stop_time'], align_times=test_df['t_update'])
+            # Optionally handle specific subsets (delay-only, update-only). leaving in for now to match Steph's set up, but not sure it's needed
+            test_delay_only_df = test_df[test_df['trial_type'] == 'delay']
+            test_update_only_df = test_df[test_df['trial_type'] == 'update']
+            
+            decoder_times_delay_only = self._get_time_intervals(test_delay_only_df['start_time'],
+                                                                test_delay_only_df['stop_time'],
+                                                                align_times=test_delay_only_df['t_update'])
+            decoder_times_update_only = self._get_time_intervals(test_update_only_df['start_time'],
+                                                                test_update_only_df['stop_time'],
+                                                                align_times=test_update_only_df['t_update'])
+            # Store everything in self.splits_data for future use
+            split_data = {
+                'fold': fold,
+                'train_df': train_df,
+                'test_df': test_df,
+                'encoder_times': encoder_times,
+                'decoder_times': decoder_times,
+                'decoder_times_delay_only': decoder_times_delay_only,
+                'decoder_times_update_only': decoder_times_update_only
+            }
+            self.splits_data.append(split_data)
         return self
 
     def _encode(self):
         # if there are no units/spikes to use for encoding, create empty dataframe as default
-        self.model = pd.DataFrame()
-        self.model_test = pd.DataFrame()
-        self.model_delay_only = pd.DataFrame()
-        self.model_update_only = pd.DataFrame()
-        self.bins = []
-
-        if self.spikes:  # if there were units and spikes to use for encoding
-            if self.dim_num == 1:
-                feat_input = self.features_train[self.feature_names[0]]
-                self.bins = np.linspace(*self.limits[self.feature_names[0]], self.encoder_bin_num + 1)
-                self.model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
-                                          ep=self.encoder_times, minmax=self.limits[self.feature_names[0]])
-                self.model_test = self.encoder(group=self.spikes, feature=self.features_test[self.feature_names[0]],
-                                               nb_bins=self.encoder_bin_num, ep=self.decoder_times,
-                                               minmax=self.limits[self.feature_names[0]])
-                self.model_delay_only = self.encoder(group=self.spikes,
-                                                     feature=self.features_test_delay_only[self.feature_names[0]],
-                                                     nb_bins=self.encoder_bin_num, ep=self.decoder_times_delay_only,
-                                                     minmax=self.limits[self.feature_names[0]])
-                if np.size(self.features_test_update_only):
-                    self.model_update_only = self.encoder(group=self.spikes,
-                                                          feature=self.features_test_update_only[self.feature_names[0]],
-                                                          nb_bins=self.encoder_bin_num, ep=self.decoder_times_update_only,
-                                                          minmax=self.limits[self.feature_names[0]])
-            elif self.dim_num == 2:
-                self.model, self.bins = self.encoder(group=self.spikes, feature=self.features_train,
-                                                     nb_bins=self.encoder_bin_num, ep=self.encoder_times)
+        
+        # Create empty lists to store models for each split
+        self.models = []
+        self.models_test = []
+        self.models_delay_only = []
+        self.models_update_only = []
+        self.bins_list = []
+        
+        # Iterate through each split from the stratified data
+        for split_data in self.splits_data:
+            # Default to empty DataFrames for each split
+            model = pd.DataFrame()
+            model_test = pd.DataFrame()
+            model_delay_only = pd.DataFrame()
+            model_update_only = pd.DataFrame()
+            bins = []
+            if self.spikes:  # If there were units and spikes to use for encoding
+                if self.dim_num == 1:
+                    # Train encoding model
+                    feat_input = split_data['train_df'][self.feature_names[0]]
+                    bins = np.linspace(*self.limits[self.feature_names[0]], self.encoder_bin_num + 1)
+                    model = self.encoder(group=self.spikes, feature=feat_input, nb_bins=self.encoder_bin_num,
+                                        ep=split_data['encoder_times'], minmax=self.limits[self.feature_names[0]])
+                    # Test model on all test trials
+                    model_test = self.encoder(group=self.spikes, feature=split_data['test_df'][self.feature_names[0]],
+                                            nb_bins=self.encoder_bin_num, ep=split_data['decoder_times'],
+                                            minmax=self.limits[self.feature_names[0]])
+                    # Test model on delay-only trials
+                    model_delay_only = self.encoder(group=self.spikes,
+                                                    feature=split_data['test_delay_only_df'][self.feature_names[0]],
+                                                    nb_bins=self.encoder_bin_num, ep=split_data['decoder_times_delay_only'],
+                                                    minmax=self.limits[self.feature_names[0]])
+                    # Test model on update-only trials if they exist
+                    if np.size(split_data['test_update_only_df']):
+                        model_update_only = self.encoder(group=self.spikes,
+                                                        feature=split_data['test_update_only_df'][self.feature_names[0]],
+                                                        nb_bins=self.encoder_bin_num, ep=split_data['decoder_times_update_only'],
+                                                        minmax=self.limits[self.feature_names[0]])
+                elif self.dim_num == 2:
+                # If using 2-dimensional features: not planning on using but including to match Steph set up
+                    model, bins = self.encoder(group=self.spikes, feature=split_data['train_df'],
+                                            nb_bins=self.encoder_bin_num, ep=split_data['encoder_times'])
+                    
+            # Store models and bins for each split
+            self.models.append(model)
+            self.models_test.append(model_test)
+            self.models_delay_only.append(model_delay_only)
+            self.models_update_only.append(model_update_only)
+            self.bins_list.append(bins)
 
         return self
 
-    def _decode(self):
-        # get arguments for decoder
-        kwargs = dict(tuning_curves=self.model, group=self.spikes, ep=self.decoder_times,
-                      bin_size=self.decoder_bin_size)
-        if self.dim_num == 2:
-            kwargs.update(binsxy=self.bins)
-
-        if self.prior == 'history-dependent':
-            if self.dim_num == 1:
-                kwargs.update(feature=self.features_train)
-            elif self.dim_num == 2:
-                kwargs.update(features=self.features_train)
-
-        # run decoding
-        if self.model.any().any():
-            self.decoded_values, self.decoded_probs = self.decoder(**kwargs)
-            edge_spaces = np.squeeze(np.argwhere(np.sum(self.model, axis=1).to_numpy() == 0))
-            self.decoded_probs.iloc[:, edge_spaces] = np.nan
-        else:
-            self.decoded_values = pd.DataFrame()
-            self.decoded_probs = pd.DataFrame()
-
-        # convert to binary if needed
+    def _decode(self):      
+        # Create lists to store decoded values and probabilities for each split
+        self.decoded_values = pd.DataFrame()
+        self.decoded_probs = pd.DataFrame()
+        # Iterate through each split from the stratified data
+        for split_data, model in zip(self.splits_data, self.models):
+            # Get arguments for the decoder
+            kwargs = dict(tuning_curves=model, group=self.spikes, ep=split_data['decoder_times'],
+                        bin_size=self.decoder_bin_size)
+            
+            if self.dim_num == 2:
+                kwargs.update(binsxy=self.bins_list[self.splits_data.index(split_data)])
+                
+            # Apply history-dependent prior if applicable
+            if self.prior == 'history-dependent':
+                if self.dim_num == 1:
+                    kwargs.update(feature=split_data['train_df'])
+                elif self.dim_num == 2:
+                    kwargs.update(features=split_data['train_df'])
+                    
+            # Run decoding for this split
+            if model.any().any():
+                decoded_values, decoded_probs = self.decoder(**kwargs)  
+                # Handle edge cases where there are empty/zero bins in the model
+                edge_spaces = np.squeeze(np.argwhere(np.sum(model, axis=1).to_numpy() == 0))
+                decoded_probs.iloc[:, edge_spaces] = np.nan
+                # Concatenate the results for each split into the final DataFrames
+                self.decoded_values = pd.concat([self.decoded_values, decoded_values], axis=0)
+                self.decoded_probs = pd.concat([self.decoded_probs, decoded_probs], axis=0)
+            else:
+                # If no valid model, append empty DataFrames
+                self.decoded_values = pd.concat([self.decoded_values, pd.DataFrame()], axis=0)
+                self.decoded_probs = pd.concat([self.decoded_probs, pd.DataFrame()], axis=0)
+        # Optionally convert to binary
         if self.convert_to_binary:
             self.decoded_values.values[self.decoded_values > 0] = int(1)
-            self.decoded_values.values[self.decoded_values < 0] = int(-1)
+            self.decoded_values.values[self.decoded_values < 0] = int(-1)   
 
         return self
 
