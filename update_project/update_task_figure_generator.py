@@ -20,7 +20,7 @@ class UpdateTaskFigureGenerator:
     def __init__(self, sessions, overwrite=False):
         self.sessions = sessions
         self.overwrite = overwrite
-        self.results_io = ResultsIO(creator_file=__file__, folder_name='manuscript_2')
+        self.results_io = ResultsIO(creator_file=__file__, folder_name='update_manuscript')
 
         self.analysis_classes = dict(Behavior=BehaviorAnalyzer,
                                      Choice=ChoiceAnalyzer,
@@ -735,7 +735,7 @@ class UpdateTaskFigureGenerator:
 
     @staticmethod
     def plot_placeholder(sfig, text):
-        axes = sfig.subplots(nrows=1, ncols=1)  # TODO - move this part to inside the visualization
+        axes = sfig.subplots(nrows=1, ncols=1)
         axes.axis('off')
         axes.annotate(text, xycoords='axes fraction', xy=(0.4, 0.5), horizontalalignment='center')
 
